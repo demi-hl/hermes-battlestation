@@ -100,10 +100,45 @@ export function useChat() {
     void refreshThreads();
   }, [refreshThreads]);
 
-  // Load the active thread's transcript from local storage on switch.
+  // Load the active thread's transcript from local storage on switch (instant
+  // paint), then hydrate from backend truth (the real shared session in
+  // state.db) so history is correct on any device, including a fresh one whose
+  // localStorage is empty.
   useEffect(() => {
     setMessages(loadTranscript(activeThreadId));
   }, [activeThreadId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const thread = threads.find((t) => t.id === activeThreadId);
+    const repo = thread?.repo ?? "general";
+    // Only hydrate threads that have a real backend session already.
+    if (thread && thread.sessionId == null && thread.messageCount === 0) return;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/chat/history?repo=${encodeURIComponent(repo)}`,
+          { cache: "no-store" },
+        );
+        if (!res.ok) return;
+        const data = (await res.json()) as { messages?: ChatMessage[] };
+        if (cancelled || !data.messages) return;
+        // Replace cache with backend truth, but never clobber an in-flight turn
+        // (a pending assistant bubble not yet persisted server-side).
+        setMessages((prev) => {
+          const hasPending = prev.some((m) => m.pending);
+          if (hasPending) return prev;
+          if (!data.messages!.length) return prev; // keep cache if backend empty
+          return data.messages!;
+        });
+      } catch {
+        /* offline / backend unreachable — keep the localStorage paint */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [activeThreadId, threads]);
 
   // Persist on every change.
   useEffect(() => {
