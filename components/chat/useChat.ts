@@ -163,6 +163,22 @@ export function useChat() {
     async (text: string, skills: string[] = []) => {
       const trimmed = text.trim();
       if (!trimmed || sending) return;
+
+      // Slash commands: `/compress` → instruction to compress context.
+      let message = trimmed;
+      if (trimmed.startsWith("/")) {
+        const cmd = trimmed.slice(1).toLowerCase();
+        const SLASH_MAP: Record<string, string> = {
+          compress:
+            "Please compress our conversation – summarize all key context, decisions, and active state into a concise summary. Report the total token savings.",
+          summary:
+            "Please provide a summary of our conversation so far, including all key decisions, context, and open items.",
+          clear:
+            "Please ignore previous instructions and start fresh. Tell me what context you still have about this session.",
+        };
+        message = SLASH_MAP[cmd] ?? trimmed;
+      }
+
       const thread = threads.find((t) => t.id === activeThreadId);
       const repo = thread?.repo ?? "general";
 
@@ -189,7 +205,7 @@ export function useChat() {
         const res = await fetch("/api/chat/send", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ repo, message: trimmed, skills }),
+          body: JSON.stringify({ repo, message, skills }),
           signal: ctrl.signal,
         });
         if (!res.ok || !res.body) {

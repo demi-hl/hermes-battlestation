@@ -108,7 +108,7 @@ function EmptyThread({ thread }: { thread: ChatThread | null }) {
         style={{ background: "color-mix(in srgb, var(--midground) 6%, transparent)" }}
       >
         <span className="arc-border" aria-hidden />
-        <span className="font-mondwest text-display text-lg">lo</span>
+        <span className="font-mondwest text-display text-lg">{thread?.repo ? thread.repo.slice(0, 2).toLowerCase() : "n"}</span>
       </div>
       <div className="animate-slide-up">
         <p className="font-mondwest text-display text-base tracking-wide text-midground">

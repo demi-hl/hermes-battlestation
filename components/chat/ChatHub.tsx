@@ -95,6 +95,7 @@ export function ChatHub() {
         animate={{ opacity: 1 }}
         transition={{ duration: 0.2 }}
         className="min-h-0 flex-1 overflow-y-auto overscroll-contain scrollbar-none"
+        data-msg-scroll
       >
         {chat.threadsError && (
           <p className="mx-3 mt-2 rounded-[var(--radius-md)] border border-border px-3 py-2 text-[0.74rem] text-text-tertiary">

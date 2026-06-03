@@ -60,7 +60,7 @@ export interface NodeMeta {
 /** Node chip palette — PC teal, PC2 amber (David), Mac slate, VPS violet. */
 export const NODE_META: Record<AgentNode, NodeMeta> = {
   PC: { label: "PC", color: "#2dd4bf", sub: "DEMI Max" },
-  PC2: { label: "PC2", color: "#f5b54a", sub: "David Max" },
+  PC2: { label: "David's Max", color: "#f5b54a", sub: "David Max" },
   Mac: { label: "Mac", color: "#94a3b8", sub: "DEMI Max" },
   VPS: { label: "VPS", color: "#a78bfa", sub: "bot" },
 };

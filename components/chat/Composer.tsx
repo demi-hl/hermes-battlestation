@@ -104,6 +104,11 @@ export function Composer({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
+          onFocus={() => {
+            // When keyboard opens on iOS, scroll the conversation into view.
+            const msgList = document.querySelector("[data-msg-scroll]");
+            if (msgList) msgList.scrollTop = msgList.scrollHeight;
+          }}
           rows={1}
           inputMode="text"
           placeholder={`Message ${contextLabel}`}
