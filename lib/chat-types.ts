@@ -85,6 +85,15 @@ export interface SkillsPayload {
 export type ChatStreamEvent =
   | { type: "session"; sessionId: string; title: string; isNew: boolean }
   | { type: "status"; elapsedMs: number; note: string }
+  /** Incremental assistant text (ACP agent_message_chunk). Append to the bubble. */
+  | { type: "delta"; text: string }
+  /** Incremental reasoning text (ACP agent_thought_chunk). */
+  | { type: "thought"; text: string }
+  /** A tool call started. */
+  | { type: "tool"; id: string; name: string; title: string; phase: "start" }
+  /** A tool call finished. */
+  | { type: "tool"; id: string; name: string; title: string; phase: "end"; ok: boolean }
+  /** Terminal full text (fallback / non-streaming path). */
   | { type: "message"; text: string }
   | { type: "usage"; used: number; total: number; messageCount: number }
   | { type: "done"; elapsedMs: number }

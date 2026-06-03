@@ -9,6 +9,14 @@ import type {
   ThreadsPayload,
 } from "@/lib/chat-types";
 
+export interface ToolActivity {
+  id: string;
+  name: string;
+  title: string;
+  done: boolean;
+  ok: boolean;
+}
+
 export interface ChatMessage {
   id: string;
   role: "user" | "assistant";
@@ -20,6 +28,10 @@ export interface ChatMessage {
   /** Live elapsed time shown on the pending bubble. */
   elapsedMs?: number;
   note?: string;
+  /** Streaming reasoning text (ACP agent_thought_chunk). */
+  thought?: string;
+  /** Live tool-call activity for this turn. */
+  tools?: ToolActivity[];
 }
 
 const TRANSCRIPT_PREFIX = "lo-chat:v1:";
@@ -235,6 +247,45 @@ export function useChat() {
             }
             if (ev.type === "status") {
               patchPending({ elapsedMs: ev.elapsedMs, note: ev.note });
+            } else if (ev.type === "delta") {
+              got = true;
+              // Append streamed text; clear the pending spinner on first token.
+              setMessages((m) =>
+                m.map((x) =>
+                  x.id === pendingMsg.id
+                    ? { ...x, pending: false, text: x.text + ev.text }
+                    : x,
+                ),
+              );
+            } else if (ev.type === "thought") {
+              setMessages((m) =>
+                m.map((x) =>
+                  x.id === pendingMsg.id
+                    ? { ...x, thought: (x.thought ?? "") + ev.text }
+                    : x,
+                ),
+              );
+            } else if (ev.type === "tool") {
+              setMessages((m) =>
+                m.map((x) => {
+                  if (x.id !== pendingMsg.id) return x;
+                  const tools = x.tools ? [...x.tools] : [];
+                  const i = tools.findIndex((t) => t.id === ev.id);
+                  if (ev.phase === "start") {
+                    if (i === -1)
+                      tools.push({
+                        id: ev.id,
+                        name: ev.name,
+                        title: ev.title,
+                        done: false,
+                        ok: false,
+                      });
+                  } else if (i !== -1) {
+                    tools[i] = { ...tools[i], done: true, ok: ev.ok };
+                  }
+                  return { ...x, tools };
+                }),
+              );
             } else if (ev.type === "message") {
               got = true;
               patchPending({ pending: false, text: ev.text, error: false });

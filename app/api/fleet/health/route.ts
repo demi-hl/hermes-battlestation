@@ -24,7 +24,7 @@ const MACHINES: {
   controlled: boolean;
 }[] = [
   { key: "pc1", display: "PC #1", host: "demi-pc-wsl", role: "PC", controlled: true },
-  { key: "pc2", display: "David's Max", host: "desktop-f5siqio", role: "PC2", controlled: false },
+  { key: "pc2", display: "PC #2", host: "desktop-f5siqio", role: "PC2", controlled: false },
   { key: "mac", display: "MacBook", host: "christophers-macbook-pro", role: "Mac", controlled: true },
   { key: "vps", display: "VPS", host: "demi-poly", role: "VPS", controlled: true },
 ];

@@ -69,7 +69,7 @@ export const TABS: TabDef[] = [
 /** Tabs shown directly in the bottom bar (the rest live behind "More").
  *  Chat + Repos are the load-bearing surfaces; Fleet is the command center;
  *  Tasks & PRs is the primary review surface. Reorder freely. */
-export const PRIMARY_TAB_IDS: TabId[] = ["chat", "repos", "fleet", "prs"];
+export const PRIMARY_TAB_IDS: TabId[] = ["chat", "repos", "fleet", "kanban", "prs"];
 
 export const TAB_MAP: Record<TabId, TabDef> = Object.fromEntries(
   TABS.map((t) => [t.id, t]),

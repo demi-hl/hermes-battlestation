@@ -60,7 +60,7 @@ export interface NodeMeta {
 /** Node chip palette — PC teal, PC2 amber (David), Mac slate, VPS violet. */
 export const NODE_META: Record<AgentNode, NodeMeta> = {
   PC: { label: "PC", color: "#2dd4bf", sub: "DEMI Max" },
-  PC2: { label: "David's Max", color: "#f5b54a", sub: "David Max" },
+  PC2: { label: "PC #2", color: "#f5b54a", sub: "PC #2" },
   Mac: { label: "Mac", color: "#94a3b8", sub: "DEMI Max" },
   VPS: { label: "VPS", color: "#a78bfa", sub: "bot" },
 };
@@ -69,7 +69,7 @@ export const NODE_META: Record<AgentNode, NodeMeta> = {
  *  is glanceable at a glance. */
 export const BILLING_META: Record<BillingSub, { label: string; color: string }> = {
   "demi-max": { label: "DEMI Max", color: "#2dd4bf" },
-  "david-max": { label: "David Max", color: "#f5b54a" },
+  "david-max": { label: "PC #2", color: "#f5b54a" },
   none: { label: "no sub", color: "#94a3b8" },
 };
 

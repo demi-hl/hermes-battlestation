@@ -27,7 +27,7 @@ function CountHeader({ agents }: { agents: FleetAgent[] }) {
     { node: "PC", text: working("PC") ? `${working("PC")} working` : "idle" },
     {
       node: "PC2",
-      text: working("PC2") ? `${working("PC2")} (David's Max)` : "idle",
+      text: working("PC2") ? `${working("PC2")} working` : "idle",
     },
     { node: "Mac", text: working("Mac") ? `${working("Mac")} working` : "idle" },
     { node: "VPS", text: vpsLive ? "bot ok" : "idle" },

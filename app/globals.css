@@ -533,6 +533,7 @@ body {
     color: var(--midground);
     height: 100dvh;
     -webkit-text-size-adjust: 100%;
+    touch-action: pan-y pinch-zoom;
   }
   body {
     font-family: var(--theme-font-sans);

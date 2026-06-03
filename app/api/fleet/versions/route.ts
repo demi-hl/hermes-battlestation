@@ -26,7 +26,7 @@ const BOXES: BoxProbe[] = [
   { key: "pc", label: "PC #1", sshPrefix: "" },
   {
     key: "pc2",
-    label: "David's Max",
+    label: "PC #2",
     sshPrefix: "ssh -o BatchMode=yes -o ConnectTimeout=6 gpu3070",
   },
   {
