@@ -105,9 +105,13 @@ export function Composer({
           onChange={(e) => setValue(e.target.value)}
           onKeyDown={onKeyDown}
           onFocus={() => {
-            // When keyboard opens on iOS, scroll the conversation into view.
-            const msgList = document.querySelector("[data-msg-scroll]");
-            if (msgList) msgList.scrollTop = msgList.scrollHeight;
+            // iOS keyboard takes a frame to open. Scroll after layout settles.
+            requestAnimationFrame(() => {
+              requestAnimationFrame(() => {
+                const msgList = document.querySelector("[data-msg-scroll]");
+                if (msgList) msgList.scrollTop = msgList.scrollHeight;
+              });
+            });
           }}
           rows={1}
           inputMode="text"
