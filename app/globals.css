@@ -1,0 +1,108 @@
+@import "tailwindcss";
+
+/* ============================================================
+   DEMI Workspace — operational cockpit
+   Hyperliquid-family palette: mint #97FCE4 on near-black #0a0a0a.
+   No dashes in UI copy, SVG icons, no emoji.
+   ============================================================ */
+
+@theme {
+  --color-bg: #0a0a0a;
+  --color-bg-1: #0c0c0e;
+  --color-surface: #111113;
+  --color-surface-2: #161619;
+  --color-elevated: #1b1b1f;
+
+  --color-line: rgba(255, 255, 255, 0.07);
+  --color-line-2: rgba(255, 255, 255, 0.12);
+
+  --color-ink: #ededef;
+  --color-ink-dim: #b8b8be;
+  --color-muted: #84848c;
+  --color-faint: #57575e;
+
+  --color-accent: #97fce4;
+  --color-accent-soft: rgba(151, 252, 228, 0.12);
+  --color-up: #5ee9c4;
+  --color-down: #ff6b7a;
+  --color-warn: #ffce6a;
+
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
+    Helvetica, Arial, sans-serif;
+  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
+    monospace;
+}
+
+@layer base {
+  html,
+  body {
+    height: 100%;
+  }
+  body {
+    background-color: var(--color-bg);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    overscroll-behavior: none;
+  }
+  /* faint structural grid + a mint glow off the top-left */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(
+        900px 500px at 12% -8%,
+        rgba(151, 252, 228, 0.06),
+        transparent 60%
+      ),
+      linear-gradient(to bottom, var(--color-bg-1), var(--color-bg));
+  }
+  ::selection {
+    background: rgba(151, 252, 228, 0.25);
+    color: #fff;
+  }
+  ::-webkit-scrollbar {
+    width: 9px;
+    height: 9px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.18);
+  }
+}
+
+/* transient highlight when nav focuses a section */
+@keyframes focuspulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(151, 252, 228, 0);
+  }
+  20% {
+    box-shadow: 0 0 0 1px rgba(151, 252, 228, 0.55),
+      0 0 22px 0 rgba(151, 252, 228, 0.22);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(151, 252, 228, 0);
+  }
+}
+[data-focus="true"] {
+  animation: focuspulse 1.3s ease-out;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.spin {
+  animation: spin 0.9s linear infinite;
+}

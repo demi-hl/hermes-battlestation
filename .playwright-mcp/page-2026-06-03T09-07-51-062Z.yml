@@ -1,0 +1,205 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e3]:
+    - navigation [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: D
+        - generic [ref=e8]:
+          - generic [ref=e9]: DEMI
+          - generic [ref=e10]: workspace
+        - button "Collapse rail" [ref=e11]:
+          - img [ref=e12]
+      - list [ref=e14]:
+        - listitem [ref=e15]:
+          - button "Cockpit" [ref=e16]:
+            - img [ref=e18]
+            - generic [ref=e23]: Cockpit
+        - listitem [ref=e25]:
+          - button "Chat" [ref=e26]:
+            - img [ref=e28]
+            - generic [ref=e30]: Chat
+        - listitem [ref=e31]:
+          - button "Repos" [ref=e32]:
+            - img [ref=e34]
+            - generic [ref=e39]: Repos
+        - listitem [ref=e40]:
+          - button "Polymarket" [ref=e41]:
+            - img [ref=e43]
+            - generic [ref=e45]: Polymarket
+        - listitem [ref=e46]:
+          - button "Fleet" [ref=e47]:
+            - img [ref=e49]
+            - generic [ref=e53]: Fleet
+      - generic [ref=e57]: Repos
+    - main [ref=e66]:
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - img [ref=e71]
+          - generic [ref=e73]: Chat with Hermes
+          - generic [ref=e74]: embedded TUI
+          - link "open" [ref=e78] [cursor=pointer]:
+            - /url: http://127.0.0.1:9119/chat
+            - text: open
+            - img [ref=e79]
+        - iframe [ref=e82]:
+          - generic [ref=f1e3]:
+            - banner [ref=f1e4]:
+              - button "Open navigation" [ref=f1e5] [cursor=pointer]:
+                - img [ref=f1e6]
+              - generic [ref=f1e7]: Hermes Agent
+            - generic [ref=f1e9]:
+              - complementary "Navigation" [ref=f1e10]:
+                - generic [ref=f1e11]:
+                  - generic [ref=f1e13]:
+                    - text: Hermes
+                    - text: Agent
+                  - button "Close navigation" [ref=f1e14] [cursor=pointer]:
+                    - img [ref=f1e15]
+                - navigation "Navigation" [ref=f1e18]:
+                  - list [ref=f1e19]:
+                    - listitem [ref=f1e20]:
+                      - link "Chat" [ref=f1e21] [cursor=pointer]:
+                        - /url: /chat
+                        - img [ref=f1e22]
+                        - generic [ref=f1e24]: Chat
+                    - listitem [ref=f1e26]:
+                      - link "Sessions" [ref=f1e27] [cursor=pointer]:
+                        - /url: /sessions
+                        - img [ref=f1e28]
+                        - generic [ref=f1e30]: Sessions
+                    - listitem [ref=f1e31]:
+                      - link "Models" [ref=f1e32] [cursor=pointer]:
+                        - /url: /models
+                        - img [ref=f1e33]
+                        - generic [ref=f1e36]: Models
+                    - listitem [ref=f1e37]:
+                      - link "Logs" [ref=f1e38] [cursor=pointer]:
+                        - /url: /logs
+                        - img [ref=f1e39]
+                        - generic [ref=f1e42]: Logs
+                    - listitem [ref=f1e43]:
+                      - link "Cron" [ref=f1e44] [cursor=pointer]:
+                        - /url: /cron
+                        - img [ref=f1e45]
+                        - generic [ref=f1e48]: Cron
+                    - listitem [ref=f1e49]:
+                      - link "Skills" [ref=f1e50] [cursor=pointer]:
+                        - /url: /skills
+                        - img [ref=f1e51]
+                        - generic [ref=f1e55]: Skills
+                    - listitem [ref=f1e56]:
+                      - link "Plugins" [ref=f1e57] [cursor=pointer]:
+                        - /url: /plugins
+                        - img [ref=f1e58]
+                        - generic [ref=f1e60]: Plugins
+                    - listitem [ref=f1e61]:
+                      - link "MCP" [ref=f1e62] [cursor=pointer]:
+                        - /url: /mcp
+                        - img [ref=f1e63]
+                        - generic [ref=f1e65]: MCP
+                    - listitem [ref=f1e66]:
+                      - link "Channels" [ref=f1e67] [cursor=pointer]:
+                        - /url: /channels
+                        - img [ref=f1e68]
+                        - generic [ref=f1e74]: Channels
+                    - listitem [ref=f1e75]:
+                      - link "Webhooks" [ref=f1e76] [cursor=pointer]:
+                        - /url: /webhooks
+                        - img [ref=f1e77]
+                        - generic [ref=f1e81]: Webhooks
+                    - listitem [ref=f1e82]:
+                      - link "Pairing" [ref=f1e83] [cursor=pointer]:
+                        - /url: /pairing
+                        - img [ref=f1e84]
+                        - generic [ref=f1e87]: Pairing
+                    - listitem [ref=f1e88]:
+                      - link "Profiles" [ref=f1e89] [cursor=pointer]:
+                        - /url: /profiles
+                        - img [ref=f1e90]
+                        - generic [ref=f1e95]: Profiles
+                    - listitem [ref=f1e96]:
+                      - link "Config" [ref=f1e97] [cursor=pointer]:
+                        - /url: /config
+                        - img [ref=f1e98]
+                        - generic [ref=f1e101]: Config
+                    - listitem [ref=f1e102]:
+                      - link "Keys" [ref=f1e103] [cursor=pointer]:
+                        - /url: /env
+                        - img [ref=f1e104]
+                        - generic [ref=f1e107]: Keys
+                    - listitem [ref=f1e108]:
+                      - link "System" [ref=f1e109] [cursor=pointer]:
+                        - /url: /system
+                        - img [ref=f1e110]
+                        - generic [ref=f1e112]: System
+                    - listitem [ref=f1e113]:
+                      - link "Documentation" [ref=f1e114] [cursor=pointer]:
+                        - /url: /docs
+                        - img [ref=f1e115]
+                        - generic [ref=f1e117]: Documentation
+                - generic [ref=f1e118]:
+                  - generic [ref=f1e119]: System
+                  - list [ref=f1e123]:
+                    - listitem [ref=f1e124]:
+                      - button "Restart Gateway" [ref=f1e125] [cursor=pointer]:
+                        - img [ref=f1e126]
+                        - generic [ref=f1e129]: Restart Gateway
+                    - listitem [ref=f1e130]:
+                      - button "Update Hermes" [ref=f1e131] [cursor=pointer]:
+                        - img [ref=f1e132]
+                        - generic [ref=f1e135]: Update Hermes
+                - generic [ref=f1e137]:
+                  - button "Switch theme" [ref=f1e140] [cursor=pointer]:
+                    - generic [ref=f1e141]:
+                      - img [ref=f1e142]
+                      - generic [ref=f1e148]: Hermes Teal
+                  - button "Switch language" [ref=f1e151] [cursor=pointer]:
+                    - generic [ref=f1e153]: EN
+                - generic [ref=f1e155]:
+                  - generic [ref=f1e156]: —
+                  - link "Nous Research" [ref=f1e157] [cursor=pointer]:
+                    - /url: https://nousresearch.com
+              - generic [ref=f1e158]:
+                - banner [ref=f1e159]:
+                  - heading "Chat" [level=1] [ref=f1e162]
+                - main [ref=f1e163]:
+                  - generic [ref=f1e167]:
+                    - generic [ref=f1e168]: ⠋
+                    - generic [ref=f1e169]: Loading chat…
+      - complementary [ref=e83]:
+        - generic [ref=e85]:
+          - img [ref=e87]
+          - heading "Polymarket bot" [level=2] [ref=e89]
+          - button "Refresh" [ref=e91]:
+            - img [ref=e92]
+        - generic [ref=e100]:
+          - img [ref=e102]
+          - heading "Fleet health" [level=2] [ref=e106]
+          - button "Refresh" [ref=e108]:
+            - img [ref=e109]
+        - generic [ref=e117]:
+          - img [ref=e119]
+          - heading "Max usage" [level=2] [ref=e121]
+          - button "Refresh" [ref=e123]:
+            - img [ref=e124]
+        - generic [ref=e132]:
+          - img [ref=e134]
+          - heading "Active builds" [level=2] [ref=e137]
+          - button "Refresh" [ref=e139]:
+            - img [ref=e140]
+        - generic [ref=e148]:
+          - img [ref=e150]
+          - heading "Vault decision log" [level=2] [ref=e153]
+          - button "Refresh" [ref=e155]:
+            - img [ref=e156]
+        - generic [ref=e164]:
+          - img [ref=e166]
+          - heading "Capture inbox" [level=2] [ref=e169]
+          - button "Refresh" [ref=e171]:
+            - img [ref=e172]
+        - generic [ref=e180]:
+          - img [ref=e182]
+          - heading "Cron jobs" [level=2] [ref=e185]
+          - button "Refresh" [ref=e187]:
+            - img [ref=e188]
+        - generic [ref=e195]: cockpit polls every 30s · server side reads only
+  - alert [ref=e196]

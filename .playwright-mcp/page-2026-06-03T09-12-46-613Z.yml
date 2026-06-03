@@ -1,0 +1,550 @@
+- generic [ref=e1]:
+  - generic [ref=e3]:
+    - navigation [ref=e5]:
+      - generic [ref=e6]:
+        - generic [ref=e7]: D
+        - generic [ref=e8]:
+          - generic [ref=e9]: DEMI
+          - generic [ref=e10]: workspace
+        - button "Collapse rail" [ref=e11]:
+          - img [ref=e12]
+      - list [ref=e14]:
+        - listitem [ref=e15]:
+          - button "Cockpit" [ref=e16]:
+            - img [ref=e18]
+            - generic [ref=e23]: Cockpit
+        - listitem [ref=e25]:
+          - button "Chat" [ref=e26]:
+            - img [ref=e28]
+            - generic [ref=e30]: Chat
+        - listitem [ref=e31]:
+          - button "Repos" [ref=e32]:
+            - img [ref=e34]
+            - generic [ref=e39]: Repos
+        - listitem [ref=e40]:
+          - button "Polymarket" [ref=e41]:
+            - img [ref=e43]
+            - generic [ref=e45]: Polymarket
+        - listitem [ref=e46]:
+          - button "Fleet" [ref=e47]:
+            - img [ref=e49]
+            - generic [ref=e53]: Fleet
+      - generic [ref=e55]:
+        - generic [ref=e56]:
+          - generic [ref=e57]: Repos
+          - generic [ref=e197]: demi-hl · 21
+        - generic [ref=e58]:
+          - link "claude-config Personal Claude Code config sync — CLAUDE.md, memory, sync scripts 1m ago" [ref=e504] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/claude-config
+            - generic [ref=e207]:
+              - generic [ref=e208]: claude-config
+              - img [ref=e209]
+            - generic [ref=e211]:
+              - generic [ref=e212]: Personal Claude Code config sync — CLAUDE.md, memory, sync scripts
+              - generic [ref=e213]: 1m ago
+          - link "hermes-battlestation Mobile Hermes IDE-cockpit PWA — repo workspaces, terminal, chat, 8-theme switcher. Tailnet-only thin client to the PC Hermes instance. 9m ago" [ref=e505] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/hermes-battlestation
+            - generic [ref=e199]:
+              - generic [ref=e200]: hermes-battlestation
+              - img [ref=e201]
+            - generic [ref=e203]:
+              - generic [ref=e204]: Mobile Hermes IDE-cockpit PWA — repo workspaces, terminal, chat, 8-theme switcher. Tailnet-only thin client to the PC Hermes instance.
+              - generic [ref=e205]: 9m ago
+          - link "hl-media Internal infra for HL Media — Hyperliquid media team 2h ago" [ref=e214] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/hl-media
+            - generic [ref=e215]:
+              - generic [ref=e216]: hl-media
+              - img [ref=e217]
+            - generic [ref=e219]:
+              - generic [ref=e220]: Internal infra for HL Media — Hyperliquid media team
+              - generic [ref=e221]: 2h ago
+          - link "rockmystic Rock Mystic — headless storefront for the crystal/healing-jewelry shop. Three.js refractive amethyst hero, deep-links to live Shopify checkout. 4h ago" [ref=e506] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/rockmystic
+            - generic [ref=e223]:
+              - generic [ref=e224]: rockmystic
+              - img [ref=e225]
+            - generic [ref=e227]:
+              - generic [ref=e228]: Rock Mystic — headless storefront for the crystal/healing-jewelry shop. Three.js refractive amethyst hero, deep-links to live Shopify checkout.
+              - generic [ref=e229]: 4h ago
+          - link "976-tuna 976-TUNA v2 — Apple-grade rebuild of the SoCal sportfishing fish-report site. Vanilla PWA, bluefin-teal Open Water design system. 9h ago" [ref=e230] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/976-tuna
+            - generic [ref=e231]:
+              - generic [ref=e232]: 976-tuna
+              - img [ref=e233]
+            - generic [ref=e235]:
+              - generic [ref=e236]: 976-TUNA v2 — Apple-grade rebuild of the SoCal sportfishing fish-report site. Vanilla PWA, bluefin-teal Open Water design system.
+              - generic [ref=e237]: 9h ago
+          - link "video-edit HL Media video pipeline port from MacBook to PC. v17 hybrid + Stage 6 Remotion scaffold. 2d ago" [ref=e238] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/video-edit
+            - generic [ref=e239]:
+              - generic [ref=e240]: video-edit
+              - img [ref=e241]
+            - generic [ref=e243]:
+              - generic [ref=e244]: HL Media video pipeline port from MacBook to PC. v17 hybrid + Stage 6 Remotion scaffold.
+              - generic [ref=e245]: 2d ago
+          - link "polymarket-arbitrage-bot Polymarket prediction market arbitrage bot with React dashboard 2d ago" [ref=e246] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/polymarket-arbitrage-bot
+            - generic [ref=e247]:
+              - generic [ref=e248]: polymarket-arbitrage-bot
+              - img [ref=e249]
+            - generic [ref=e251]:
+              - generic [ref=e252]: Polymarket prediction market arbitrage bot with React dashboard
+              - generic [ref=e253]: 2d ago
+          - link "BajaFish_Chris no description 2d ago" [ref=e254] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/BajaFish_Chris
+            - generic [ref=e255]:
+              - generic [ref=e256]: BajaFish_Chris
+              - img [ref=e257]
+            - generic [ref=e259]:
+              - generic [ref=e260]: no description
+              - generic [ref=e261]: 2d ago
+          - link "pokemon-multi-agent no description 5d ago" [ref=e262] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/pokemon-multi-agent
+            - generic [ref=e263]:
+              - generic [ref=e264]: pokemon-multi-agent
+              - img [ref=e265]
+            - generic [ref=e267]:
+              - generic [ref=e268]: no description
+              - generic [ref=e269]: 5d ago
+          - link "clawd-workspace no description 9d ago" [ref=e270] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/clawd-workspace
+            - generic [ref=e271]:
+              - generic [ref=e272]: clawd-workspace
+              - img [ref=e273]
+            - generic [ref=e275]:
+              - generic [ref=e276]: no description
+              - generic [ref=e277]: 9d ago
+          - link "biopunk-preview Biopunk Peptides preview site (Next.js + Tailwind) 12d ago" [ref=e278] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/biopunk-preview
+            - generic [ref=e279]:
+              - generic [ref=e280]: biopunk-preview
+              - img [ref=e281]
+            - generic [ref=e283]:
+              - generic [ref=e284]: Biopunk Peptides preview site (Next.js + Tailwind)
+              - generic [ref=e285]: 12d ago
+          - link "mint-sniper EVM NFT mint sniper. RBF + sequencer strategies, deployer-watch discovery, optimization modules. Private. 12d ago" [ref=e286] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/mint-sniper
+            - generic [ref=e287]:
+              - generic [ref=e288]: mint-sniper
+              - img [ref=e289]
+            - generic [ref=e291]:
+              - generic [ref=e292]: EVM NFT mint sniper. RBF + sequencer strategies, deployer-watch discovery, optimization modules. Private.
+              - generic [ref=e293]: 12d ago
+          - link "agelesshumans Ageless Humans preview site (Next.js + Tailwind) 12d ago" [ref=e294] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/agelesshumans
+            - generic [ref=e295]:
+              - generic [ref=e296]: agelesshumans
+              - img [ref=e297]
+            - generic [ref=e299]:
+              - generic [ref=e300]: Ageless Humans preview site (Next.js + Tailwind)
+              - generic [ref=e301]: 12d ago
+          - link "agelesshumans-ugc Ageless Humans UGC pipeline (image/video/voice generation, scheduling, posting) 12d ago" [ref=e302] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/agelesshumans-ugc
+            - generic [ref=e303]:
+              - generic [ref=e304]: agelesshumans-ugc
+              - img [ref=e305]
+            - generic [ref=e307]:
+              - generic [ref=e308]: Ageless Humans UGC pipeline (image/video/voice generation, scheduling, posting)
+              - generic [ref=e309]: 12d ago
+          - 'link "pokemon-ugc-pipeline Vertical short-form UGC pipeline: auto-generates TikTok/X/Reels videos from Pokemon Card Agent signals (deal alerts, market movers, grade reveals). 15d ago" [ref=e310] [cursor=pointer]':
+            - /url: https://github.com/demi-hl/pokemon-ugc-pipeline
+            - generic [ref=e311]:
+              - generic [ref=e312]: pokemon-ugc-pipeline
+              - img [ref=e313]
+            - generic [ref=e315]:
+              - generic [ref=e316]: "Vertical short-form UGC pipeline: auto-generates TikTok/X/Reels videos from Pokemon Card Agent signals (deal alerts, market movers, grade reveals)."
+              - generic [ref=e317]: 15d ago
+          - link "obsidian-vault DEMI's Obsidian vault — PARA + auto-captured trades + Telegram 16d ago" [ref=e318] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/obsidian-vault
+            - generic [ref=e319]:
+              - generic [ref=e320]: obsidian-vault
+              - img [ref=e321]
+            - generic [ref=e323]:
+              - generic [ref=e324]: DEMI's Obsidian vault — PARA + auto-captured trades + Telegram
+              - generic [ref=e325]: 16d ago
+          - link "create-mcp-workspace One-command bootstrap for a Claude Code workspace with Obsidian, qmd, and LanceDB MCPs 41d ago" [ref=e326] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/create-mcp-workspace
+            - generic [ref=e327]:
+              - generic [ref=e328]: create-mcp-workspace
+              - img [ref=e329]
+            - generic [ref=e331]:
+              - generic [ref=e332]: One-command bootstrap for a Claude Code workspace with Obsidian, qmd, and LanceDB MCPs
+              - generic [ref=e333]: 41d ago
+          - link "straight-of-hummus Straight of Hummus - Solana memecoin 77d ago" [ref=e334] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/straight-of-hummus
+            - generic [ref=e335]:
+              - generic [ref=e336]: straight-of-hummus
+              - img [ref=e337]
+            - generic [ref=e339]:
+              - generic [ref=e340]: Straight of Hummus - Solana memecoin
+              - generic [ref=e341]: 77d ago
+          - link "polymarket-arbitrage Polymarket Arbitrage Bot — 20 strategies, deep learning, GPU-powered sentiment, orderbook CNN, Monte Carlo risk simulation 84d ago" [ref=e342] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/polymarket-arbitrage
+            - generic [ref=e343]:
+              - generic [ref=e344]: polymarket-arbitrage
+              - img [ref=e345]
+            - generic [ref=e347]:
+              - generic [ref=e348]: Polymarket Arbitrage Bot — 20 strategies, deep learning, GPU-powered sentiment, orderbook CNN, Monte Carlo risk simulation
+              - generic [ref=e349]: 84d ago
+          - link "x-content-generator no description 107d ago" [ref=e350] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/x-content-generator
+            - generic [ref=e351]:
+              - generic [ref=e352]: x-content-generator
+              - img [ref=e353]
+            - generic [ref=e355]:
+              - generic [ref=e356]: no description
+              - generic [ref=e357]: 107d ago
+          - link "clawd-empire no description 107d ago" [ref=e358] [cursor=pointer]:
+            - /url: https://github.com/demi-hl/clawd-empire
+            - generic [ref=e359]:
+              - generic [ref=e360]: clawd-empire
+              - img [ref=e361]
+            - generic [ref=e363]:
+              - generic [ref=e364]: no description
+              - generic [ref=e365]: 107d ago
+    - main [ref=e66]:
+      - generic [ref=e68]:
+        - generic [ref=e69]:
+          - img [ref=e71]
+          - generic [ref=e73]: Chat with Hermes
+          - generic [ref=e74]: embedded TUI
+          - link "open" [ref=e78] [cursor=pointer]:
+            - /url: http://127.0.0.1:9119/chat
+            - text: open
+            - img [ref=e79]
+        - iframe [active] [ref=e82]:
+          - generic [ref=f1e1]:
+            - generic [ref=f1e3]:
+              - banner [ref=f1e4]:
+                - button "Open navigation" [ref=f1e5] [cursor=pointer]:
+                  - img [ref=f1e6]
+                - generic [ref=f1e7]: Hermes Agent
+              - generic [ref=f1e9]:
+                - complementary "Navigation" [ref=f1e10]:
+                  - generic [ref=f1e11]:
+                    - generic [ref=f1e13]:
+                      - text: Hermes
+                      - text: Agent
+                    - button "Close navigation" [ref=f1e14] [cursor=pointer]:
+                      - img [ref=f1e15]
+                  - navigation "Navigation" [ref=f1e18]:
+                    - list [ref=f1e19]:
+                      - listitem [ref=f1e20]:
+                        - link "Chat" [ref=f1e21] [cursor=pointer]:
+                          - /url: /chat
+                          - img [ref=f1e22]
+                          - generic [ref=f1e24]: Chat
+                      - listitem [ref=f1e26]:
+                        - link "Sessions" [ref=f1e27] [cursor=pointer]:
+                          - /url: /sessions
+                          - img [ref=f1e28]
+                          - generic [ref=f1e30]: Sessions
+                      - listitem [ref=f1e31]:
+                        - link "Models" [ref=f1e32] [cursor=pointer]:
+                          - /url: /models
+                          - img [ref=f1e33]
+                          - generic [ref=f1e36]: Models
+                      - listitem [ref=f1e37]:
+                        - link "Logs" [ref=f1e38] [cursor=pointer]:
+                          - /url: /logs
+                          - img [ref=f1e39]
+                          - generic [ref=f1e42]: Logs
+                      - listitem [ref=f1e43]:
+                        - link "Cron" [ref=f1e44] [cursor=pointer]:
+                          - /url: /cron
+                          - img [ref=f1e45]
+                          - generic [ref=f1e48]: Cron
+                      - listitem [ref=f1e49]:
+                        - link "Skills" [ref=f1e50] [cursor=pointer]:
+                          - /url: /skills
+                          - img [ref=f1e51]
+                          - generic [ref=f1e55]: Skills
+                      - listitem [ref=f1e56]:
+                        - link "Plugins" [ref=f1e57] [cursor=pointer]:
+                          - /url: /plugins
+                          - img [ref=f1e58]
+                          - generic [ref=f1e60]: Plugins
+                      - listitem [ref=f1e61]:
+                        - link "MCP" [ref=f1e62] [cursor=pointer]:
+                          - /url: /mcp
+                          - img [ref=f1e63]
+                          - generic [ref=f1e65]: MCP
+                      - listitem [ref=f1e66]:
+                        - link "Channels" [ref=f1e67] [cursor=pointer]:
+                          - /url: /channels
+                          - img [ref=f1e68]
+                          - generic [ref=f1e74]: Channels
+                      - listitem [ref=f1e75]:
+                        - link "Webhooks" [ref=f1e76] [cursor=pointer]:
+                          - /url: /webhooks
+                          - img [ref=f1e77]
+                          - generic [ref=f1e81]: Webhooks
+                      - listitem [ref=f1e82]:
+                        - link "Pairing" [ref=f1e83] [cursor=pointer]:
+                          - /url: /pairing
+                          - img [ref=f1e84]
+                          - generic [ref=f1e87]: Pairing
+                      - listitem [ref=f1e88]:
+                        - link "Profiles" [ref=f1e89] [cursor=pointer]:
+                          - /url: /profiles
+                          - img [ref=f1e90]
+                          - generic [ref=f1e95]: Profiles
+                      - listitem [ref=f1e96]:
+                        - link "Config" [ref=f1e97] [cursor=pointer]:
+                          - /url: /config
+                          - img [ref=f1e98]
+                          - generic [ref=f1e101]: Config
+                      - listitem [ref=f1e102]:
+                        - link "Keys" [ref=f1e103] [cursor=pointer]:
+                          - /url: /env
+                          - img [ref=f1e104]
+                          - generic [ref=f1e107]: Keys
+                      - listitem [ref=f1e108]:
+                        - link "System" [ref=f1e109] [cursor=pointer]:
+                          - /url: /system
+                          - img [ref=f1e110]
+                          - generic [ref=f1e112]: System
+                      - listitem [ref=f1e113]:
+                        - link "Documentation" [ref=f1e114] [cursor=pointer]:
+                          - /url: /docs
+                          - img [ref=f1e115]
+                          - generic [ref=f1e117]: Documentation
+                    - group "Plugins" [ref=f1e170]:
+                      - generic [ref=f1e171]: Plugins
+                      - list [ref=f1e172]:
+                        - listitem [ref=f1e173]:
+                          - link "Kanban" [ref=f1e174] [cursor=pointer]:
+                            - /url: /kanban
+                            - img [ref=f1e175]
+                            - generic [ref=f1e179]: Kanban
+                        - listitem [ref=f1e180]:
+                          - link "Achievements" [ref=f1e181] [cursor=pointer]:
+                            - /url: /achievements
+                            - img [ref=f1e182]
+                            - generic [ref=f1e184]: Achievements
+                  - generic [ref=f1e118]:
+                    - generic [ref=f1e119]: System
+                    - 'link "Gateway Status: Running Active Sessions: 1" [ref=f1e185] [cursor=pointer]':
+                      - /url: /sessions
+                      - generic [ref=f1e186]:
+                        - paragraph [ref=f1e187]: "Gateway Status: Running"
+                        - paragraph [ref=f1e188]: "Active Sessions: 1"
+                    - list [ref=f1e123]:
+                      - listitem [ref=f1e124]:
+                        - button "Restart Gateway" [ref=f1e125] [cursor=pointer]:
+                          - img [ref=f1e126]
+                          - generic [ref=f1e129]: Restart Gateway
+                      - listitem [ref=f1e130]:
+                        - button "Update Hermes" [ref=f1e131] [cursor=pointer]:
+                          - img [ref=f1e132]
+                          - generic [ref=f1e135]: Update Hermes
+                  - generic [ref=f1e137]:
+                    - button "Switch theme" [ref=f1e140] [cursor=pointer]:
+                      - generic [ref=f1e141]:
+                        - img [ref=f1e142]
+                        - generic [ref=f1e148]: Hermes Teal
+                    - button "Switch language" [ref=f1e151] [cursor=pointer]:
+                      - generic [ref=f1e153]: EN
+                  - generic [ref=f1e155]:
+                    - generic [ref=f1e156]: v0.15.1
+                    - link "Nous Research" [ref=f1e157] [cursor=pointer]:
+                      - /url: https://nousresearch.com
+                - generic [ref=f1e158]:
+                  - banner [ref=f1e159]:
+                    - generic [ref=f1e160]:
+                      - heading "Chat" [level=1] [ref=f1e162]
+                      - button "Model & tools" [ref=f1e190] [cursor=pointer]:
+                        - generic [ref=f1e191]:
+                          - img [ref=f1e192]
+                          - text: Model & tools
+                  - main [ref=f1e163]:
+                    - generic [ref=f1e196]:
+                      - generic [ref=f1e200]:
+                        - textbox "Terminal input" [active] [ref=f1e201]
+                        - generic:
+                          - generic:
+                            - generic: Chat
+                            - generic: "unavailable:"
+                            - generic: "1"
+                      - button "Copy last assistant response" [ref=f1e202] [cursor=pointer]:
+                        - generic [ref=f1e203]:
+                          - img [ref=f1e204]
+                          - generic [ref=f1e207]: copy last response
+            - complementary "Model & tools":
+              - generic:
+                - generic:
+                  - text: Model
+                  - text: "& tools"
+                - button "Close model and tools":
+                  - img
+              - generic:
+                - complementary:
+                  - generic:
+                    - generic:
+                      - generic: model
+                      - button "claude-opus-4-8":
+                        - generic: claude-opus-4-8
+                        - generic:
+                          - img
+                    - generic: live
+                  - generic:
+                    - generic: tools
+                    - generic:
+                      - generic: no tool calls yet
+      - complementary [ref=e83]:
+        - generic [ref=e84]:
+          - generic [ref=e85]:
+            - img [ref=e87]
+            - heading "Polymarket bot" [level=2] [ref=e89]
+            - generic [ref=e90]:
+              - generic [ref=e366]: online
+              - button "Refresh" [ref=e91]:
+                - img [ref=e92]
+          - generic [ref=e370]:
+            - generic [ref=e371]:
+              - generic [ref=e372]:
+                - generic [ref=e373]: uptime
+                - generic [ref=e374]: 1d 16h
+              - generic [ref=e375]:
+                - generic [ref=e376]: restarts
+                - generic [ref=e377]: "38"
+              - generic [ref=e378]:
+                - generic [ref=e379]: cpu
+                - generic [ref=e380]: 25.2%
+            - generic [ref=e381]:
+              - generic [ref=e382]:
+                - generic [ref=e383]: mem
+                - generic [ref=e384]: 373 MB
+              - generic [ref=e385]:
+                - generic [ref=e386]: unstable
+                - generic [ref=e387]: "0"
+              - generic [ref=e388]:
+                - generic [ref=e389]: proc
+                - generic [ref=e390]: demi-server
+            - generic [ref=e391]:
+              - generic [ref=e392]:
+                - generic [ref=e393]: Today PnL
+                - generic [ref=e394]: unavailable
+              - paragraph [ref=e395]: no clean read-only source (bot API requires login)
+          - generic [ref=e396]: updated just now
+        - generic [ref=e99]:
+          - generic [ref=e100]:
+            - img [ref=e102]
+            - heading "Fleet health" [level=2] [ref=e106]
+            - generic [ref=e107]:
+              - generic [ref=e397]: 4/4 up
+              - button "Refresh" [ref=e108]:
+                - img [ref=e109]
+          - generic [ref=e398]:
+            - generic [ref=e399]:
+              - generic [ref=e400]:
+                - generic [ref=e404]: PC local
+                - generic [ref=e405]: local
+              - generic [ref=e406]: 23 ms
+            - generic [ref=e407]:
+              - generic [ref=e412]: gpu3070
+              - generic [ref=e413]: 558 ms
+            - generic [ref=e414]:
+              - generic [ref=e419]: demi-poly
+              - generic [ref=e420]: 1931 ms
+            - generic [ref=e421]:
+              - generic [ref=e426]: ccmb
+              - generic [ref=e427]: 431 ms
+          - generic [ref=e428]: updated just now
+        - generic [ref=e116]:
+          - generic [ref=e117]:
+            - img [ref=e119]
+            - heading "Max usage" [level=2] [ref=e121]
+            - generic [ref=e122]:
+              - generic [ref=e429]: high
+              - button "Refresh" [ref=e123]:
+                - img [ref=e124]
+          - generic [ref=e430]:
+            - generic [ref=e431]:
+              - generic [ref=e432]:
+                - generic [ref=e433]: calls today
+                - generic [ref=e434]: "482"
+              - generic [ref=e435]:
+                - generic [ref=e436]: tokens today
+                - generic [ref=e437]: 77.6M
+            - generic [ref=e438]: 3 throttle signals today, may be near the cap
+            - paragraph [ref=e439]: exact weekly-cap % is interactive-only (run /usage in claude)
+          - generic [ref=e440]: updated just now
+        - generic [ref=e131]:
+          - generic [ref=e132]:
+            - img [ref=e134]
+            - heading "Active builds" [level=2] [ref=e137]
+            - generic [ref=e138]:
+              - generic [ref=e441]: 1 pm2
+              - button "Refresh" [ref=e139]:
+                - img [ref=e140]
+          - list [ref=e442]:
+            - listitem [ref=e443]:
+              - generic [ref=e447]: hermes-gateway
+              - generic [ref=e448]: 11h 26m · 1%
+          - generic [ref=e449]: updated just now
+        - generic [ref=e147]:
+          - generic [ref=e148]:
+            - img [ref=e150]
+            - heading "Vault decision log" [level=2] [ref=e153]
+            - generic [ref=e154]:
+              - generic [ref=e450]: 2026-06-03
+              - button "Refresh" [ref=e155]:
+                - img [ref=e156]
+          - generic [ref=e451]:
+            - generic [ref=e452]:
+              - generic [ref=e453]:
+                - generic [ref=e455]: Shipped
+                - generic [ref=e456]: "5"
+              - list [ref=e457]:
+                - listitem [ref=e458]: "Mac→CCPC inbound SSH wired end-to-end: sshd live on port 2222, Mac `id_rsa` authorized, `ssh ccpc` from Mac runs commands (verified `ALIAS_OK`)."
+                - listitem [ref=e459]: "`ccmb`/`mac` alias on CCPC + `ccpc` alias on Mac, both tested."
+                - listitem [ref=e460]: FLEET.md updated and byte-identical on both boxes (3532=3532).
+                - listitem [ref=e461]: "`openrouter-expert` skill created (`~/.hermes/skills/mlops/openrouter-expert/`) — fetches llms.txt index, `.md` page suffix, live pricing via `api/v1/models`."
+                - listitem [ref=e462]: "`~/.hermes/scripts/max_usage_check.py` — today's Anthropic token volume + throttle/429 detector, `--quiet` watchdog flag; verified against 199 real calls."
+            - generic [ref=e463]:
+              - generic [ref=e464]:
+                - generic [ref=e466]: Decided
+                - generic [ref=e467]: "6"
+              - list [ref=e468]:
+                - listitem [ref=e469]: Override earlier "PC sole orchestrator" call → wire Mac→CCPC inbound — same agent, both seats should drive the fleet (DEMI override).
+                - listitem [ref=e470]: WSL sshd on 2222 not 22 — WSL is mirrored-mode, Windows already owns 22; two sshd's can't share.
+                - listitem [ref=e471]: "Don't route Hermes' own loop to OpenRouter — OpenRouter is metered, Max is flat-rate; it stays `provider=anthropic` to avoid per-message billing."
+                - listitem [ref=e472]: "OpenRouter = overflow/pressure-release for bulk fan-out, Max `claude -p` for heavy reasoning — keeps volume off Max weekly cap so Opus work isn't throttled. Dispatch decision at spawn time, not a config toggle."
+                - listitem [ref=e473]: Won't print a fabricated "% weekly cap" — no headless source exists; throttle/429 detector is the truthful near-cap signal.
+                - listitem [ref=e474]: No dashes (-s) / no emojis anywhere — standing rule reaffirmed; profile restored after a bad replace.
+          - generic [ref=e475]: updated just now
+        - generic [ref=e163]:
+          - generic [ref=e164]:
+            - img [ref=e166]
+            - heading "Capture inbox" [level=2] [ref=e169]
+            - button "Refresh" [ref=e171]:
+              - img [ref=e172]
+          - generic [ref=e476]:
+            - generic [ref=e478]: "0"
+            - generic [ref=e479]:
+              - paragraph [ref=e480]: no captures today
+              - paragraph [ref=e481]: Inbox/ clean
+          - generic [ref=e482]: updated just now
+        - generic [ref=e179]:
+          - generic [ref=e180]:
+            - img [ref=e182]
+            - heading "Cron jobs" [level=2] [ref=e185]
+            - generic [ref=e186]:
+              - generic [ref=e483]: "2"
+              - button "Refresh" [ref=e187]:
+                - img [ref=e188]
+          - list [ref=e484]:
+            - listitem [ref=e485]:
+              - generic [ref=e488]:
+                - generic [ref=e489]: polymarket-bot-health
+                - generic [ref=e490]: every 120m
+              - generic [ref=e491]: ok
+            - listitem [ref=e492]:
+              - generic [ref=e495]:
+                - generic [ref=e496]: weekly-dep-audit-polymarket
+                - generic [ref=e497]: 0 9 * * 1
+              - generic [ref=e498]: no runs
+          - generic [ref=e499]: updated just now
+        - generic [ref=e195]: cockpit polls every 30s · server side reads only
+  - alert [ref=e196]
