@@ -3,6 +3,7 @@
 import {
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
   type CSSProperties,
@@ -15,10 +16,14 @@ import { Splash } from "./Splash";
 import {
   getTab,
   PRIMARY_TAB_IDS,
+  PRIMARY_TABS,
+  SECONDARY_TABS,
   DEFAULT_TAB_ID,
+  type TabDef,
   type TabId,
 } from "./tabs";
 import { haptic } from "./haptics";
+import { cn } from "@/lib/utils";
 
 /** Layout heights consumed by the pane padding + chrome. */
 const SHELL_VARS = {
@@ -26,6 +31,19 @@ const SHELL_VARS = {
   "--app-context-h": "40px",
   "--app-tabbar-h": "58px",
 } as CSSProperties;
+
+/** Bool media-query hook. Returns true once matched. */
+function useMediaQuery(query: string): boolean {
+  const [match, setMatch] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    setMatch(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setMatch(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [query]);
+  return match;
+}
 
 /** iOS-style decel spring for the snap-back / commit. Tuned to feel like the
  *  UIScrollView paging deceleration in Claude/Codex: firm, slightly
@@ -41,26 +59,165 @@ function rubber(dx: number, width: number) {
 }
 
 /**
- * The mobile app shell. The middle region is a finger-tracked horizontal pager
- * over the primary tabs: during a horizontal drag the active pane follows your
- * thumb 1:1, the neighbouring pane peeks in from the side, and on release we
- * commit or snap back based on distance + fling velocity — the same model as
- * the Claude / Codex iOS apps. Secondary tabs (reached via More) are not in the
- * swipe ring, so landing on one just renders without a neighbour.
+ * Compact desktop sidebar nav. Shows all tabs (primary + secondary) with
+ * icons + labels, collapsible to icon-only. Synced to the same activeTab
+ * state as the mobile bottom bar.
+ */
+function DesktopSidebar({
+  activeTab,
+  onSelect,
+}: {
+  activeTab: TabId;
+  onSelect: (id: TabId) => void;
+}) {
+  const [collapsed, setCollapsed] = useState(false);
+  const allTabs = useMemo(() => [...PRIMARY_TABS, ...SECONDARY_TABS], []);
+
+  return (
+    <nav
+      className={cn(
+        "flex shrink-0 flex-col border-r border-border bg-surface/60 backdrop-blur-sm transition-[width] duration-200",
+        collapsed ? "w-[60px]" : "w-[200px]",
+      )}
+    >
+      {/* Brand + collapse toggle */}
+      <div className="flex h-[56px] shrink-0 items-center gap-2 border-b border-border px-3">
+        <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md bg-accent text-[11px] font-black text-bg">
+          D
+        </span>
+        {!collapsed && (
+          <>
+            <span className="min-w-0 text-[13px] font-bold tracking-wide text-ink">
+              DEMI
+            </span>
+            <span className="ml-auto text-[9px] text-faint">ws</span>
+          </>
+        )}
+      </div>
+
+      {/* Tab list */}
+      <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-2 py-2">
+        {allTabs.map((tab) => {
+          const active = tab.id === activeTab;
+          return (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => onSelect(tab.id)}
+              title={tab.label}
+              className={cn(
+                "flex w-full shrink-0 items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[13px] transition-colors",
+                collapsed && "justify-center px-0",
+                active
+                  ? "bg-[color-mix(in_srgb,var(--midground)_10%,transparent)] text-midground"
+                  : "text-text-tertiary hover:bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] hover:text-ink",
+              )}
+            >
+              <tab.Icon
+                width={18}
+                height={18}
+                className={cn(active && "text-midground")}
+              />
+              {!collapsed && (
+                <span className="truncate font-medium">{tab.label}</span>
+              )}
+              {!collapsed && active && (
+                <span className="ml-auto h-[4px] w-[4px] shrink-0 rounded-full bg-midground" />
+              )}
+            </button>
+          );
+        })}
+      </div>
+
+      {/* Collapse toggle at bottom */}
+      <button
+        type="button"
+        aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
+        onClick={() => setCollapsed((c) => !c)}
+        className={cn(
+          "flex shrink-0 items-center justify-center border-t border-border py-2.5 text-[10px] text-faint transition-colors hover:text-ink",
+          collapsed ? "" : "gap-1",
+        )}
+      >
+        <svg
+          width={14}
+          height={14}
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth={2}
+          className={cn("transition-transform", collapsed && "rotate-180")}
+        >
+          <path d="M15 19l-7-7 7-7" />
+        </svg>
+        {!collapsed && <span>collapse</span>}
+      </button>
+    </nav>
+  );
+}
+
+/**
+ * The mobile + desktop app shell. On narrow screens (<1024px) renders the
+ * finger-tracked horizontal pager with a bottom tab bar. On wide screens
+ * renders a left sidebar nav + full-width pane, with keyboard shortcuts
+ * (Cmd+1–9, Cmd+0 for the last tab).
  */
 export function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>(DEFAULT_TAB_ID);
   const scrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
-  // Pager geometry + live drag transform.
+  // ---- keyboard shortcuts (desktop only) ----
+  useEffect(() => {
+    if (!isDesktop) return;
+    const ALL_IDS: TabId[] = [
+      "chat",
+      "repos",
+      "editor",
+      "terminal",
+      "diff",
+      "fleet",
+      "kanban",
+      "prs",
+      "automations",
+      "settings",
+    ];
+    const handler = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key >= "1" && e.key <= "9") {
+        e.preventDefault();
+        const idx = parseInt(e.key) - 1;
+        if (idx < ALL_IDS.length) {
+          setActiveTab(ALL_IDS[idx]);
+          scrollRefs.current[ALL_IDS[idx]]?.scrollTo({ top: 0, behavior: "smooth" });
+        }
+      }
+      if ((e.metaKey || e.ctrlKey) && e.key === "0") {
+        e.preventDefault();
+        setActiveTab("settings");
+        scrollRefs.current.settings?.scrollTo({ top: 0, behavior: "smooth" });
+      }
+    };
+    window.addEventListener("keydown", handler);
+    return () => window.removeEventListener("keydown", handler);
+  }, [isDesktop]);
+
+  const goTab = useCallback(
+    (id: TabId) => {
+      if (id === activeTab) {
+        scrollRefs.current[id]?.scrollTo({ top: 0, behavior: "smooth" });
+        return;
+      }
+      setActiveTab(id);
+    },
+    [activeTab],
+  );
+
+  // ---- pager state (mobile only) ----
   const trackRef = useRef<HTMLDivElement>(null);
   const widthRef = useRef(0);
   const x = useMotionValue(0);
-
-  // The neighbour we reveal during an in-flight drag (null = none mounted).
-  const [neighbor, setNeighbor] = useState<{ id: TabId; side: 1 | -1 } | null>(
-    null,
-  );
+  const [neighbor, setNeighbor] = useState<{ id: TabId; side: 1 | -1 } | null>(null);
+  const primaryIndex = PRIMARY_TAB_IDS.indexOf(activeTab);
 
   useEffect(() => {
     const measure = () => {
@@ -70,43 +227,6 @@ export function AppShell() {
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, []);
-
-  const primaryIndex = PRIMARY_TAB_IDS.indexOf(activeTab);
-
-  const commitTo = useCallback(
-    (id: TabId) => {
-      const width = widthRef.current || window.innerWidth;
-      const toIndex = PRIMARY_TAB_IDS.indexOf(id);
-      const side = toIndex > primaryIndex ? 1 : -1;
-      // Animate the current pane fully off, then swap state and reset.
-      animate(x, -side * width, {
-        ...SNAP_SPRING,
-        onComplete: () => {
-          setActiveTab(id);
-          setNeighbor(null);
-          x.set(0);
-        },
-      });
-    },
-    [primaryIndex, x],
-  );
-
-  const goTab = useCallback(
-    (id: TabId) => {
-      if (id === activeTab) {
-        // Double-tap on the live tab: scroll its pane to top.
-        haptic(6);
-        scrollRefs.current[id]?.scrollTo({ top: 0, behavior: "smooth" });
-        return;
-      }
-      // Tab-bar taps are instant (no pager animation) — matches the native
-      // tab bar, where only swipes animate laterally.
-      setNeighbor(null);
-      x.set(0);
-      setActiveTab(id);
-    },
-    [activeTab, x],
-  );
 
   // ---- finger-tracked horizontal drag over the primary ring ----
   const drag = useRef<{
@@ -224,7 +344,31 @@ export function AppShell() {
     );
   };
 
-  return (
+  return isDesktop ? (
+    /* ------------------------------------------------
+       DESKTOP LAYOUT: sidebar + full-width pane
+    ------------------------------------------------ */
+    <div className="flex h-dvh overflow-hidden" style={SHELL_VARS}>
+      <DesktopSidebar activeTab={activeTab} onSelect={goTab} />
+      <div className="flex min-w-0 flex-1 flex-col">
+        <AppHeader />
+        <div
+          ref={(el) => {
+            scrollRefs.current[activeTab] = el;
+          }}
+          className="flex-1 overflow-y-auto overscroll-contain"
+          style={{
+            padding: "20px 28px",
+          }}
+        >
+          {renderPane(activeTab)}
+        </div>
+      </div>
+    </div>
+  ) : (
+    /* ------------------------------------------------
+       MOBILE LAYOUT: pager + bottom tabs
+    ------------------------------------------------ */
     <div
       className="relative mx-auto h-[100dvh] w-full max-w-[560px] overflow-hidden"
       style={SHELL_VARS}

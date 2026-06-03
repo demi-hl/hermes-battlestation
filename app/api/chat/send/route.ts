@@ -1,6 +1,6 @@
+import { spawn } from "node:child_process";
 import { resolveRepoCwd } from "@/lib/local-repos";
-import { sessionTitleFor, tryLock, unlock } from "@/lib/sessions";
-import { acpBridge, type AcpTurnEvent } from "@/lib/acp-bridge";
+import { tryLock, unlock, sessionTitleFor } from "@/lib/sessions";
 import type { ChatStreamEvent, SendRequest } from "@/lib/chat-types";
 
 export const runtime = "nodejs";
@@ -12,12 +12,9 @@ function frame(ev: ChatStreamEvent): Uint8Array {
 }
 
 /**
- * Send one message to a repo's bound Hermes session and stream the turn back as
- * newline-delimited JSON — live. This drives the real agent over ACP
- * (Agent Client Protocol), so the browser receives token-by-token text,
- * reasoning, and tool-call activity as it happens, exactly like the desktop
- * TUI. One ACP session per repo (cwd = repo path); the adapter persists
- * sessions so context carries across turns and server restarts.
+ * Send one message to Hermes via the CLI subprocess.
+ * Uses `hermes chat -q` directly instead of the ACP bridge, which has a bug
+ * where the agent runs silently and produces no streamed output in ACP mode.
  */
 export async function POST(req: Request) {
   let body: SendRequest;
@@ -35,7 +32,6 @@ export async function POST(req: Request) {
   if (!cwd) return new Response("unknown repo", { status: 404 });
 
   const title = sessionTitleFor(repo);
-
   if (!tryLock(title)) {
     return new Response(
       JSON.stringify({ type: "error", error: "a turn is already running for this thread" }),
@@ -44,76 +40,61 @@ export async function POST(req: Request) {
   }
 
   const started = Date.now();
-  const bridge = acpBridge();
-
   const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
+    async start(controller) {
       let closed = false;
       const emit = (ev: ChatStreamEvent) => {
         if (closed) return;
-        try {
-          controller.enqueue(frame(ev));
-        } catch {
-          /* torn down */
-        }
+        try { controller.enqueue(frame(ev)); } catch { /* torn down */ }
       };
 
-      const onEvent = (e: AcpTurnEvent) => {
-        switch (e.kind) {
-          case "session":
-            emit({ type: "session", sessionId: e.sessionId, title, isNew: e.isNew });
-            break;
-          case "delta":
-            emit({ type: "delta", text: e.text });
-            break;
-          case "thought":
-            emit({ type: "thought", text: e.text });
-            break;
-          case "tool-start":
-            emit({ type: "tool", id: e.id, name: e.name, title: e.title, phase: "start" });
-            break;
-          case "tool-end":
-            emit({
-              type: "tool",
-              id: e.id,
-              name: e.name,
-              title: e.title,
-              phase: "end",
-              ok: e.ok,
-            });
-            break;
-          case "usage":
-            if (e.total > 0)
-              emit({ type: "usage", used: e.used, total: e.total, messageCount: 0 });
-            break;
-          case "error":
-            emit({ type: "error", error: e.error });
-            break;
-          case "done":
-            // handled after prompt() resolves
-            break;
-        }
-      };
+      try {
+        const child = spawn(
+          "/home/demi/.local/bin/hermes",
+          ["chat", "-q", message, "--yolo", "--quiet"],
+          { cwd, env: { ...process.env, HOME: "/home/demi" }, stdio: ["ignore", "pipe", "pipe"] },
+        );
 
-      bridge
-        .prompt(repo, cwd, message, onEvent)
-        .catch((err) => {
-          emit({ type: "error", error: err instanceof Error ? err.message : "send failed" });
-        })
-        .finally(() => {
-          emit({ type: "done", elapsedMs: Date.now() - started });
-          unlock(title);
-          closed = true;
-          try {
-            controller.close();
-          } catch {
-            /* already closed */
-          }
+        let out = "";
+        child.stdout.on("data", (d: Buffer) => { out += d.toString(); });
+
+        const exitCode = await new Promise<number | null>((resolve) => {
+          child.on("close", (code: number | null) => resolve(code));
+          child.on("error", () => resolve(null));
         });
+
+        if (exitCode !== 0 && exitCode !== null) {
+          // Use whatever we got on stderr as the error
+          emit({ type: "error", error: `hermes exited ${exitCode}` });
+        } else {
+          // Parse: first line is "session_id: <id>", rest is the response text
+          const lines = out.split("\n");
+          const sidLine = lines.find((l) => l.startsWith("session_id: "));
+          const sessionId = sidLine ? sidLine.replace("session_id: ", "").trim() : "cli";
+          const responseText = lines
+            .filter((l) => !l.startsWith("session_id: "))
+            .join("\n")
+            .trim();
+
+          emit({ type: "session", sessionId, title, isNew: true });
+          if (responseText) {
+            emit({ type: "message", text: responseText });
+          }
+        }
+
+        emit({ type: "done", elapsedMs: Date.now() - started });
+        closed = true;
+        controller.close();
+      } catch (e) {
+        emit({ type: "error", error: e instanceof Error ? e.message : "CLI failed" });
+        emit({ type: "done", elapsedMs: Date.now() - started });
+        closed = true;
+        controller.close();
+      } finally {
+        unlock(title);
+      }
     },
     cancel() {
-      // Client disconnected — cancel the in-flight turn and release the lock.
-      void bridge.cancel(repo);
       unlock(title);
     },
   });

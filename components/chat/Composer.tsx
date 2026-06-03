@@ -54,7 +54,8 @@ export function Composer({
     <div
       className="border-t border-border px-3 pt-2.5"
       style={{
-        background: "color-mix(in srgb, var(--background-base) 78%, transparent)",
+        background: "var(--background-base)",
+        opacity: 0.96,
         backdropFilter: "blur(20px) saturate(150%)",
         WebkitBackdropFilter: "blur(20px) saturate(150%)",
         paddingBottom: "10px",
@@ -116,7 +117,7 @@ export function Composer({
           rows={1}
           inputMode="text"
           placeholder={`Message ${contextLabel}`}
-          className="scrollbar-none max-h-[140px] min-h-[28px] flex-1 resize-none bg-transparent py-1 text-[0.95rem] leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
+          className="scrollbar-none max-h-[140px] min-h-[28px] flex-1 resize-none bg-transparent py-1 text-base leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
         />
 
         {sending ? (
