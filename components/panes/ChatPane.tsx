@@ -1,16 +1,12 @@
 "use client";
 
-import { PanePlaceholder } from "./PanePlaceholder";
-import { ChatIcon } from "@/components/shell/icons";
+import { ChatHub } from "@/components/chat/ChatHub";
 
-/** Placeholder. The Chat slice fills this with the per-repo agent threads
- *  (the messaging hub that replaces Telegram). */
+/**
+ * Chat slice entry point. The tab registry (slice 1) maps the `chat` tab to this
+ * component; we keep that contract and render the real per-repo messaging hub
+ * (ChatHub) instead of the placeholder.
+ */
 export function ChatPane() {
-  return (
-    <PanePlaceholder
-      icon={ChatIcon}
-      title="Chat"
-      blurb="Talk to the Hermes agent here. One persistent thread per repo, plus a general thread. This is the messaging hub, not a side tab."
-    />
-  );
+  return <ChatHub />;
 }
