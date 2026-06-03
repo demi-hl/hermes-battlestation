@@ -31,11 +31,10 @@ export function Splash() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <motion.img
-            src="/brand/locals-only-logo.jpg"
-            alt="locals only"
+            src="/nous-mark.svg"
+            alt=""
             draggable={false}
-            className="w-[76%] max-w-[420px] object-contain"
-            style={{ mixBlendMode: "screen" }}
+            className="w-28 h-28 object-contain"
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}

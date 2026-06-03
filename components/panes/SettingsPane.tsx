@@ -4,7 +4,6 @@ import { useState } from "react";
 import { useTheme } from "@/lib/themes";
 import { useWorkspace } from "@/components/shell/workspace-context";
 import { ThemeSheet } from "@/components/shell/ThemeSwitcher";
-import { BrandLockup } from "@/components/shell/BrandLockup";
 import {
   PaletteIcon,
   CpuIcon,
@@ -25,10 +24,6 @@ export function SettingsPane() {
 
   return (
     <div className="mx-auto flex min-h-full w-full max-w-[520px] flex-col gap-6 px-5 pt-2">
-      <div className="flex flex-col items-center gap-2 pt-2">
-        <BrandLockup className="items-center" />
-      </div>
-
       <section className="flex flex-col gap-1.5">
         <SectionLabel>Appearance</SectionLabel>
         <Row
@@ -55,8 +50,8 @@ export function SettingsPane() {
       <section className="flex flex-col gap-2">
         <SectionLabel>About</SectionLabel>
         <p className="rounded-[var(--radius-lg)] border border-border bg-[color-mix(in_srgb,var(--midground)_4%,transparent)] p-3.5 text-[0.82rem] leading-relaxed text-text-tertiary">
-          Locals Only is the mobile hub for the Hermes agent, reached over
-          Tailscale. Heads up: unlike Telegram, it is live only while this PC is
+          Hermes Agent is the mobile hub, reached over
+          Tailscale. Unlike Telegram, it is live only while this PC is
           awake and your phone is on the tailnet. If the PC sleeps or reboots,
           the hub goes dark and messages are not queued. Keep the PC always-on.
         </p>

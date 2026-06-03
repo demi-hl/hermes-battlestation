@@ -191,7 +191,7 @@ function IdentityHeader({
         <span className="arc-border" aria-hidden />
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          src="/brand/nous-girl.png"
+          src="/n-mark.svg"
           alt=""
           className="h-full w-full object-cover opacity-95"
         />

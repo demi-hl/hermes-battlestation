@@ -11,7 +11,7 @@ const SHELL = [
   "/icon-512.png",
   "/apple-touch-icon.png",
   "/filler-bg0.webp",
-  "/brand/locals-only-logo.jpg",
+  "/n-mark.svg",
 ];
 
 self.addEventListener("install", (e) => {

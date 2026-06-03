@@ -482,7 +482,11 @@
     font-size: var(--theme-base-size);
     line-height: var(--theme-line-height);
     letter-spacing: var(--theme-letter-spacing);
-    background-color: var(--background-base);
+    /* Document base must be BLACK, not the theme teal: the Backdrop's z-1 layer
+       paints `--background-base` with mix-blend-mode:difference, so the base
+       behind it has to be black for difference(teal, black)=teal to render.
+       Painting teal here caused difference(teal,teal)=black (the dead middle). */
+    background-color: #000;
     color: var(--midground);
     height: 100dvh;
     -webkit-text-size-adjust: 100%;

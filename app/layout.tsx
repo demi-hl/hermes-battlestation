@@ -5,15 +5,15 @@ import { Backdrop } from "@/components/shell/Backdrop";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
-  title: "Locals Only",
+  title: "Hermes Agent",
   description:
-    "Locals Only — the mobile hub for the Hermes agent. Chat, repos, fleet, and review, over Tailscale.",
-  applicationName: "Locals Only",
+    "Hermes Agent — mobile hub. Chat, repos, fleet, and review, over Tailscale.",
+  applicationName: "Hermes Agent",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Locals Only",
+    title: "Hermes",
   },
   icons: {
     icon: [
@@ -58,7 +58,6 @@ s.setProperty("--midground","color-mix(in srgb, "+p[1]+" 100%, transparent)");
 s.setProperty("--foreground-base",p[2]);
 s.setProperty("--foreground","color-mix(in srgb, "+p[2]+" "+(p[3]*100)+"%, transparent)");
 s.setProperty("--foreground-alpha",String(p[3]));
-r.style.backgroundColor=p[0];
 }catch(e){}})();`;
 
 export default function RootLayout({

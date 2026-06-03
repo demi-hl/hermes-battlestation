@@ -1,0 +1,61 @@
+{
+  "workflow": "locals-only-superset-build",
+  "title": "Locals Only - Superset Build",
+  "description": "Multi-agent parallel build of the mobile IDE superset + Hermes control plane",
+  "createdAt": "2026-06-03T03:15:00-07:00",
+  "base": "9ab8af9",
+  "node": "PC",
+  "billing": "demi-max",
+  "mode": "cc-team-divide-and-conquer",
+  "agents": [
+    {
+      "id": "slice-1-shell",
+      "title": "App shell, 8-theme port, Backdrop, PWA, tab registry",
+      "lane": "done",
+      "node": "PC",
+      "branch": "main",
+      "commit": "9ab8af9",
+      "parentId": null,
+      "diffStat": { "adds": 0, "dels": 0 }
+    },
+    {
+      "id": "slice-chat",
+      "title": "Chat hub + per-repo sessions + agent-inline-edit backend",
+      "lane": "working",
+      "node": "PC",
+      "branch": "slice/chat",
+      "parentId": "locals-only-superset-build"
+    },
+    {
+      "id": "slice-repos",
+      "title": "Conductor sidebar + full IDE editor + terminal",
+      "lane": "working",
+      "node": "PC",
+      "branch": "slice/repos",
+      "parentId": "locals-only-superset-build",
+      "recovery": "recover/slice-repos-c7e9e54"
+    },
+    {
+      "id": "slice-fleet",
+      "title": "Team-of-agents board + fleet health + kanban",
+      "lane": "working",
+      "node": "PC",
+      "branch": "slice/fleet",
+      "parentId": "locals-only-superset-build"
+    },
+    {
+      "id": "slice-prs",
+      "title": "Tasks & PRs (GitHub-authed, demi-hl)",
+      "lane": "working",
+      "node": "PC",
+      "branch": "slice/prs",
+      "parentId": "locals-only-superset-build"
+    }
+  ],
+  "wave2_pending": [
+    { "id": "slice-controlplane", "title": "Hermes 17-page control plane (Models/Cron/Channels/Sessions/Skills/Logs/System)", "lane": "spawned", "node": "PC2", "billing": "david-max" },
+    { "id": "slice-multiagent", "title": "Claude/Codex/Copilot agent selector + Set Run", "lane": "spawned", "node": "PC2", "billing": "david-max" },
+    { "id": "slice-explorer", "title": "Files/Changes/Review right-column explorer", "lane": "spawned", "node": "Mac", "billing": "demi-max" },
+    { "id": "slice-conductor-shell", "title": "Conductor 3-column->mobile-collapse layout shell", "lane": "spawned", "node": "Mac", "billing": "demi-max" }
+  ]
+}

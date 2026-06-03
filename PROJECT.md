@@ -1,7 +1,58 @@
-# PROJECT.md — Locals Only: the Agent-Native IDE Superset
+# PROJECT.md — Locals Only: the Hermes desktop app, mobile-native and better
 
-> NORTH STAR. This supersedes the "command-and-review cockpit, not a full IDE" framing in
-> `demi_workspace_v2_brief.md`. Where they conflict, THIS wins. Every slice reads this first.
+> NORTH STAR (simplified, authoritative): Build the Hermes desktop agent app — but for mobile, and
+> better. Its source is ON DISK at `/usr/local/lib/hermes-agent/web/src/` (42 components, 17 pages,
+> theme system, Backdrop). COPY-ADAPT it; do not reinvent. The win is mobile-native (PWA, gestures,
+> sheets, safe-areas, one-thumb reach) + the per-repo agent context. Everything else below (Conductor
+> 3-column, full IDE, multi-agent selector) is STRETCH for later waves — do NOT let it block shipping
+> a faithful, better-on-mobile Hermes app first.
+
+## What v1 actually is (build THIS, ship it, then extend)
+A mobile PWA that IS the Hermes desktop app:
+1. **Chat** — the primary surface, matching desktop Hermes exactly: instrumented turns, collapsible
+   tool-action rows, the bottom status strip (gateway/agents/cron/model/tokens/session). This is the
+   conduit that replaces Telegram. Per-repo sessions (`hermes chat --continue lol-<repo> --source locals-only`).
+2. **The desktop control surfaces, mobile-native** — port the real pages (they already talk to the
+   Hermes daemon, reuse the APIs): Sessions, Skills, Models, Cron, Channels, Logs, System. Start with
+   these 7 live; the other 10 desktop pages stub with a designed "coming soon" + SAY SO.
+3. **The Hermes look, ported verbatim** — 8 themes, Backdrop, DS keyframes, Collapse font, Hermes Teal.
+4. **Better-than-desktop = the mobile layer** — installable PWA, native gestures, haptics, splash,
+   60fps, one-thumb reach. The desktop app can't go in your pocket; this does.
+
+## PUBLIC-READY LATER (forward-compat — design for it now, don't build it yet)
+PRIORITY: internal use is the ONLY v1 goal. Public-ready is a nice-to-have that must NEVER block or
+degrade the internal build. If a forward-compat constraint below makes the internal app slower, uglier,
+or later — DROP IT and hardcode for DEMI. Public is a someday-maybe; the working internal tool is the
+job. Follow these ONLY where they're free or near-free (no hardcoded paths is just good hygiene anyway);
+the moment any of them costs internal quality or time, skip it and SAY SO in the report.
+This ships as DEMI's private tool first, and MIGHT go public later: any Hermes user points it
+at their own Hermes daemon and gets the same mobile cockpit. We do NOT build multi-tenancy / auth /
+billing now — that's premature. We DO avoid the single-user assumptions that would make it a rewrite
+later. The discipline (cheap now, expensive to retrofit):
+- **No hardcoded identity.** Never bake in "demi-hl", "/home/demi", the Tailscale hostname, wallet
+  addresses, or DEMI's repo names. Derive everything at runtime: user from `gh api user`, home from
+  `$HOME`/`os.homedir()`, repos by scanning configured roots, daemon URL from config/env. The repo
+  list, the team header, paths — all discovered, never literal.
+- **Config-driven, not constant-driven.** One config surface (env or a config file) holds: Hermes
+  daemon URL, scan roots, fleet node list, default model. A new user changes config, not code. No
+  magic paths sprinkled through components.
+- **The app is a CLIENT to a Hermes daemon, not coupled to one box.** It already talks to Hermes over
+  HTTP/WS — keep that boundary clean. Anyone's daemon (their PC, their Tailscale) is a valid backend.
+  Don't reach around the daemon API to touch DEMI's specific filesystem/processes directly.
+- **Auth seam, stubbed.** v1 trusts the tailnet (single user, no login). But put the trust check
+  behind ONE seam (a middleware / a `getUser()` that today returns the local user) so adding real
+  auth later is swapping that one function, not threading sessions through every route. Don't scatter
+  "it's always DEMI" assumptions past that seam.
+- **Secrets never client-side.** Tokens (`gh`, OAuth, wallet) stay server-side on the daemon host and
+  are used by API routes — never shipped to the PWA bundle. This is required for single-user security
+  AND mandatory before public. Get it right once.
+- **Brand seam.** "Locals Only" + Nous girl is DEMI's skin. Keep brand assets/copy in one place
+  (a theme/brand config) so a public build could reskin without touching logic. Low priority, but
+  don't hardcode the wordmark into 30 components.
+Mark in the verification report which surfaces are still single-user-coupled so the public-readiness
+gap is known, not discovered later. Architecture target = "multi-user-ready, single-user-deployed."
+
+## Stretch (later waves — NOT v1, do not block on these)
 
 ## The one-line vision
 **Locals Only is what you get if a mobile IDE superset and the Hermes desktop app had a baby.**

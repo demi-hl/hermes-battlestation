@@ -1,7 +1,7 @@
 {
-  "name": "Locals Only",
-  "short_name": "Locals Only",
-  "description": "Mobile hub for the Hermes agent. Chat, repos, fleet, and review, over Tailscale.",
+  "name": "Hermes Agent",
+  "short_name": "Hermes",
+  "description": "Hermes Agent — mobile hub. Chat, repos, fleet, and review, over Tailscale.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
