@@ -1,8 +1,0 @@
-[      42ms] [ERROR] Manifest: Line: 1, column: 1, Syntax error. @ http://127.0.0.1:9119/manifest.webmanifest:0
-[      42ms] [ERROR] Failed to load resource: net::ERR_CONTENT_LENGTH_MISMATCH @ http://127.0.0.1:9119/manifest.webmanifest:0
-[     126ms] [ERROR] An unknown error occurred when fetching the script. @ :0
-[     188ms] [ERROR] Manifest: Line: 1, column: 1, Syntax error. @ http://127.0.0.1:9119/manifest.webmanifest:0
-[     188ms] [ERROR] Failed to load resource: net::ERR_CONTENT_LENGTH_MISMATCH @ http://127.0.0.1:9119/manifest.webmanifest:0
-[     210ms] [ERROR] Failed to load resource: the server responded with a status of 401 (Unauthorized) @ http://127.0.0.1:9119/api/auth/me:0
-[     210ms] [WARNING] <meta name="apple-mobile-web-app-capable" content="yes"> is deprecated. Please include <meta name="mobile-web-app-capable" content="yes"> @ http://127.0.0.1:9119/chat:0
-[     723ms] [WARNING] task queue exceeded allotted deadline by 24ms @ http://127.0.0.1:9119/assets/index-DQ2E1DJI.js:81

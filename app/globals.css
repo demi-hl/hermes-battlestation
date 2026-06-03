@@ -1,108 +1,542 @@
 @import "tailwindcss";
 
-/* ============================================================
-   DEMI Workspace — operational cockpit
-   Hyperliquid-family palette: mint #97FCE4 on near-black #0a0a0a.
-   No dashes in UI copy, SVG icons, no emoji.
-   ============================================================ */
+/* ============================================================================
+   Locals Only — mobile Hermes hub
+   Theme system + design-system layer ported from the desktop Hermes dashboard
+   (`/usr/local/lib/hermes-agent/web`). The 8-theme switcher rewrites the
+   --background / --midground / --foreground / --warm-glow / --noise-* vars at
+   runtime (see lib/themes/context.tsx); everything below derives from them.
+   No em/en dashes in UI copy. SVG icons only, no emoji.
+   ============================================================================ */
 
-@theme {
-  --color-bg: #0a0a0a;
-  --color-bg-1: #0c0c0e;
-  --color-surface: #111113;
-  --color-surface-2: #161619;
-  --color-elevated: #1b1b1f;
-
-  --color-line: rgba(255, 255, 255, 0.07);
-  --color-line-2: rgba(255, 255, 255, 0.12);
-
-  --color-ink: #ededef;
-  --color-ink-dim: #b8b8be;
-  --color-muted: #84848c;
-  --color-faint: #57575e;
-
-  --color-accent: #97fce4;
-  --color-accent-soft: rgba(151, 252, 228, 0.12);
-  --color-up: #5ee9c4;
-  --color-down: #ff6b7a;
-  --color-warn: #ffce6a;
-
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto,
-    Helvetica, Arial, sans-serif;
-  --font-mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas,
-    monospace;
+/* ---------------------------------------------------------------------------
+   Self-hosted Nous fonts (woff2 copied into public/fonts — never fetched from
+   the network). Collapse = primary UI sans; Mondwest/Neuebit/Rules = accents.
+   --------------------------------------------------------------------------- */
+@font-face {
+  font-family: "Collapse";
+  font-style: normal;
+  font-weight: 100;
+  font-display: swap;
+  src: url("/fonts/Collapse-Thin.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Collapse";
+  font-style: italic;
+  font-weight: 100;
+  font-display: swap;
+  src: url("/fonts/Collapse-ThinItalic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Collapse";
+  font-style: normal;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/Collapse-Light.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Collapse";
+  font-style: italic;
+  font-weight: 300;
+  font-display: swap;
+  src: url("/fonts/Collapse-LightItalic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Collapse";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Collapse-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Collapse";
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Collapse-Italic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Collapse";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/Collapse-Bold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Collapse";
+  font-style: italic;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/Collapse-BoldItalic.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Mondwest";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/Mondwest-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Neuebit";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/Neuebit-Bold.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Rules Compressed";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/RulesCompressed-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Rules Compressed";
+  font-style: normal;
+  font-weight: 600;
+  font-display: swap;
+  src: url("/fonts/RulesCompressed-Medium.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Rules Expanded";
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url("/fonts/RulesExpanded-Regular.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Rules Expanded";
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url("/fonts/RulesExpanded-Bold.woff2") format("woff2");
 }
 
+/* ---------------------------------------------------------------------------
+   LENS_0 (Hermes Teal) defaults. These are the defaults for the `default`
+   theme; ThemeProvider rewrites them as inline styles on <html> on switch.
+   Ported from the desktop dashboard's src/index.css.
+   --------------------------------------------------------------------------- */
+:root {
+  --foreground: color-mix(in srgb, #ffffff 0%, transparent);
+  --foreground-base: #ffffff;
+  --foreground-alpha: 0;
+  --midground: color-mix(in srgb, #ffe6cb 100%, transparent);
+  --midground-base: #ffe6cb;
+  --midground-alpha: 1;
+  --background: color-mix(in srgb, #041c1c 100%, transparent);
+  --background-base: #041c1c;
+  --background-alpha: 1;
+
+  /* Consumed by <Backdrop />; also theme-switchable. */
+  --warm-glow: rgba(255, 189, 56, 0.35);
+  --noise-opacity-mul: 1;
+
+  /* Typography tokens — rewritten by ThemeProvider. Default to self-hosted
+     Collapse so the canonical Hermes typeface renders before any switch. */
+  --theme-font-sans: "Collapse", system-ui, -apple-system, "Segoe UI", Roboto,
+    "Helvetica Neue", Arial, sans-serif;
+  --theme-font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
+    Menlo, Consolas, monospace;
+  --theme-font-display: var(--theme-font-sans);
+  --theme-base-size: 15px;
+  --theme-line-height: 1.55;
+  --theme-letter-spacing: 0;
+
+  /* Accent display fonts. */
+  --font-mondwest: "Mondwest", var(--theme-font-sans);
+  --font-neuebit: "Neuebit", var(--theme-font-mono);
+  --font-rules-compressed: "Rules Compressed", var(--theme-font-sans);
+  --font-rules-expanded: "Rules Expanded", var(--theme-font-sans);
+
+  /* Layout tokens. */
+  --radius: 0.5rem;
+  --theme-radius: 0.5rem;
+  --theme-spacing-mul: 1;
+  --theme-density: comfortable;
+
+  /* Data-series accents (Analytics/Models token charts). */
+  --series-input-token: #ffe6cb;
+  --series-output-token: #34d399;
+
+  --vsq: calc(0.5vw + 0.5vh);
+}
+
+/* ---------------------------------------------------------------------------
+   Tailwind v4 token mapping. `@theme inline` so each utility resolves to the
+   LIVE CSS var (ThemeProvider overrides them at runtime) rather than baking a
+   value at build time. Mirrors the desktop dashboard's shadcn-compat cascade.
+   --------------------------------------------------------------------------- */
+@theme inline {
+  --color-background: var(--background);
+  --color-background-base: var(--background-base);
+  --color-midground: var(--midground);
+  --color-midground-base: var(--midground-base);
+  --color-gesso: #eaeaea;
+
+  /* Remap foreground to midground so `text-foreground`/`bg-foreground` stay
+     visible — in LENS_0 `--foreground` itself has alpha 0. */
+  --color-foreground: var(--midground);
+  --color-foreground-base: var(--foreground-base);
+
+  /* Text hierarchy — WCAG-AA-targeted defaults derived from midground. */
+  --color-text-primary: var(--text-primary, var(--midground));
+  --color-text-secondary: var(
+    --text-secondary,
+    color-mix(in srgb, var(--midground-base) 80%, transparent)
+  );
+  --color-text-tertiary: var(
+    --text-tertiary,
+    color-mix(in srgb, var(--midground-base) 65%, transparent)
+  );
+  --color-text-disabled: var(
+    --text-disabled,
+    color-mix(in srgb, var(--midground-base) 45%, transparent)
+  );
+  --color-text-on-accent: var(--text-on-accent, var(--background));
+
+  /* Shadcn-compat tokens derived from the 3-layer palette via color-mix. */
+  --color-card: color-mix(in srgb, var(--midground-base) 4%, var(--background-base));
+  --color-card-foreground: var(--midground);
+  --color-primary: var(--midground);
+  --color-primary-foreground: var(--background-base);
+  --color-secondary: color-mix(in srgb, var(--midground-base) 6%, var(--background-base));
+  --color-secondary-foreground: var(--midground);
+  --color-muted: color-mix(in srgb, var(--midground-base) 8%, var(--background-base));
+  --color-muted-foreground: var(--color-text-secondary);
+  --color-accent: color-mix(in srgb, var(--midground-base) 10%, var(--background-base));
+  --color-accent-foreground: var(--midground);
+  --color-destructive: var(--destructive, #fb2c36);
+  --color-destructive-foreground: var(--destructive-foreground, #ffffff);
+  --color-success: var(--success, #4ade80);
+  --color-warning: var(--warning, #ffbd38);
+  --color-border: color-mix(in srgb, var(--midground-base) 15%, transparent);
+  --color-input: color-mix(in srgb, var(--midground-base) 15%, transparent);
+  --color-ring: var(--midground);
+  --color-popover: color-mix(in srgb, var(--midground-base) 4%, var(--background-base));
+  --color-popover-foreground: var(--midground);
+
+  --color-current: currentColor;
+  --color-transparent: transparent;
+
+  /* Density: scale Tailwind's spacing scale by the theme multiplier. */
+  --spacing: calc(0.25rem * var(--theme-spacing-mul, 1));
+
+  --font-sans: var(--theme-font-sans);
+  --font-mono: var(--theme-font-mono);
+
+  --radius-sm: calc(var(--theme-radius) - 4px);
+  --radius-md: calc(var(--theme-radius) - 2px);
+  --radius-lg: var(--theme-radius);
+  --radius-xl: calc(var(--theme-radius) + 4px);
+}
+
+/* ---------------------------------------------------------------------------
+   Custom utilities (Tailwind v4 @utility). Match the DS so chrome can opt into
+   the brand typographic treatments.
+   --------------------------------------------------------------------------- */
+@utility font-mondwest {
+  font-family: var(--font-mondwest);
+}
+@utility font-neuebit {
+  font-family: var(--font-neuebit);
+}
+@utility font-compressed {
+  font-family: var(--font-rules-compressed);
+}
+@utility font-expanded {
+  font-family: var(--font-rules-expanded);
+}
+@utility font-mono-ui {
+  font-family: var(--theme-font-mono);
+}
+/* Brand display style — opt-in uppercase + tracking. Compose with a font
+   utility (e.g. `text-display font-mondwest`) on chrome only, never body. */
+@utility text-display {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+@utility scrollbar-none {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+@utility tabular {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum" 1;
+}
+
+/* ===========================================================================
+   Design-system keyframes — copied VERBATIM from
+   `@nous-research/ui/dist/ui/globals.css`. This is "the Hermes look": the
+   gradient-stroke arc, marching ants, terminal blink, slow spin, the fade /
+   slide entrances, and the toast transitions. Do not edit the timings.
+   =========================================================================== */
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes slide-down {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+}
+@keyframes slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+.animate-slide-down {
+  animation: slide-down 0.6s ease-out both;
+}
+.animate-slide-up {
+  animation: slide-up 0.6s ease-out both;
+}
+.animate-fade-in {
+  animation: fade-in 0.5s ease-out both;
+}
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+.animate-spin-slow {
+  animation: spin-slow 12s linear infinite;
+}
+@keyframes march {
+  to {
+    background-position: 0.5rem 0;
+  }
+}
+/* Marching-ants dashed border for in-progress / streaming states. */
+.march {
+  background-image: repeating-linear-gradient(
+    90deg,
+    var(--midground) 0 4px,
+    transparent 4px 8px
+  );
+  background-size: 0.5rem 1px;
+  background-repeat: repeat-x;
+  animation: march 0.6s linear infinite;
+}
+/* Terminal / cursor blink. Use on the chat caret + terminal. */
+.blink {
+  animation: blink 1s step-end infinite;
+}
+.group:hover .blink {
+  animation: blink 1s step-end infinite;
+}
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateX(1rem);
+  }
+}
+@keyframes toast-out {
+  to {
+    opacity: 0;
+    transform: translateX(1rem);
+  }
+}
+@keyframes gradient-stroke {
+  0% {
+    background-position: 15% 15%;
+  }
+  100% {
+    background-position: 75% 75%;
+  }
+}
+
+/* The signature rotating-glow border. Drop <span class="arc-border" /> inside
+   a `position: relative` rounded element (active rows, focused inputs). */
+.arc-border {
+  --_t: clamp(0%, (0.5 - var(--foreground-alpha, 1)) * 99900%, 100%);
+  --arc-c0: color-mix(in srgb, var(--foreground) var(--_t), transparent);
+  --arc-c1: var(--midground);
+  --arc-c2: var(--background);
+  --arc-angle: 160deg;
+  --arc-width: 1.25px;
+  --arc-inset: -2px;
+  --arc-duration: 2.23s;
+  --arc-gradient: linear-gradient(
+    var(--arc-angle),
+    transparent 0%,
+    var(--arc-c0) 15%,
+    var(--arc-c1) 20%,
+    var(--arc-c2) 25%,
+    transparent 35%,
+    transparent 40%,
+    var(--arc-c0) 55%,
+    var(--arc-c1) 60%,
+    var(--arc-c2) 65%,
+    transparent 75%,
+    transparent 80%,
+    var(--arc-c0) 95%,
+    var(--arc-c1) 100%
+  );
+
+  pointer-events: none;
+  position: absolute;
+  z-index: -1;
+  overflow: hidden;
+  border-radius: inherit;
+  inset: var(--arc-inset);
+  padding: var(--arc-width);
+  mask:
+    linear-gradient(#000 0 0) content-box,
+    linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+}
+.arc-border::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: var(--arc-gradient);
+  background-size: 300% 300%;
+  animation: gradient-stroke var(--arc-duration) linear infinite;
+}
+
+/* Animated film-grain shift for the Backdrop noise layer. The static SVG noise
+   tiles at 512px; nudging the position in steps gives the living TV-static
+   shimmer. Backdrop only mounts this layer when the GPU tier probe passes, so
+   it is already skipped under reduced-motion / software renderers; the media
+   query below is belt-and-braces. */
+@keyframes noise-shift {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  25% {
+    transform: translate3d(-3%, 2%, 0);
+  }
+  50% {
+    transform: translate3d(2%, -2%, 0);
+  }
+  75% {
+    transform: translate3d(-2%, -3%, 0);
+  }
+  100% {
+    transform: translate3d(0, 0, 0);
+  }
+}
+.noise-grain {
+  animation: noise-shift 0.7s steps(3) infinite;
+}
+
+/* Subtle conic grain overlay for badges/chips. */
+.grain {
+  position: relative;
+}
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  opacity: 0.12;
+  pointer-events: none;
+  background: repeating-conic-gradient(currentColor 0% 25%, #0000 0% 50%) 0 0 /
+    2px 2px;
+  border-radius: inherit;
+}
+
+/* Plus-lighter blend used by the brand lockup for a subtle glow. */
+.blend-lighter {
+  mix-blend-mode: plus-lighter;
+}
+
+/* When a theme provides `assets.bg`, the backdrop renders it as a CSS bg and
+   the default filler <img> hides to avoid double-compositing. */
+:root:not([style*="--theme-asset-bg:"]) .theme-default-filler {
+  display: block;
+}
+:root[style*="--theme-asset-bg:"] .theme-default-filler {
+  display: none;
+}
+
+/* ---------------------------------------------------------------------------
+   Document shell. Mobile-first: lock the app to the dynamic viewport so the
+   tab bar / context bar stay pinned and panes scroll internally (native feel).
+   --------------------------------------------------------------------------- */
 @layer base {
-  html,
-  body {
-    height: 100%;
+  html {
+    font-family: var(--theme-font-sans);
+    font-size: var(--theme-base-size);
+    line-height: var(--theme-line-height);
+    letter-spacing: var(--theme-letter-spacing);
+    background-color: var(--background-base);
+    color: var(--midground);
+    height: 100dvh;
+    -webkit-text-size-adjust: 100%;
   }
   body {
-    background-color: var(--color-bg);
-    color: var(--color-ink);
-    font-family: var(--font-sans);
-    -webkit-font-smoothing: antialiased;
-    text-rendering: optimizeLegibility;
+    font-family: var(--theme-font-sans);
+    margin: 0;
+    height: 100dvh;
+    overflow: hidden;
     overscroll-behavior: none;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+    /* Disable the iOS tap-highlight flash; we render our own press states. */
+    -webkit-tap-highlight-color: transparent;
   }
-  /* faint structural grid + a mint glow off the top-left */
-  body::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    z-index: 0;
-    pointer-events: none;
-    background:
-      radial-gradient(
-        900px 500px at 12% -8%,
-        rgba(151, 252, 228, 0.06),
-        transparent 60%
-      ),
-      linear-gradient(to bottom, var(--color-bg-1), var(--color-bg));
+  code,
+  kbd,
+  pre,
+  samp,
+  .font-mono {
+    font-family: var(--theme-font-mono);
   }
   ::selection {
-    background: rgba(151, 252, 228, 0.25);
-    color: #fff;
+    background: var(--midground);
+    color: var(--background-base);
   }
+  /* Thin themed scrollbars (desktop / hover devices). */
   ::-webkit-scrollbar {
-    width: 9px;
-    height: 9px;
+    width: 0.3rem;
+    height: 0.3rem;
   }
   ::-webkit-scrollbar-track {
     background: transparent;
   }
   ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-  }
-  ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.18);
+    background: color-mix(in srgb, var(--midground) 22%, transparent);
+    border-radius: 1rem;
   }
 }
 
-/* transient highlight when nav focuses a section */
-@keyframes focuspulse {
-  0% {
-    box-shadow: 0 0 0 0 rgba(151, 252, 228, 0);
+/* Respect reduced motion globally — kill the looping decorative animations.
+   (Backdrop's GPU probe already returns tier 0 under reduced-motion, so the
+   noise layer never mounts; this also stops the arc + march on cards.) */
+@media (prefers-reduced-motion: reduce) {
+  .arc-border::before,
+  .noise-grain,
+  .march,
+  .animate-spin-slow {
+    animation: none !important;
   }
-  20% {
-    box-shadow: 0 0 0 1px rgba(151, 252, 228, 0.55),
-      0 0 22px 0 rgba(151, 252, 228, 0.22);
+  .animate-slide-up,
+  .animate-slide-down,
+  .animate-fade-in {
+    animation-duration: 0.01ms !important;
   }
-  100% {
-    box-shadow: 0 0 0 0 rgba(151, 252, 228, 0);
-  }
-}
-[data-focus="true"] {
-  animation: focuspulse 1.3s ease-out;
-}
-
-@keyframes spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-.spin {
-  animation: spin 0.9s linear infinite;
 }

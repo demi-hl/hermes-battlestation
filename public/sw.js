@@ -1,9 +1,18 @@
-// DEMI Workspace PWA service worker.
+// Locals Only PWA service worker.
 // Network-first for navigations with an app-shell precache so the install/icon
 // works offline. NEVER caches /api/* (live ops data) or any auth traffic, and
-// never touches non-GET requests.
-const CACHE = "demi-workspace-v1";
-const SHELL = ["/", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
+// never touches non-GET requests. Self-hosted fonts + brand assets are
+// runtime-cached on first load by the same-origin GET branch below.
+const CACHE = "locals-only-v1";
+const SHELL = [
+  "/",
+  "/manifest.webmanifest",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/apple-touch-icon.png",
+  "/filler-bg0.webp",
+  "/brand/locals-only-logo.jpg",
+];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(
@@ -35,7 +44,7 @@ self.addEventListener("fetch", (e) => {
   ) {
     return;
   }
-  // Only handle same-origin GETs (the chat iframe is a different origin).
+  // Only handle same-origin GETs.
   if (url.origin !== self.location.origin) return;
 
   e.respondWith(
