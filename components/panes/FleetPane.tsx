@@ -2,8 +2,10 @@
 
 import { motion } from "framer-motion";
 import { FleetHealthStrip } from "./fleet/FleetHealthStrip";
+import { VersionsCard } from "./fleet/VersionsCard";
 
-/** Fleet pane: live fleet health + Polymarket PM2 panel. No mock data. */
+/** Fleet pane: live fleet health, Polymarket PM2 panel, and toolchain version
+ *  manager (Claude Code / Hermes update across boxes). No mock data. */
 export function FleetPane() {
   return (
     <motion.div
@@ -13,6 +15,8 @@ export function FleetPane() {
       className="flex flex-col gap-4 pt-1"
     >
       <FleetHealthStrip />
+      <div className="mx-3 border-t border-border/60" />
+      <VersionsCard />
     </motion.div>
   );
 }

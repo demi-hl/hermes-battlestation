@@ -1,7 +1,12 @@
 "use client";
 
-import type React from "react";
-import { useCallback, useRef, useState, type CSSProperties } from "react";
+import {
+  useCallback,
+  useRef,
+  useState,
+  type CSSProperties,
+  type ReactNode,
+} from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { AppHeader } from "./AppHeader";
 import { ContextBar } from "./ContextBar";
@@ -14,6 +19,7 @@ import {
   DEFAULT_TAB_ID,
   type TabId,
 } from "./tabs";
+import { haptic } from "./haptics";
 
 /** Layout heights consumed by the pane padding + chrome. */
 const SHELL_VARS = {
@@ -22,10 +28,13 @@ const SHELL_VARS = {
   "--app-tabbar-h": "58px",
 } as CSSProperties;
 
+/** iOS spring — snappier than the old ease. */
+const PANE_SPRING = { type: "spring" as const, stiffness: 380, damping: 38, mass: 0.8 };
+
 const PANE_VARIANTS = {
-  enter: (dir: number) => ({ x: dir > 0 ? 26 : -26, opacity: 0 }),
+  enter: (dir: number) => ({ x: dir > 0 ? 24 : -24, opacity: 0 }),
   center: { x: 0, opacity: 1 },
-  exit: (dir: number) => ({ x: dir > 0 ? -26 : 26, opacity: 0 }),
+  exit: (dir: number) => ({ x: dir > 0 ? -24 : 24, opacity: 0 }),
 };
 
 const TAB_ORDER = TABS.map((t) => t.id);
@@ -40,17 +49,62 @@ const TAB_ORDER = TABS.map((t) => t.id);
 export function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>(DEFAULT_TAB_ID);
   const [dir, setDir] = useState(1);
+  const scrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
 
   const goTab = useCallback(
     (id: TabId) => {
       setActiveTab((prev) => {
-        if (id === prev) return prev;
+        // Double-tap: scroll to top
+        if (id === prev) {
+          haptic(6);
+          const el = scrollRefs.current[id];
+          el?.scrollTo({ top: 0, behavior: "smooth" });
+          return prev;
+        }
         setDir(TAB_ORDER.indexOf(id) >= TAB_ORDER.indexOf(prev) ? 1 : -1);
         return id;
       });
     },
     [],
   );
+
+  // Panes except Chat have a minimal tap-at-bottom area — Chat has its own
+  // iframe so it gets a padded wrapper instead.
+  const ActivePane = getTab(activeTab).Pane;
+  const paneContent =
+    activeTab === "chat" ? (
+      <div
+        ref={(el) => {
+          scrollRefs.current[activeTab] = el;
+        }}
+        className="absolute inset-0 overflow-y-auto overscroll-contain"
+        style={{
+          paddingTop:
+            "calc(var(--app-header-h) + env(safe-area-inset-top) + 6px)",
+          paddingBottom:
+            "calc(var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom) + 8px)",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <ActivePane />
+      </div>
+    ) : (
+      <div
+        ref={(el) => {
+          scrollRefs.current[activeTab] = el;
+        }}
+        className="absolute inset-0 overflow-y-auto overscroll-contain"
+        style={{
+          paddingTop:
+            "calc(var(--app-header-h) + env(safe-area-inset-top) + 6px)",
+          paddingBottom:
+            "calc(var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom) + 8px)",
+          WebkitOverflowScrolling: "touch",
+        }}
+      >
+        <ActivePane />
+      </div>
+    );
 
   // Passive swipe across the primary tabs.
   const touch = useRef<{ x: number; y: number; t: number } | null>(null);
@@ -74,8 +128,6 @@ export function AppShell() {
     if (next) goTab(next);
   };
 
-  const ActivePane = getTab(activeTab).Pane;
-
   return (
     <div
       className="relative mx-auto h-[100dvh] w-full max-w-[560px] overflow-hidden"
@@ -88,7 +140,7 @@ export function AppShell() {
         onTouchStart={onTouchStart}
         onTouchEnd={onTouchEnd}
       >
-        <AnimatePresence initial={false} custom={dir}>
+        <AnimatePresence initial={false} custom={dir} mode="popLayout">
           <motion.div
             key={activeTab}
             custom={dir}
@@ -96,17 +148,10 @@ export function AppShell() {
             initial="enter"
             animate="center"
             exit="exit"
-            transition={{ duration: 0.24, ease: [0.16, 1, 0.3, 1] }}
-            className="absolute inset-0 overflow-y-auto overscroll-contain"
-            style={{
-              paddingTop:
-                "calc(var(--app-header-h) + env(safe-area-inset-top) + 6px)",
-              paddingBottom:
-                "calc(var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom) + 8px)",
-              WebkitOverflowScrolling: "touch",
-            }}
+            transition={PANE_SPRING}
+            className="absolute inset-0"
           >
-            <ActivePane />
+            {paneContent}
           </motion.div>
         </AnimatePresence>
       </main>

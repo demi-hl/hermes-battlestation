@@ -31,3 +31,4 @@ yarn-error.log*
 /.playwright-mcp/
 .playwright-mcp/
 *.log
+ios/App/App/public/

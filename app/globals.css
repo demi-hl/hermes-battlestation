@@ -1,6 +1,49 @@
 @import "tailwindcss";
 
 /* ============================================================================
+   iOS-native base layer — tap highlights, scroll momentum, overscroll
+   ============================================================================ */
+html {
+  -webkit-tap-highlight-color: transparent;
+  -webkit-touch-callout: none;
+  -webkit-overflow-scrolling: touch;
+  /* Prevent text selection on UI chrome (pane content can override) */
+  -webkit-user-select: none;
+  user-select: none;
+  /* Kill the 350ms tap delay */
+  touch-action: manipulation;
+}
+
+/* Restore text selection inside scrollable panes */
+main,
+[role="dialog"],
+[contenteditable],
+textarea,
+input {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+/* iOS scrollbar styling — thin, transparent track */
+::-webkit-scrollbar {
+  width: 3px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--midground) 20%, transparent);
+  border-radius: 99px;
+}
+
+body {
+  /* Prevent rubber-band overscroll on the root — panes handle their own */
+  overscroll-behavior: none;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ============================================================================
    Locals Only — mobile Hermes hub
    Theme system + design-system layer ported from the desktop Hermes dashboard
    (`/usr/local/lib/hermes-agent/web`). The 8-theme switcher rewrites the
