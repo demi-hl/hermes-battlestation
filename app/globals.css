@@ -174,6 +174,7 @@ body {
   /* Consumed by <Backdrop />; also theme-switchable. */
   --warm-glow: rgba(255, 189, 56, 0.18);
   --noise-opacity-mul: 0;
+  --component-backdrop-filler-opacity: 0.05;
 
   /* Typography tokens — rewritten by ThemeProvider. Default to self-hosted
      Collapse so the canonical Hermes typeface renders before any switch. */
