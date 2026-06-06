@@ -40,3 +40,8 @@ export function sshCmd(host: string, remote: string, connectTimeout = 6): string
   const safeRemote = remote.replace(/'/g, "'\\''");
   return `ssh -o BatchMode=yes -o ConnectTimeout=${connectTimeout} ${host} '${safeRemote}'`;
 }
+
+// Single-quote a string for safe inclusion in a /bin/sh command line.
+export function shellQuote(s: string): string {
+  return `'${s.replace(/'/g, "'\\''")}'`;
+}

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { run, sshCmd } from "@/lib/exec";
+import { run, sshCmd, shellQuote } from "@/lib/exec";
 import { cached } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import type {
@@ -9,6 +9,7 @@ import type {
   FleetMachine,
   GpuStat,
   MachineRole,
+  SysStat,
 } from "@/lib/fleet/types";
 
 export const runtime = "nodejs";
@@ -25,11 +26,15 @@ const MACHINES: {
   controlled: boolean;
   /** SSH alias for a read-only nvidia-smi probe. Set only for GPU nodes we can reach. */
   gpuHost?: string;
+  /** SSH alias for a read-only CPU/RAM probe. "self" = probe locally (this box). */
+  sysHost?: string;
+  /** OS of the sys probe target — picks the probe command. */
+  sysOs?: "linux" | "darwin" | "windows";
 }[] = [
-  { key: "pc1", display: "PC #1", host: "pop-os", role: "PC", controlled: true },
-  { key: "pc2", display: "PC #2", host: "desktop-f5siqio", role: "PC2", controlled: false, gpuHost: "gpu3070" },
-  { key: "mac", display: "MacBook", host: "christophers-macbook-pro", role: "Mac", controlled: true },
-  { key: "vps", display: "VPS", host: "demi-poly", role: "VPS", controlled: true },
+  { key: "pc1", display: "PC #1", host: "pop-os", role: "PC", controlled: true, gpuHost: "self", sysHost: "self", sysOs: "linux" },
+  { key: "pc2", display: "PC #2", host: "desktop-f5siqio", role: "PC2", controlled: false, gpuHost: "gpu3070", sysHost: "gpu3070", sysOs: "windows" },
+  { key: "mac", display: "MacBook", host: "christophers-macbook-pro", role: "Mac", controlled: true, sysHost: "mac", sysOs: "darwin" },
+  { key: "vps", display: "VPS", host: "demi-poly", role: "VPS", controlled: true, sysHost: "demi-poly", sysOs: "linux" },
 ];
 
 // Polymarket bot pm2 family — these are the bot-health processes (other pm2
@@ -58,7 +63,10 @@ type TsPeer = {
 async function probeGpu(gpuHost: string): Promise<GpuStat | null> {
   const query =
     "nvidia-smi --query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu --format=csv,noheader,nounits";
-  const r = await run(sshCmd(gpuHost, query, 6), { timeoutMs: 9000 });
+  const r =
+    gpuHost === "self"
+      ? await run(query, { timeoutMs: 9000 })
+      : await run(sshCmd(gpuHost, query, 6), { timeoutMs: 9000 });
   if (!r.ok) return null;
   const line = r.stdout.trim().split("\n")[0] ?? "";
   const parts = line.split(",").map((s) => s.trim());
@@ -76,6 +84,64 @@ async function probeGpu(gpuHost: string): Promise<GpuStat | null> {
     utilPct: num(util),
     tempC: num(temp),
   };
+}
+
+async function probeSys(
+  sysHost: string,
+  sysOs: "linux" | "darwin" | "windows",
+): Promise<SysStat | null> {
+  // Per-OS one-liner that prints "cpuPct|cores|memUsedMB|memTotalMB".
+  let cmd: string;
+  if (sysOs === "linux") {
+    cmd =
+      'C=$(nproc); read a b c d r < /proc/stat; i1=$d; t1=$((a+b+c+d)); ' +
+      "sleep 0.3; read a b c d r < /proc/stat; i2=$d; t2=$((a+b+c+d)); " +
+      'cpu=$((100-(100*(i2-i1))/(t2-t1))); ' +
+      'M=$(free -m | awk "/^Mem:/{print \\$3\\"|\\"\\$2}"); echo "$cpu|$C|$M"';
+  } else if (sysOs === "darwin") {
+    cmd =
+      "C=$(sysctl -n hw.ncpu); " +
+      'CPU=$(ps -A -o %cpu | awk -v c=$C "{s+=\\$1} END{print int(s/c)}"); ' +
+      "TM=$(( $(sysctl -n hw.memsize)/1048576 )); " +
+      'PF=$(vm_stat | awk "/free/{f=\\$3} /inactive/{i=\\$3} END{print int((f+i)*4096/1048576)}"); ' +
+      'echo "$CPU|$C|$((TM-PF))|$TM"';
+  } else {
+    // windows — wmic, parse separately below (different output shape).
+    cmd =
+      "wmic cpu get LoadPercentage,NumberOfLogicalProcessors /value & " +
+      "wmic OS get FreePhysicalMemory,TotalVisibleMemorySize /value";
+  }
+
+  const local = sysHost === "self";
+  const r = local
+    ? await run(`bash -c ${shellQuote(cmd)}`, { timeoutMs: 9000 })
+    : await run(sshCmd(sysHost, cmd, 6), { timeoutMs: 11000 });
+  if (!r.ok) return null;
+  const out = r.stdout;
+
+  if (sysOs === "windows") {
+    const grab = (k: string) => {
+      const m = out.match(new RegExp(`${k}=(\\d+)`, "i"));
+      return m ? Number(m[1]) : NaN;
+    };
+    const load = grab("LoadPercentage");
+    const cores = grab("NumberOfLogicalProcessors");
+    const freeKB = grab("FreePhysicalMemory");
+    const totalKB = grab("TotalVisibleMemorySize");
+    if (![load, cores, freeKB, totalKB].every(Number.isFinite)) return null;
+    const memTotalMB = Math.round(totalKB / 1024);
+    return {
+      cpuPct: load,
+      cores,
+      memUsedMB: memTotalMB - Math.round(freeKB / 1024),
+      memTotalMB,
+    };
+  }
+
+  const parts = out.trim().split("\n")[0]?.split("|").map((s) => Number(s.trim()));
+  if (!parts || parts.length < 4 || !parts.every(Number.isFinite)) return null;
+  const [cpuPct, cores, memUsedMB, memTotalMB] = parts;
+  return { cpuPct, cores, memUsedMB, memTotalMB };
 }
 
 async function probeMachines(): Promise<FleetMachine[]> {
@@ -121,8 +187,13 @@ async function probeMachines(): Promise<FleetMachine[]> {
           ? peer.LastSeen
           : null;
       const online = isSelf ? true : Boolean(peer?.Online);
-      // Probe GPU only when the box is a reachable GPU node and currently online.
-      const gpu = m.gpuHost && online ? await probeGpu(m.gpuHost) : null;
+      // Probe GPU + sys only when reachable. Self probes locally; others over SSH.
+      const [gpu, sys] = await Promise.all([
+        m.gpuHost && online ? probeGpu(m.gpuHost) : Promise.resolve(null),
+        m.sysHost && (online || isSelf) && m.sysOs
+          ? probeSys(m.sysHost, m.sysOs)
+          : Promise.resolve(null),
+      ]);
       return {
         key: m.key,
         display: m.display,
@@ -135,6 +206,7 @@ async function probeMachines(): Promise<FleetMachine[]> {
         lastSeen,
         self: isSelf,
         gpu,
+        sys,
       } satisfies FleetMachine;
     }),
   );

@@ -62,6 +62,12 @@ function MachineRow({ m }: { m: FleetMachine }) {
             {m.gpu.tempC}°C
           </span>
         )}
+        {m.sys && (
+          <span className="font-mono-ui tabular block truncate text-[0.56rem] text-text-disabled">
+            CPU {m.sys.cpuPct}% · {m.sys.cores}c · RAM{" "}
+            {Math.round(m.sys.memUsedMB / 1024)}/{Math.round(m.sys.memTotalMB / 1024)}G
+          </span>
+        )}
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-0.5">
