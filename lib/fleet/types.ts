@@ -117,6 +117,8 @@ export interface FleetMachine {
   self: boolean;
   /** Live GPU readout (SSH nvidia-smi). Null unless the box is a probed GPU node. */
   gpu?: GpuStat | null;
+  /** Live CPU/RAM readout (SSH). Null unless the box is probed for system load. */
+  sys?: SysStat | null;
 }
 
 export interface GpuStat {
@@ -125,6 +127,14 @@ export interface GpuStat {
   memTotalMB: number;
   utilPct: number;
   tempC: number;
+}
+
+export interface SysStat {
+  /** Whole-box CPU load, 0-100. */
+  cpuPct: number;
+  cores: number;
+  memUsedMB: number;
+  memTotalMB: number;
 }
 
 export interface BotProcess {
