@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const VAULT =
   process.env.OBSIDIAN_VAULT_PATH ??
-  "/mnt/c/Users/demig/iCloudDrive/Documents/Obsidian Vault";
+  `${process.env.HOME ?? process.cwd()}/Obsidian Vault`;
 
 // Pull the bullets under a "## Heading" until the next "## " heading.
 function section(md: string, heading: string): string[] {

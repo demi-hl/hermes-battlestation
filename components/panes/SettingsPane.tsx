@@ -42,7 +42,7 @@ export function SettingsPane() {
         <Row
           icon={CpuIcon}
           label="Model"
-          value={`${model.label} · ${model.plan}`}
+          value={model.label}
           hint="Switch from the context bar"
         />
       </section>

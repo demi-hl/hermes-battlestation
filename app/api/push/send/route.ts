@@ -17,7 +17,7 @@ export async function POST(req: Request) {
       );
     }
     webpush.setVapidDetails(
-      "mailto:christophergervais92@gmail.com",
+      process.env.VAPID_CONTACT ?? "mailto:admin@example.com",
       pubKey,
       privKey,
     );

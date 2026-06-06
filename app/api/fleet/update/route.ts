@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { run } from "@/lib/exec";
+import { fleetNode } from "@/lib/fleet/hosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -8,14 +9,15 @@ export const dynamic = "force-dynamic";
  * Trigger a Claude Code update on a fleet box, then verify by re-probing the
  * version. Real command execution — `claude update` (self-update) with an npm
  * fallback. Returns the version before/after so the UI can confirm the bump.
+ *
+ * SSH prefixes are resolved from env (lib/fleet/hosts.ts) — no hosts in source.
  */
 
-const PREFIX: Record<string, string> = {
-  pc: "",
-  pc2: "ssh -o BatchMode=yes -o ConnectTimeout=8 gpu3070",
-  mac: "ssh -o BatchMode=yes -o ConnectTimeout=8 christophergervais@christophers-macbook-pro",
-  vps: "ssh -o BatchMode=yes -o ConnectTimeout=8 root@demi-poly",
-};
+function prefixFor(box: string): string | undefined {
+  if (box === "pc") return ""; // local
+  const node = fleetNode(box as "pc1" | "pc2" | "mac" | "vps");
+  return node?.ssh;
+}
 
 function wrap(prefix: string, remote: string): string {
   return prefix ? `${prefix} '${remote.replace(/'/g, "'\\''")}'` : remote;
@@ -35,9 +37,9 @@ export async function POST(req: Request) {
   }
 
   const box = body.box ?? "";
-  const prefix = PREFIX[box];
+  const prefix = prefixFor(box);
   if (prefix === undefined) {
-    return NextResponse.json({ ok: false, error: "unknown box" }, { status: 404 });
+    return NextResponse.json({ ok: false, error: "unknown or unconfigured box" }, { status: 404 });
   }
 
   // Before.

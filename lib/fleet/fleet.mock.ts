@@ -17,7 +17,7 @@ const MIN = 60 * SEC;
  *
  * Coverage the board needs to exercise every feature:
  *  - all four lanes + the BLOCKED tray,
- *  - all four nodes (PC/PC2/Mac/VPS) and both billing subs,
+ *  - all four nodes (PC/PC2/Mac/VPS),
  *  - a subagent spawn tree (a parent with children → expandable),
  *  - a STALE agent (lastSignal ~2.4m old, the verify-loop deadlock),
  *  - DONE agents carrying a real commit SHA (the only proof of done).
@@ -30,7 +30,6 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       objective: "slice 4 fleet board + kanban",
       node: "PC",
       lane: "working",
-      billing: "demi-max",
       children: ["pc-a31f-1", "pc-a31f-2"],
       startedAt: now - 14 * MIN,
       lastSignal: now - 7 * SEC,
@@ -43,7 +42,6 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       objective: "fleet.mock + API routes",
       node: "PC",
       lane: "working",
-      billing: "demi-max",
       parentId: "pc-a31f",
       startedAt: now - 11 * MIN,
       lastSignal: now - 4 * SEC,
@@ -56,7 +54,6 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       objective: "fleet types + chips",
       node: "PC",
       lane: "done",
-      billing: "demi-max",
       parentId: "pc-a31f",
       startedAt: now - 13 * MIN,
       lastSignal: now - 6 * MIN,
@@ -72,7 +69,6 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       objective: "polymarket neg-risk scanner tuning",
       node: "PC",
       lane: "verifying",
-      billing: "demi-max",
       startedAt: now - 26 * MIN,
       lastSignal: now - 19 * SEC,
       signal: "npm test · 42/58 passing",
@@ -86,7 +82,6 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       objective: "agelesshumans portal a11y pass",
       node: "PC",
       lane: "verifying",
-      billing: "demi-max",
       startedAt: now - 33 * MIN,
       lastSignal: now - 144 * SEC,
       signal: "awaiting verify loop",
@@ -94,13 +89,12 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       branch: "fix/a11y-contrast",
     },
 
-    // PC2 (David's Max) working — amber billing attribution.
+    // PC2 working.
     {
       id: "pc2-9c44",
       objective: "remotion clip render dispatch",
       node: "PC2",
       lane: "working",
-      billing: "david-max",
       startedAt: now - 9 * MIN,
       lastSignal: now - 5 * SEC,
       signal: "rendering shot 12/30",
@@ -112,7 +106,6 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       objective: "x-content-generator thread drafts",
       node: "Mac",
       lane: "spawned",
-      billing: "demi-max",
       startedAt: now - 22 * SEC,
       lastSignal: now - 3 * SEC,
       signal: "booting session · loading skills",
@@ -124,7 +117,6 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       objective: "pokemon-card-agent grading sync",
       node: "Mac",
       lane: "done",
-      billing: "demi-max",
       startedAt: now - 41 * MIN,
       lastSignal: now - 70 * SEC,
       signal: "committed",
@@ -139,7 +131,6 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       objective: "hl-media feed processor fix",
       node: "PC",
       lane: "done",
-      billing: "demi-max",
       startedAt: now - 52 * MIN,
       lastSignal: now - 4 * MIN,
       signal: "committed + pushed",
@@ -148,25 +139,23 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       commitSha: "c20be41",
     },
 
-    // VPS — the live Polymarket bot represented as a fleet agent (billing none).
+    // VPS — the live bot represented as a fleet agent.
     {
       id: "vps-bot",
       objective: "polymarket arb bot · live",
       node: "VPS",
       lane: "working",
-      billing: "none",
       startedAt: now - 6 * 86_400 * SEC,
       lastSignal: now - 4 * SEC,
-      signal: "demi-server online · scanning markets",
+      signal: "bot online · scanning markets",
     },
 
-    // BLOCKED tray — David's box, GPU OOM.
+    // BLOCKED tray — node 2, GPU OOM.
     {
       id: "pc2-3f55",
       objective: "blender scene bake",
       node: "PC2",
       lane: "blocked",
-      billing: "david-max",
       startedAt: now - 17 * MIN,
       lastSignal: now - 31 * SEC,
       signal: "BLOCKED: GPU OOM, awaiting retry",
@@ -178,7 +167,6 @@ export function buildFleetAgents(now: number): FleetAgent[] {
       objective: "BajaFish full sweep merge",
       node: "PC",
       lane: "blocked",
-      billing: "demi-max",
       startedAt: now - 28 * MIN,
       lastSignal: now - 200 * SEC,
       signal: "BLOCKED: conflict in package-lock.json",

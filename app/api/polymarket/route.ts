@@ -6,8 +6,8 @@ import type { ApiEnvelope, BotStatus } from "@/lib/types";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const HOST = process.env.POLY_HOST ?? "demi-poly";
-const PROC = process.env.POLY_PROC ?? "demi-server";
+const HOST = process.env.POLY_HOST ?? "";
+const PROC = process.env.POLY_PROC ?? "app-server";
 
 const PNL_REASON = "no clean read-only source (bot API requires login)";
 

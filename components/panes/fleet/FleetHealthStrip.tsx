@@ -52,7 +52,7 @@ function MachineRow({ m }: { m: FleetMachine }) {
           )}
         </div>
         <span className="font-mono-ui block truncate text-[0.6rem] text-text-tertiary">
-          {m.host}
+          {m.display}
           {m.os ? ` · ${m.os}` : ""}
         </span>
         {m.gpu && (
@@ -134,7 +134,7 @@ function BotCard({ bot }: { bot: FleetHealth["bot"] }) {
             Polymarket bot
           </span>
           <span className="font-mono-ui block text-[0.6rem] text-text-tertiary">
-            demi-poly · pm2
+            VPS · pm2
           </span>
         </div>
         <span className="flex items-center gap-1.5">
@@ -152,7 +152,7 @@ function BotCard({ bot }: { bot: FleetHealth["bot"] }) {
               bot.procs.map((p) => <ProcRow key={p.name} p={p} />)
             ) : (
               <p className="py-2 text-[0.64rem] text-text-tertiary">
-                No demi-server family processes found.
+                No bot family processes found.
               </p>
             )}
           </div>

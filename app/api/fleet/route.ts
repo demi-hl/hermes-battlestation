@@ -1,37 +1,29 @@
 import { NextResponse } from "next/server";
-import { run, sshCmd } from "@/lib/exec";
+import { run } from "@/lib/exec";
 import { cached } from "@/lib/cache";
 import type { ApiEnvelope, FleetHost } from "@/lib/types";
+import { FLEET } from "@/lib/fleet/hosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// PC is local (no ssh). The rest are ssh aliases from ~/.ssh/config.
-const REMOTE: { host: string; label: string }[] = [
-  { host: "gpu3070", label: "gpu3070" },
-  { host: "demi-poly", label: "demi-poly" },
-  { host: "ccmb", label: "ccmb" },
-];
+// Reachability probe per configured node. Hosts/labels come from env
+// (lib/fleet/hosts.ts); only generic display names ever reach the client.
 
-async function probeLocal(): Promise<FleetHost> {
-  const r = await run("echo up", { timeoutMs: 4000 });
+async function probeNode(
+  key: string,
+  label: string,
+  ssh: string,
+): Promise<FleetHost> {
+  const local = ssh === "";
+  const cmd = local ? "echo up" : `${ssh} 'echo up'`;
+  const r = await run(cmd, { timeoutMs: local ? 4000 : 8000 });
   return {
-    host: "local",
-    label: "PC local",
-    up: r.ok && r.stdout.trim() === "up",
-    latencyMs: r.ms,
-    local: true,
-  };
-}
-
-async function probeRemote(host: string, label: string): Promise<FleetHost> {
-  const r = await run(sshCmd(host, "echo up", 5), { timeoutMs: 8000 });
-  return {
-    host,
+    host: key,
     label,
     up: r.ok && r.stdout.trim() === "up",
     latencyMs: r.ok ? r.ms : null,
-    local: false,
+    local,
   };
 }
 
@@ -40,10 +32,10 @@ export async function GET() {
     "fleet",
     20_000,
     async () => {
-      const results = await Promise.all([
-        probeLocal(),
-        ...REMOTE.map((h) => probeRemote(h.host, h.label)),
-      ]);
+      const nodes = FLEET.filter((n) => n.ssh !== undefined);
+      const results = await Promise.all(
+        nodes.map((n) => probeNode(n.key, n.display, n.ssh as string)),
+      );
       return { data: results, fetchedAt: new Date().toISOString() };
     },
   );

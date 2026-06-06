@@ -50,9 +50,9 @@ export async function POST(req: Request) {
 
       try {
         const child = spawn(
-          "/home/demi/.local/bin/hermes",
+          process.env.HERMES_BIN ?? "hermes",
           ["chat", "-q", message, "--yolo", "--quiet"],
-          { cwd, env: { ...process.env, HOME: "/home/demi" }, stdio: ["ignore", "pipe", "pipe"] },
+          { cwd, env: { ...process.env }, stdio: ["ignore", "pipe", "pipe"] },
         );
 
         let out = "";

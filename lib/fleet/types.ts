@@ -1,19 +1,17 @@
 // Shared shapes for the Fleet slice: the Team-of-Agents board, the fleet
-// health strip (tailnet machines + the VPS Polymarket bot), and their colour
-// metadata. Kept in its own module so the slice does not have to touch the
-// slice-1 `lib/types.ts` contract.
+// health strip (tailnet machines + the VPS bot), and their colour metadata.
+// Kept in its own module so the slice does not have to touch the slice-1
+// `lib/types.ts` contract.
 
-/** PC = DEMI Max box, PC2 = David Max box, Mac = DEMI Max, VPS = bot host. */
+/** Logical fleet nodes. */
 export type AgentNode = "PC" | "PC2" | "Mac" | "VPS";
 export type AgentLane = "spawned" | "working" | "verifying" | "done" | "blocked";
-export type BillingSub = "demi-max" | "david-max" | "none";
 
 export interface FleetAgent {
   id: string;
   objective: string;
   node: AgentNode;
   lane: AgentLane;
-  billing: BillingSub;
   parentId?: string;
   children?: string[];
   /** epoch ms. */
@@ -57,20 +55,12 @@ export interface NodeMeta {
   sub: string;
 }
 
-/** Node chip palette — PC teal, PC2 amber (David), Mac slate, VPS violet. */
+/** Node chip palette — PC teal, PC2 amber, Mac slate, VPS violet. */
 export const NODE_META: Record<AgentNode, NodeMeta> = {
-  PC: { label: "PC", color: "#2dd4bf", sub: "DEMI Max" },
-  PC2: { label: "PC #2", color: "#f5b54a", sub: "PC #2" },
-  Mac: { label: "Mac", color: "#94a3b8", sub: "DEMI Max" },
+  PC: { label: "PC", color: "#2dd4bf", sub: "node 1" },
+  PC2: { label: "PC #2", color: "#f5b54a", sub: "node 2" },
+  Mac: { label: "Mac", color: "#94a3b8", sub: "node 3" },
   VPS: { label: "VPS", color: "#a78bfa", sub: "bot" },
-};
-
-/** Billing chip palette — your-Max teal vs David-Max amber so cap attribution
- *  is glanceable at a glance. */
-export const BILLING_META: Record<BillingSub, { label: string; color: string }> = {
-  "demi-max": { label: "DEMI Max", color: "#2dd4bf" },
-  "david-max": { label: "PC #2", color: "#f5b54a" },
-  none: { label: "no sub", color: "#94a3b8" },
 };
 
 /** Amber stale signal. A card with no signal for this long must be VISIBLE
@@ -105,8 +95,6 @@ export interface FleetMachine {
   key: string;
   /** Display name, e.g. "PC #1". */
   display: string;
-  /** Tailnet hostname we match the peer on. */
-  host: string;
   role: MachineRole;
   /** Whether we SSH-probe it (trusted) or show tailnet status only. */
   controlled: boolean;
@@ -152,7 +140,7 @@ export interface BotProcess {
 export interface BotHealth {
   reachable: boolean;
   procs: BotProcess[];
-  /** pm2 processes outside the Polymarket bot family (rolled up, not listed). */
+  /** pm2 processes outside the bot family (rolled up, not listed). */
   otherCount: number;
   /** No clean source for last-trade ts is exposed; never fabricated. */
   lastTrade: { available: false; reason: string };

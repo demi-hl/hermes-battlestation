@@ -71,8 +71,8 @@ This is not just an IDE — it is the COMPLETE Hermes desktop app, controllable 
 desktop dashboard (`/usr/local/lib/hermes-agent/web/src/pages/`) exposes 17 control surfaces; Locals
 Only must reach ALL of them (port the real backend calls — these pages already talk to the Hermes
 daemon, reuse those APIs, do not rebuild the control logic):
-- **Models** — model routing + the model picker (default Opus 4.8/Max), per-session model switch.
-- **Providers/OAuth** — the Max OAuth path, provider config (the thing that must stay anthropic, never OpenRouter).
+- **Models** — model routing + the model picker (default Opus 4.8), per-session model switch.
+- **Providers** — provider config (defaults to anthropic, configurable via env).
 - **Cron** — list/create/pause/run scheduled jobs (port ScheduleBuilder). Control automations from the phone.
 - **Channels** — gateway/platform wiring (Telegram, etc.) — manage the very conduits this app replaces.
 - **Sessions** — browse/resume/search all agent sessions (this is also where per-repo threads live).
@@ -140,7 +140,7 @@ mission control. A desktop IDE has none of this.
 - Brand = Nous girl icon + blackletter "locals only" / "hermes agent" lockup. Hermes Teal default.
 - The 8 desktop themes ported verbatim. Collapse/Nous fonts self-hosted. Backdrop + DS keyframes.
 - Premium feel = Linear/Raycast/Cursor bar. 60fps. Native gestures, haptics, skeletons, splash.
-- Default model claude-opus-4-8 on Max (NEVER OpenRouter). Context bar pinned bottom.
+- Default model claude-opus-4-8 (provider configurable). Context bar pinned bottom.
 - Standalone dir, survives `hermes update`. No em/en dashes in copy. Real data, never fabricated.
 - Honest stubs: any IDE surface not finished ships a designed "coming soon" state and is named as
   such in the verification report. Do NOT fake a working debugger/LSP.
@@ -162,11 +162,10 @@ DEMI shared the Conductor desktop layout as the definitive superset reference. T
 all-in-one, on the phone. Three-column desktop layout that COLLAPSES into mobile tabs/sheets:
 
 **LEFT RAIL — workspaces + repos (Conductor-exact):**
-- Team header "demigodzx's Team" (real `gh api user --jq .login`).
+- Team header from the authed GitHub user (real `gh api user --jq .login`).
 - Nav: Workspaces · Automations · Tasks & PRs · + New Workspace.
-- Repo list, each repo a row with an active-workspace count badge: hl-media, polymarket-arbitrage-bot,
-  pokemon-multi-agent, x-content-generator, agelesshumans, clawd-local, BajaFish — derive from
-  /home/demi/projects/* + /home/demi/agent/* git repos, do NOT hardcode.
+- Repo list, each repo a row with an active-workspace count badge — derive from
+  the configured project/agent git roots under $HOME, do NOT hardcode.
 - Each repo EXPANDS into its branch-workspaces: branch name (feat/video-clip-system, main, etc.) +
   REAL `+adds −dels` diff stats per branch (git --numstat) + type icon. Active workspace highlighted.
 - Selecting a workspace sets the ENTIRE app context (chat thread + files + changes + terminal cwd) atomically.
@@ -213,7 +212,7 @@ mobile-native descendant. The real desktop layout:
 - **THE SIGNATURE — bottom status strip (port this concept as the mobile context bar):** a single thin
   full-width strip, left→right:
   `⌘ · "Gateway ready" (signal dot) · "Agents N running" · "Cron"` ... then right-aligned:
-  `Running 0:56 · 97.7k/1.0M (token meter bar) · 10% · Session 2:03:09 · claude-opus-4-8 anthropic · v0.15.1 (+21) · <commit hash>`.
+  `Running 0:56 · 97.7k/1.0M (token meter bar) · 10% · Session 2:03:09 · claude-opus-4-8 · v0.15.1 (+21) · <commit hash>`.
   This is the live instrument panel: gateway health, running-agent count, cron, elapsed run timer,
   token-window meter with %, session duration, active model+provider, version, git sha. The mobile
   context bar (pinned bottom, above tab bar) must surface the mobile-relevant subset of these — active
