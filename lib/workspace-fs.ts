@@ -3,6 +3,7 @@ import path from "node:path";
 import os from "node:os";
 import { runFile } from "@/lib/run-file";
 import { cached } from "@/lib/cache";
+import { resolvedRepoRoots } from "@/lib/app-config";
 import type {
   Workspace,
   RepoSummary,
@@ -32,7 +33,8 @@ export type {
 
 const HOME = os.homedir();
 
-/** Fixed roots we will enumerate git repos under. Nothing outside these is reachable. */
+/** Default roots when no user config is set. The resolved set (config overlay)
+ *  comes from resolvedRepoRoots(); this stays exported for back-compat. */
 export const ALLOWED_ROOTS = [
   path.join(HOME, "projects"),
   path.join(HOME, "agent"),
@@ -67,11 +69,12 @@ export interface RepoRef {
   root: string;
 }
 
-/** Enumerate git repos under the allowlist (basename = slug). Cached 30s. */
+/** Enumerate git repos under the resolved roots (basename = slug). Cached 30s. */
 export async function listRepos(): Promise<RepoRef[]> {
   return cached("wsfs:repos", 30_000, async () => {
+    const roots = await resolvedRepoRoots();
     const found: RepoRef[] = [];
-    for (const root of ALLOWED_ROOTS) {
+    for (const root of roots) {
       let entries: string[] = [];
       try {
         entries = await fs.readdir(root);
@@ -250,6 +253,65 @@ export async function repoSummary(ref: RepoRef): Promise<RepoSummary> {
   };
 }
 
+export interface CreateWorktreeResult {
+  branch: string;
+  path: string;
+  created: boolean;
+  base: string | null;
+}
+
+/**
+ * Create a git worktree for `branch`, checked out at a sibling path
+ * `<repo>-worktrees/<safe-branch>`. If the branch already exists it is checked
+ * out; otherwise it is created from `from` (defaults to the detected base).
+ * Everything runs via execFile argv — no client value touches a shell.
+ */
+export async function createWorktree(
+  ref: RepoRef,
+  branch: string,
+  from?: string,
+): Promise<CreateWorktreeResult> {
+  if (!SAFE_BRANCH.test(branch)) {
+    throw new Error("invalid branch name");
+  }
+  if (from && !SAFE_BRANCH.test(from)) {
+    throw new Error("invalid base ref");
+  }
+
+  const base = await detectBase(ref.root);
+  const startPoint = from || base || "HEAD";
+
+  // Already has a worktree for this branch? Return it.
+  const existing = await listWorktrees(ref.root);
+  const match = existing.find((w) => w.branch === branch);
+  if (match) {
+    return { branch, path: match.path, created: false, base };
+  }
+
+  const safeDir = branch.replace(/[/\\]+/g, "-").replace(/[^\w.-]+/g, "_");
+  const parent = `${ref.root}-worktrees`;
+  const dest = path.join(parent, safeDir);
+  await fs.mkdir(parent, { recursive: true });
+
+  // Does the branch ref already exist locally?
+  const hasBranch = await git(ref.root, [
+    "show-ref",
+    "--verify",
+    "--quiet",
+    `refs/heads/${branch}`,
+  ]);
+
+  const args = hasBranch.ok
+    ? ["worktree", "add", dest, branch]
+    : ["worktree", "add", "-b", branch, dest, startPoint];
+
+  const r = await git(ref.root, args, 20000);
+  if (!r.ok) {
+    throw new Error(r.stderr.trim() || "git worktree add failed");
+  }
+  return { branch, path: dest, created: true, base };
+}
+
 function sumNumstat(stdout: string): { adds: number; dels: number; files: number } {
   let adds = 0;
   let dels = 0;
@@ -385,4 +447,87 @@ export async function writeFileSafe(
   }
   await fs.writeFile(abs, content, "utf8");
   return { bytes: Buffer.byteLength(content, "utf8") };
+}
+
+// ---------------------------------------------------------------------------
+// Git: working-tree changes (the source-control "Changes" panel)
+// ---------------------------------------------------------------------------
+
+export interface ChangeEntry {
+  path: string;
+  /** Single-letter status: M, A, D, R, C, ?, U. */
+  status: string;
+  staged: boolean;
+  adds: number | null;
+  dels: number | null;
+}
+
+export interface ChangesResult {
+  branch: string | null;
+  ahead: number;
+  behind: number;
+  entries: ChangeEntry[];
+}
+
+/** Parse `git status --porcelain=v1 -b -z` + `git diff --numstat` into a flat
+ *  change list for the Changes panel. Read-only; argv-only (no shell). */
+export async function listChanges(root: string): Promise<ChangesResult> {
+  const [statusR, numR, numStagedR] = await Promise.all([
+    git(root, ["status", "--porcelain=v1", "-b", "-z"]),
+    git(root, ["diff", "--numstat", "-z"]),
+    git(root, ["diff", "--numstat", "-z", "--cached"]),
+  ]);
+
+  // numstat: "adds\tdels\tpath\0" repeated.
+  const parseNum = (out: string): Map<string, [number, number]> => {
+    const m = new Map<string, [number, number]>();
+    for (const rec of out.split("\0")) {
+      if (!rec) continue;
+      const t = rec.split("\t");
+      if (t.length < 3) continue;
+      const adds = t[0] === "-" ? 0 : Number(t[0]);
+      const dels = t[1] === "-" ? 0 : Number(t[1]);
+      m.set(t[2], [adds, dels]);
+    }
+    return m;
+  };
+  const numUnstaged = numR.ok ? parseNum(numR.stdout) : new Map();
+  const numStaged = numStagedR.ok ? parseNum(numStagedR.stdout) : new Map();
+
+  let branch: string | null = null;
+  let ahead = 0;
+  let behind = 0;
+  const entries: ChangeEntry[] = [];
+
+  if (statusR.ok) {
+    const recs = statusR.stdout.split("\0");
+    for (const rec of recs) {
+      if (!rec) continue;
+      if (rec.startsWith("## ")) {
+        // "## branch...origin/branch [ahead 1, behind 2]"
+        const head = rec.slice(3);
+        branch = head.split(/\.\.\.|\s/)[0] || null;
+        const a = head.match(/ahead (\d+)/);
+        const b = head.match(/behind (\d+)/);
+        if (a) ahead = Number(a[1]);
+        if (b) behind = Number(b[1]);
+        continue;
+      }
+      const x = rec[0];
+      const y = rec[1];
+      const path = rec.slice(3);
+      const staged = x !== " " && x !== "?";
+      const code = (staged ? x : y) || "?";
+      const num = (staged ? numStaged : numUnstaged).get(path) ?? null;
+      entries.push({
+        path,
+        status: code === "?" ? "?" : code,
+        staged,
+        adds: num ? num[0] : null,
+        dels: num ? num[1] : null,
+      });
+    }
+  }
+
+  return { branch, ahead, behind, entries };
 }

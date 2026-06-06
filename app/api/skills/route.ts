@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { run } from "@/lib/exec";
-import { cached } from "@/lib/cache";
+import { cached, bust } from "@/lib/cache";
 import type {
   SkillEntry,
   SkillGroup,
@@ -14,6 +14,7 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 const HOME = process.env.HOME ?? process.cwd();
+const HERMES_HOME = process.env.HERMES_HOME || path.join(HOME, ".hermes");
 const SKILL_ROOTS = [
   `${HOME}/.hermes/skills`,
   "/usr/local/lib/hermes-agent/skills",
@@ -202,4 +203,58 @@ export async function GET() {
   });
 
   return NextResponse.json(payload);
+}
+
+/**
+ * Toggle a skill's enabled state by editing `skills.disabled` in config.yaml.
+ * Body: { name: string, enabled: boolean }. enabled=false adds to the disabled
+ * list; enabled=true removes it. config.yaml is YAML with structured values, so
+ * we edit it via a Python yaml round-trip (hermes config set can't write lists).
+ * Changes apply to NEW sessions (the running gateway loaded config at boot).
+ */
+export async function POST(req: Request) {
+  let body: { name?: string; enabled?: boolean };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+
+  const name = (body.name ?? "").trim();
+  if (!name) return NextResponse.json({ error: "name required" }, { status: 400 });
+  if (typeof body.enabled !== "boolean") {
+    return NextResponse.json({ error: "enabled (boolean) required" }, { status: 400 });
+  }
+  // Guard: skill names are [a-z0-9._-]; reject anything else so it can't break
+  // out of the python literal.
+  if (!/^[a-zA-Z0-9._-]+$/.test(name)) {
+    return NextResponse.json({ error: "invalid skill name" }, { status: 400 });
+  }
+
+  const cfgPath = path.join(HERMES_HOME, "config.yaml");
+  const enable = body.enabled;
+  // Python edits the disabled set: remove on enable, add on disable.
+  const py = [
+    "import yaml,sys",
+    `p=${JSON.stringify(cfgPath)}`,
+    `n=${JSON.stringify(name)}`,
+    `en=${enable ? "True" : "False"}`,
+    "d=yaml.safe_load(open(p)) or {}",
+    "sk=d.setdefault('skills',{})",
+    "dis=set(sk.get('disabled') or [])",
+    "dis.discard(n) if en else dis.add(n)",
+    "sk['disabled']=sorted(dis)",
+    "yaml.safe_dump(d,open(p,'w'),default_flow_style=False,sort_keys=False)",
+    "print('ok')",
+  ].join("; ");
+
+  const res = await run(`python3 -c ${JSON.stringify(py)}`, { timeoutMs: 10000 });
+  if (!res.ok || !res.stdout.includes("ok")) {
+    return NextResponse.json(
+      { error: (res.stderr || res.stdout || "config write failed").trim().slice(0, 500) },
+      { status: 500 },
+    );
+  }
+  bust("skills");
+  return NextResponse.json({ ok: true, name, enabled: enable });
 }

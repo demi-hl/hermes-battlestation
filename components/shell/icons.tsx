@@ -127,6 +127,30 @@ export const ChevronUpDownIcon = (p: P) => (
   </svg>
 );
 
+export const ChevronDownIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+
+export const CompressIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5" />
+    <path d="M8 3v5H3" stroke="none" fill="currentColor" />
+    <path d="M21 3v5h-5" stroke="none" fill="currentColor" />
+    <path d="M8 21v-5H3" stroke="none" fill="currentColor" />
+    <path d="M21 21v-5h-5" stroke="none" fill="currentColor" />
+    <circle cx="12" cy="12" r="2" stroke="none" fill="currentColor" opacity="0.4" />
+  </svg>
+);
+
+export const ClockIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+);
+
 export const CpuIcon = (p: P) => (
   <svg {...base(p)}>
     <rect x="6" y="6" width="12" height="12" rx="2" />
@@ -154,3 +178,58 @@ export const CloseIcon = (p: P) => (
     <path d="M6 6l12 12M18 6 6 18" />
   </svg>
 );
+
+export const SkillsIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="4" y="4" width="6" height="6" rx="1.5" />
+    <rect x="14" y="4" width="6" height="6" rx="1.5" />
+    <path d="M7 15c0-2 2-3 5-3s5 1 5 3" />
+    <circle cx="7" cy="17" r="2" />
+    <circle cx="17" cy="17" r="2" />
+  </svg>
+);
+
+export const KeyIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="7.5" cy="15.5" r="4.5" />
+    <path d="M10.5 12.5 21 2M16 7l3 3M14 9l2.5 2.5" />
+  </svg>
+);
+
+export const ChartIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M3 3v18h18" />
+    <rect x="7" y="12" width="3" height="6" rx="0.5" />
+    <rect x="12" y="8" width="3" height="10" rx="0.5" />
+    <rect x="17" y="5" width="3" height="13" rx="0.5" />
+  </svg>
+);
+
+export const DownloadIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M12 3v12M8 11l4 4 4-4M4 19h16" />
+  </svg>
+);
+
+export const PlugIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8ZM12 17v5" />
+  </svg>
+);
+
+// Vault: a stylized obsidian gem (diamond facets).
+export const VaultIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M12 2 4 8.5 12 22l8-13.5L12 2Z" />
+    <path d="M4 8.5h16M12 2v20M8 8.5 12 22l4-13.5" />
+  </svg>
+);
+
+// Router: a hub/switch with an antenna — the OpenRouter dispatch pane.
+export const RouterIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3" y="14" width="18" height="7" rx="2" />
+    <path d="M7 14V8a5 5 0 0 1 10 0v6M7 17.5h.01M11 17.5h.01" />
+  </svg>
+);
+

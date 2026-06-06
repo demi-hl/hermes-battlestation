@@ -169,7 +169,17 @@ export function ReposPane() {
         )}
       </div>
 
-      <NewWorkspaceSheet open={newOpen} onClose={() => setNewOpen(false)} />
+      <NewWorkspaceSheet
+        open={newOpen}
+        onClose={() => setNewOpen(false)}
+        repos={data?.repos ?? []}
+        defaultRepo={active?.repo ?? data?.repos[0]?.slug ?? null}
+        onCreated={async (slug, branch, wtPath) => {
+          await load();
+          setExpanded((prev) => new Set(prev).add(slug));
+          setActiveWorkspace({ repo: slug, path: wtPath, branch });
+        }}
+      />
     </div>
   );
 }
@@ -477,25 +487,127 @@ function DiffStatChip({ stat }: { stat: StatState | undefined }) {
 function NewWorkspaceSheet({
   open,
   onClose,
+  repos,
+  defaultRepo,
+  onCreated,
 }: {
   open: boolean;
   onClose: () => void;
+  repos: RepoSummary[];
+  defaultRepo: string | null;
+  onCreated: (slug: string, branch: string, path: string) => void;
 }) {
+  const [slug, setSlug] = useState<string | null>(defaultRepo);
+  const [branch, setBranch] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (open) {
+      setSlug(defaultRepo);
+      setBranch("");
+      setErr(null);
+    }
+  }, [open, defaultRepo]);
+
+  const repo = repos.find((r) => r.slug === slug) ?? null;
+  const trimmed = branch.trim();
+  const valid = !!slug && trimmed.length > 0 && /^[\w./+@-]+$/.test(trimmed);
+
+  const submit = useCallback(async () => {
+    if (!slug || !valid || busy) return;
+    setBusy(true);
+    setErr(null);
+    haptic(12);
+    try {
+      const res = await fetch("/api/workspaces/worktree", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ repo: slug, branch: trimmed }),
+      });
+      const body = await res.json();
+      if (!res.ok) throw new Error(body?.error ?? "worktree create failed");
+      haptic(20);
+      onCreated(slug, body.branch as string, body.path as string);
+      onClose();
+    } catch (e) {
+      setErr((e as Error).message);
+      haptic(30);
+    } finally {
+      setBusy(false);
+    }
+  }, [slug, trimmed, valid, busy, onCreated, onClose]);
+
   return (
     <Sheet open={open} onClose={onClose} title="New Workspace">
-      <div className="px-3 pb-3">
-        <p className="text-sm leading-relaxed text-text-secondary">
-          Creating a workspace will branch or add a git worktree for the selected
-          repo and bind it as the active context.
+      <div className="space-y-4 px-3 pb-3">
+        <p className="text-[0.8rem] leading-relaxed text-text-secondary">
+          Adds a git worktree for a branch in the selected repo and binds it as
+          the active context. The branch is created from the repo base if it
+          does not exist, checked out at a sibling worktree path.
         </p>
-        <p className="mt-2 text-[0.72rem] leading-relaxed text-text-tertiary">
-          This action is not wired in this slice. Workspace creation writes to
-          git and is owned by the integration pass, so it ships as a designed
-          state rather than a faked branch.
-        </p>
-        <span className="mt-3 inline-block font-mono-ui text-[0.6rem] uppercase tracking-[0.16em] text-text-disabled">
-          coming soon
-        </span>
+
+        <label className="block">
+          <span className="mb-1.5 block font-mono-ui text-[0.6rem] uppercase tracking-[0.16em] text-text-tertiary">
+            Repository
+          </span>
+          <select
+            value={slug ?? ""}
+            onChange={(e) => setSlug(e.target.value || null)}
+            className="w-full rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_4%,transparent)] px-3 py-2.5 text-[0.84rem] text-midground outline-none focus:border-[color-mix(in_srgb,var(--midground)_30%,transparent)]"
+          >
+            {repos.length === 0 && <option value="">No repos found</option>}
+            {repos.map((r) => (
+              <option key={r.slug} value={r.slug}>
+                {r.slug}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block">
+          <span className="mb-1.5 block font-mono-ui text-[0.6rem] uppercase tracking-[0.16em] text-text-tertiary">
+            Branch name
+          </span>
+          <input
+            type="text"
+            value={branch}
+            onChange={(e) => setBranch(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") submit();
+            }}
+            placeholder="feat/my-change"
+            autoCapitalize="off"
+            autoCorrect="off"
+            spellCheck={false}
+            className="w-full rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_4%,transparent)] px-3 py-2.5 font-mono-ui text-[0.82rem] text-midground outline-none placeholder:text-text-disabled focus:border-[color-mix(in_srgb,var(--midground)_30%,transparent)]"
+          />
+          {repo?.base && (
+            <span className="mt-1.5 block font-mono-ui text-[0.62rem] text-text-tertiary">
+              from {repo.base}
+            </span>
+          )}
+        </label>
+
+        {err && (
+          <p className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-destructive)_40%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] px-3 py-2 text-[0.72rem] text-[var(--color-destructive)]">
+            {err}
+          </p>
+        )}
+
+        <button
+          type="button"
+          disabled={!valid || busy}
+          onClick={submit}
+          className={cn(
+            "flex w-full items-center justify-center gap-2 rounded-[var(--radius-md)] px-4 py-2.5 text-[0.84rem] font-medium transition-colors",
+            valid && !busy
+              ? "bg-midground text-[var(--color-background)] active:scale-[0.98]"
+              : "cursor-not-allowed bg-[color-mix(in_srgb,var(--midground)_12%,transparent)] text-text-disabled",
+          )}
+        >
+          {busy ? "Creating worktree…" : "Create worktree"}
+        </button>
       </div>
     </Sheet>
   );

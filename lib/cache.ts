@@ -17,3 +17,8 @@ export async function cached<T>(
   store.set(key, { value, expires: now + ttlMs });
   return value;
 }
+
+/** Drop a cached entry so the next read recomputes (after a mutation). */
+export function bust(key: string): void {
+  store.delete(key);
+}

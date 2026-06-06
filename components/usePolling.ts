@@ -1,7 +1,6 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { ApiEnvelope } from "@/lib/types";
 
 type State<T> = {
   data: T | null;
@@ -24,11 +23,17 @@ export function usePolling<T>(url: string, intervalMs = 30_000): State<T> {
     async (signal?: AbortSignal) => {
       try {
         const res = await fetch(url, { cache: "no-store", signal });
-        const json = (await res.json()) as ApiEnvelope<T>;
+        const json = (await res.json()) as Record<string, unknown>;
         if (!mounted.current) return;
-        setData(json.data);
-        setError(json.error ?? null);
-        setUpdatedAt(json.fetchedAt ?? null);
+        // Tolerate both shapes: the ApiEnvelope `{data, fetchedAt}` wrapper
+        // (e.g. /api/cron) and routes that return the payload bare at the top
+        // level (e.g. /api/skills, /api/analytics, /api/env-keys, /api/mcp).
+        const enveloped =
+          json && typeof json === "object" && "data" in json && "fetchedAt" in json;
+        const payload = enveloped ? (json.data as T) : (json as unknown as T);
+        setData(payload ?? null);
+        setError((json?.error as string | undefined) ?? null);
+        setUpdatedAt((json?.fetchedAt as string | undefined) ?? null);
       } catch (e) {
         if (!mounted.current || (e instanceof Error && e.name === "AbortError"))
           return;

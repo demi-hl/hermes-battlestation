@@ -52,7 +52,9 @@ function MachineRow({ m }: { m: FleetMachine }) {
           )}
         </div>
         <span className="font-mono-ui block truncate text-[0.6rem] text-text-tertiary">
-          {m.display}
+          {m.role === "PC" || m.role === "PC2" || m.role === "Mac" || m.role === "VPS"
+            ? NODE_META[m.role].sub
+            : m.display}
           {m.os ? ` · ${m.os}` : ""}
         </span>
         {m.gpu && (
@@ -66,6 +68,22 @@ function MachineRow({ m }: { m: FleetMachine }) {
           <span className="font-mono-ui tabular block truncate text-[0.56rem] text-text-disabled">
             CPU {m.sys.cpuPct}% · {m.sys.cores}c · RAM{" "}
             {Math.round(m.sys.memUsedMB / 1024)}/{Math.round(m.sys.memTotalMB / 1024)}G
+          </span>
+        )}
+        {m.agent && (
+          <span className="font-mono-ui block truncate text-[0.56rem]">
+            <span
+              style={{
+                color: m.agent.reachable
+                  ? "var(--color-success)"
+                  : "var(--text-disabled)",
+              }}
+            >
+              ● agent {m.agent.reachable ? "up" : "down"}
+            </span>
+            {m.agent.reachable && m.agent.latencyMs != null
+              ? ` · ${m.agent.latencyMs}ms`
+              : ""}
           </span>
         )}
       </div>

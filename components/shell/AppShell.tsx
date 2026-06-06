@@ -24,6 +24,7 @@ import {
 } from "./tabs";
 import { haptic } from "./haptics";
 import { cn } from "@/lib/utils";
+import { IDEShell } from "./ide/IDEShell";
 
 /** Layout heights consumed by the pane padding + chrome. */
 const SHELL_VARS = {
@@ -82,16 +83,17 @@ function DesktopSidebar({
     >
       {/* Brand + collapse toggle */}
       <div className="flex h-[56px] shrink-0 items-center gap-2 border-b border-border px-3">
-        <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md bg-accent text-[11px] font-black text-bg">
-          D
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/nous-logo.svg"
+          alt="Nous"
+          draggable={false}
+          className="h-[22px] w-auto shrink-0"
+        />
         {!collapsed && (
-          <>
-            <span className="min-w-0 text-[13px] font-bold tracking-wide text-ink">
-              DEMI
-            </span>
-            <span className="ml-auto text-[9px] text-faint">ws</span>
-          </>
+          <span className="ml-auto font-mondwest text-display text-[0.58rem] tracking-[0.22em] text-text-tertiary">
+            battlestation
+          </span>
         )}
       </div>
 
@@ -324,7 +326,7 @@ export function AppShell() {
     }
   };
 
-  const renderPane = (id: TabId) => {
+  const renderPane = (id: TabId, desktop = false) => {
     const Pane = getTab(id).Pane;
     return (
       <div
@@ -333,9 +335,12 @@ export function AppShell() {
         }}
         className="absolute inset-0 overflow-y-auto overscroll-contain"
         style={{
-          paddingTop: "calc(var(--app-header-h) + env(safe-area-inset-top) + 6px)",
-          paddingBottom:
-            "calc(var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom) + 8px)",
+          paddingTop: desktop
+            ? "var(--app-header-h)"
+            : "calc(var(--app-header-h) + env(safe-area-inset-top) + 6px)",
+          paddingBottom: desktop
+            ? "0px"
+            : "calc(var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom) + 8px)",
           WebkitOverflowScrolling: "touch",
         }}
       >
@@ -346,25 +351,9 @@ export function AppShell() {
 
   return isDesktop ? (
     /* ------------------------------------------------
-       DESKTOP LAYOUT: sidebar + full-width pane
+       DESKTOP LAYOUT: god-mode IDE (rail + agent spine + source panel)
     ------------------------------------------------ */
-    <div className="flex h-dvh overflow-hidden" style={SHELL_VARS}>
-      <DesktopSidebar activeTab={activeTab} onSelect={goTab} />
-      <div className="flex min-w-0 flex-1 flex-col">
-        <AppHeader />
-        <div
-          ref={(el) => {
-            scrollRefs.current[activeTab] = el;
-          }}
-          className="flex-1 overflow-y-auto overscroll-contain"
-          style={{
-            padding: "20px 28px",
-          }}
-        >
-          {renderPane(activeTab)}
-        </div>
-      </div>
-    </div>
+    <IDEShell />
   ) : (
     /* ------------------------------------------------
        MOBILE LAYOUT: pager + bottom tabs

@@ -1,7 +1,7 @@
 {
-  "name": "Hermes Agent",
-  "short_name": "Hermes",
-  "description": "Hermes Agent — mobile hub. Chat, repos, fleet, and review, over Tailscale.",
+  "name": "Hermes Battlestation",
+  "short_name": "Battlestation",
+  "description": "Hermes Battlestation — cockpit for your local agent. Chat, repos, fleet, and review, over Tailscale.",
   "id": "/",
   "start_url": "/",
   "scope": "/",
@@ -10,8 +10,8 @@
   "background_color": "#041c1c",
   "theme_color": "#041c1c",
   "icons": [
-    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
-    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
     {
       "src": "/icon-512-maskable.png",
       "sizes": "512x512",

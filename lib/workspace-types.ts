@@ -47,3 +47,29 @@ export interface ReadResult {
   size: number;
   content: string | null;
 }
+
+/** Repo avatar: two-letter abbreviation or custom image URL. Stored in localStorage. */
+export interface RepoAvatar {
+  letters: string;
+  imageUrl?: string;
+}
+
+/** Hermes agent profile: model + provider + optional skill bundle. */
+export interface AgentProfile {
+  id: string;
+  label: string;
+  model: string;
+  provider: string;
+  /** Optional skill bundle name loaded when this profile is active. */
+  skills?: string[];
+}
+
+/** An active/live session in progress. */
+export interface ActiveSession {
+  repo: string;
+  branch: string;
+  sessionId: string | null;
+  startedAt: number;
+  messageCount: number;
+  usage: { used: number; total: number } | null;
+}

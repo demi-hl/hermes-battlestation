@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { usePolling } from "@/components/usePolling";
 import { relativeTime } from "@/lib/format";
@@ -78,7 +78,7 @@ function Column({
   onOpen: (id: string) => void;
 }) {
   return (
-    <section className="flex w-[80vw] max-w-[280px] shrink-0 snap-start flex-col">
+    <section className="flex w-[80vw] max-w-[280px] shrink-0 snap-start flex-col lg:w-auto lg:max-w-none lg:flex-1 lg:shrink">
       <header className="mb-2 flex items-center gap-2 px-0.5">
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
         <span className="text-display font-mondwest text-[0.68rem] tracking-[0.12em] text-text-secondary">
@@ -105,12 +105,26 @@ function Column({
 }
 
 export function KanbanPane() {
-  const { data, loading, error, updatedAt } = usePolling<KanbanData>(
+  const { data, loading, error, updatedAt, reload } = usePolling<KanbanData>(
     "/api/kanban",
     15_000,
   );
   const [openId, setOpenId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
+  const [showForm, setShowForm] = useState(false);
+  const [formTitle, setFormTitle] = useState("");
+  const [formBody, setFormBody] = useState("");
+  const [formStatus, setFormStatus] = useState<KanbanStatus>("todo");
+  const [creating, setCreating] = useState(false);
+
+  // auto-dismiss the form when data refresh brings the new card in
+  const prevCountRef = useRef(0);
+  useEffect(() => {
+    if (data && data.tasks.length > prevCountRef.current && prevCountRef.current !== 0) {
+      setShowForm(false);
+    }
+    prevCountRef.current = data?.tasks.length ?? 0;
+  }, [data]);
 
   const tasks = data?.tasks ?? [];
   const byColumn = useMemo(() => {
@@ -123,6 +137,35 @@ export function KanbanPane() {
   const openTask = (id: string) => {
     setOpenId(id);
     setSheetOpen(true);
+  };
+
+  const createTask = useCallback(async () => {
+    const title = formTitle.trim();
+    if (!title) return;
+    setCreating(true);
+    haptic(12);
+    try {
+      const body = formBody.trim() || undefined;
+      await fetch("/api/kanban", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ title, body, status: formStatus }),
+      });
+      setFormTitle("");
+      setFormBody("");
+      reload();
+    } catch {
+      // error swallowed — the user will see the card still absent
+    } finally {
+      setCreating(false);
+    }
+  }, [formTitle, formBody, formStatus, reload]);
+
+  const resetForm = () => {
+    setShowForm(false);
+    setFormTitle("");
+    setFormBody("");
+    setFormStatus("todo");
   };
 
   return (
@@ -142,6 +185,89 @@ export function KanbanPane() {
         </span>
       </header>
 
+      {/* ── quick-create form ── */}
+      <AnimatePresence>
+        {showForm && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden px-3"
+          >
+            <div className="mb-3 rounded-[var(--radius-md)] border border-border bg-card p-3">
+              <input
+                type="text"
+                placeholder="Task title…"
+                value={formTitle}
+                onChange={(e) => setFormTitle(e.target.value)}
+                className="mb-2 w-full rounded-[var(--radius-sm)] border border-border bg-[color-mix(in_srgb,var(--midground)_6%,transparent)] px-2.5 py-1.5 text-[0.78rem] text-midground outline-none placeholder:text-text-disabled focus:border-[color-mix(in_srgb,var(--accent)_60%,transparent)]"
+                autoFocus
+              />
+              <textarea
+                placeholder="Optional body…"
+                value={formBody}
+                onChange={(e) => setFormBody(e.target.value)}
+                rows={2}
+                className="mb-2 w-full resize-none rounded-[var(--radius-sm)] border border-border bg-[color-mix(in_srgb,var(--midground)_6%,transparent)] px-2.5 py-1.5 text-[0.72rem] text-midground outline-none placeholder:text-text-disabled focus:border-[color-mix(in_srgb,var(--accent)_60%,transparent)]"
+              />
+              <div className="flex items-center justify-between gap-2">
+                <select
+                  value={formStatus}
+                  onChange={(e) => setFormStatus(e.target.value as KanbanStatus)}
+                  className="rounded-[var(--radius-sm)] border border-border bg-[color-mix(in_srgb,var(--midground)_6%,transparent)] px-2 py-1 text-[0.7rem] text-midground outline-none focus:border-[color-mix(in_srgb,var(--accent)_60%,transparent)]"
+                >
+                  {KANBAN_COLUMNS.flatMap((col) =>
+                    col.statuses.map((s) => (
+                      <option key={s} value={s}>
+                        {col.label} — {s}
+                      </option>
+                    )),
+                  )}
+                </select>
+                <div className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    onClick={resetForm}
+                    className="rounded-[var(--radius-sm)] px-2.5 py-1 text-[0.7rem] text-text-tertiary transition-colors hover:text-midground active:scale-[0.96]"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!formTitle.trim() || creating}
+                    onClick={createTask}
+                    className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-3 py-1 text-[0.7rem] font-medium text-white transition-colors disabled:opacity-40 active:scale-[0.96]"
+                  >
+                    {creating ? "Creating…" : "Create"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ── floating + button ── */}
+      <div className="relative">
+        {!showForm && (
+          <motion.button
+            type="button"
+            initial={{ opacity: 0, scale: 0.8 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.8 }}
+            onClick={() => {
+              haptic(6);
+              setShowForm(true);
+            }}
+            className="absolute -top-1 right-3 z-10 grid h-7 w-7 place-items-center rounded-full bg-[var(--accent)] text-sm text-white shadow-lg transition-transform active:scale-90"
+            aria-label="Create task"
+          >
+            +
+          </motion.button>
+        )}
+      </div>
+
       {loading && !data ? (
         <ColumnsSkeleton />
       ) : error && !data ? (
@@ -149,7 +275,7 @@ export function KanbanPane() {
       ) : tasks.length === 0 ? (
         <EmptyBoard />
       ) : (
-        <div className="scrollbar-none flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-2">
+        <div className="scrollbar-none flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-2 lg:snap-none lg:items-start lg:overflow-x-visible">
           {byColumn.map((col) => (
             <Column
               key={col.id}
