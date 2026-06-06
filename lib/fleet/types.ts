@@ -55,12 +55,12 @@ export interface NodeMeta {
   sub: string;
 }
 
-/** Node chip palette — PC teal, PC2 amber, Mac slate, VPS violet. */
+/** Node chip palette — PC1 teal, PC2 amber, Mac slate, VPS violet. */
 export const NODE_META: Record<AgentNode, NodeMeta> = {
-  PC: { label: "PC", color: "#2dd4bf", sub: "node 1" },
-  PC2: { label: "PC #2", color: "#f5b54a", sub: "node 2" },
-  Mac: { label: "Mac", color: "#94a3b8", sub: "node 3" },
-  VPS: { label: "VPS", color: "#a78bfa", sub: "bot" },
+  PC: { label: "PC1", color: "#2dd4bf", sub: "you · pop-os" },
+  PC2: { label: "PC2", color: "#f5b54a", sub: "David's · 3070 Ti" },
+  Mac: { label: "Mac", color: "#94a3b8", sub: "CCMB" },
+  VPS: { label: "VPS", color: "#a78bfa", sub: "Polymarket bot" },
 };
 
 /** Amber stale signal. A card with no signal for this long must be VISIBLE

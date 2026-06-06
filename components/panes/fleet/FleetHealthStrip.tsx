@@ -52,7 +52,9 @@ function MachineRow({ m }: { m: FleetMachine }) {
           )}
         </div>
         <span className="font-mono-ui block truncate text-[0.6rem] text-text-tertiary">
-          {m.display}
+          {m.role === "PC" || m.role === "PC2" || m.role === "Mac" || m.role === "VPS"
+            ? NODE_META[m.role].sub
+            : m.display}
           {m.os ? ` · ${m.os}` : ""}
         </span>
         {m.gpu && (

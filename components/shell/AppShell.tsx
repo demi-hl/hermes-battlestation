@@ -24,6 +24,7 @@ import {
 } from "./tabs";
 import { haptic } from "./haptics";
 import { cn } from "@/lib/utils";
+import { IDEShell } from "./ide/IDEShell";
 
 /** Layout heights consumed by the pane padding + chrome. */
 const SHELL_VARS = {
@@ -350,15 +351,9 @@ export function AppShell() {
 
   return isDesktop ? (
     /* ------------------------------------------------
-       DESKTOP LAYOUT: sidebar + full-width pane
+       DESKTOP LAYOUT: god-mode IDE (rail + agent spine + source panel)
     ------------------------------------------------ */
-    <div className="flex h-dvh overflow-hidden" style={SHELL_VARS}>
-      <DesktopSidebar activeTab={activeTab} onSelect={goTab} />
-      <div className="relative flex min-w-0 flex-1 flex-col">
-        <AppHeader />
-        <main className="relative min-h-0 flex-1">{renderPane(activeTab, true)}</main>
-      </div>
-    </div>
+    <IDEShell />
   ) : (
     /* ------------------------------------------------
        MOBILE LAYOUT: pager + bottom tabs

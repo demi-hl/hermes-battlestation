@@ -47,7 +47,7 @@ const env = (k: string): string | undefined => process.env[k];
 export const FLEET: FleetNode[] = [
   {
     key: "pc1",
-    display: "PC #1",
+    display: "PC1 (You)",
     os: "linux",
     match: env("FLEET_PC1_MATCH") ?? "localhost",
     ssh: env("FLEET_PC1_SSH") ?? "",
@@ -57,7 +57,7 @@ export const FLEET: FleetNode[] = [
   },
   {
     key: "pc2",
-    display: "PC #2",
+    display: "PC2 (David's)",
     os: "windows",
     match: env("FLEET_PC2_MATCH"),
     ssh: env("FLEET_PC2_SSH"),

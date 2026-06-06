@@ -448,3 +448,86 @@ export async function writeFileSafe(
   await fs.writeFile(abs, content, "utf8");
   return { bytes: Buffer.byteLength(content, "utf8") };
 }
+
+// ---------------------------------------------------------------------------
+// Git: working-tree changes (the source-control "Changes" panel)
+// ---------------------------------------------------------------------------
+
+export interface ChangeEntry {
+  path: string;
+  /** Single-letter status: M, A, D, R, C, ?, U. */
+  status: string;
+  staged: boolean;
+  adds: number | null;
+  dels: number | null;
+}
+
+export interface ChangesResult {
+  branch: string | null;
+  ahead: number;
+  behind: number;
+  entries: ChangeEntry[];
+}
+
+/** Parse `git status --porcelain=v1 -b -z` + `git diff --numstat` into a flat
+ *  change list for the Changes panel. Read-only; argv-only (no shell). */
+export async function listChanges(root: string): Promise<ChangesResult> {
+  const [statusR, numR, numStagedR] = await Promise.all([
+    git(root, ["status", "--porcelain=v1", "-b", "-z"]),
+    git(root, ["diff", "--numstat", "-z"]),
+    git(root, ["diff", "--numstat", "-z", "--cached"]),
+  ]);
+
+  // numstat: "adds\tdels\tpath\0" repeated.
+  const parseNum = (out: string): Map<string, [number, number]> => {
+    const m = new Map<string, [number, number]>();
+    for (const rec of out.split("\0")) {
+      if (!rec) continue;
+      const t = rec.split("\t");
+      if (t.length < 3) continue;
+      const adds = t[0] === "-" ? 0 : Number(t[0]);
+      const dels = t[1] === "-" ? 0 : Number(t[1]);
+      m.set(t[2], [adds, dels]);
+    }
+    return m;
+  };
+  const numUnstaged = numR.ok ? parseNum(numR.stdout) : new Map();
+  const numStaged = numStagedR.ok ? parseNum(numStagedR.stdout) : new Map();
+
+  let branch: string | null = null;
+  let ahead = 0;
+  let behind = 0;
+  const entries: ChangeEntry[] = [];
+
+  if (statusR.ok) {
+    const recs = statusR.stdout.split("\0");
+    for (const rec of recs) {
+      if (!rec) continue;
+      if (rec.startsWith("## ")) {
+        // "## branch...origin/branch [ahead 1, behind 2]"
+        const head = rec.slice(3);
+        branch = head.split(/\.\.\.|\s/)[0] || null;
+        const a = head.match(/ahead (\d+)/);
+        const b = head.match(/behind (\d+)/);
+        if (a) ahead = Number(a[1]);
+        if (b) behind = Number(b[1]);
+        continue;
+      }
+      const x = rec[0];
+      const y = rec[1];
+      const path = rec.slice(3);
+      const staged = x !== " " && x !== "?";
+      const code = (staged ? x : y) || "?";
+      const num = (staged ? numStaged : numUnstaged).get(path) ?? null;
+      entries.push({
+        path,
+        status: code === "?" ? "?" : code,
+        staged,
+        adds: num ? num[0] : null,
+        dels: num ? num[1] : null,
+      });
+    }
+  }
+
+  return { branch, ahead, behind, entries };
+}
