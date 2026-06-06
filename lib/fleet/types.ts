@@ -115,6 +115,16 @@ export interface FleetMachine {
   /** ISO last-seen for offline / status-only boxes. */
   lastSeen: string | null;
   self: boolean;
+  /** Live GPU readout (SSH nvidia-smi). Null unless the box is a probed GPU node. */
+  gpu?: GpuStat | null;
+}
+
+export interface GpuStat {
+  name: string;
+  memUsedMB: number;
+  memTotalMB: number;
+  utilPct: number;
+  tempC: number;
 }
 
 export interface BotProcess {

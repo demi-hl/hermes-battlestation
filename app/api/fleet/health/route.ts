@@ -7,6 +7,7 @@ import type {
   BotProcess,
   FleetHealth,
   FleetMachine,
+  GpuStat,
   MachineRole,
 } from "@/lib/fleet/types";
 
@@ -22,9 +23,11 @@ const MACHINES: {
   host: string;
   role: MachineRole;
   controlled: boolean;
+  /** SSH alias for a read-only nvidia-smi probe. Set only for GPU nodes we can reach. */
+  gpuHost?: string;
 }[] = [
-  { key: "pc1", display: "PC #1", host: "demi-pc-wsl", role: "PC", controlled: true },
-  { key: "pc2", display: "PC #2", host: "desktop-f5siqio", role: "PC2", controlled: false },
+  { key: "pc1", display: "PC #1", host: "pop-os", role: "PC", controlled: true },
+  { key: "pc2", display: "PC #2", host: "desktop-f5siqio", role: "PC2", controlled: false, gpuHost: "gpu3070" },
   { key: "mac", display: "MacBook", host: "christophers-macbook-pro", role: "Mac", controlled: true },
   { key: "vps", display: "VPS", host: "demi-poly", role: "VPS", controlled: true },
 ];
@@ -51,6 +54,29 @@ type TsPeer = {
   Online?: boolean;
   LastSeen?: string;
 };
+
+async function probeGpu(gpuHost: string): Promise<GpuStat | null> {
+  const query =
+    "nvidia-smi --query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu --format=csv,noheader,nounits";
+  const r = await run(sshCmd(gpuHost, query, 6), { timeoutMs: 9000 });
+  if (!r.ok) return null;
+  const line = r.stdout.trim().split("\n")[0] ?? "";
+  const parts = line.split(",").map((s) => s.trim());
+  if (parts.length < 5) return null;
+  const [name, memUsed, memTotal, util, temp] = parts;
+  const num = (s: string) => {
+    const n = Number(s);
+    return Number.isFinite(n) ? n : 0;
+  };
+  if (!name) return null;
+  return {
+    name,
+    memUsedMB: num(memUsed),
+    memTotalMB: num(memTotal),
+    utilPct: num(util),
+    tempC: num(temp),
+  };
+}
 
 async function probeMachines(): Promise<FleetMachine[]> {
   const r = await run("tailscale status --json", { timeoutMs: 8000 });
@@ -85,27 +111,33 @@ async function probeMachines(): Promise<FleetMachine[]> {
     return { peer: hit.p, self: hit.p === self };
   };
 
-  return MACHINES.map((m) => {
-    const hit = findPeer(m.host);
-    const peer = hit?.peer;
-    const isSelf = hit?.self ?? false;
-    const lastSeen =
-      peer?.LastSeen && !peer.LastSeen.startsWith("0001-01-01")
-        ? peer.LastSeen
-        : null;
-    return {
-      key: m.key,
-      display: m.display,
-      host: m.host,
-      role: m.role,
-      controlled: m.controlled,
-      // Self is always "online" (we are running on it).
-      online: isSelf ? true : Boolean(peer?.Online),
-      os: peer?.OS ?? null,
-      lastSeen,
-      self: isSelf,
-    } satisfies FleetMachine;
-  });
+  return Promise.all(
+    MACHINES.map(async (m) => {
+      const hit = findPeer(m.host);
+      const peer = hit?.peer;
+      const isSelf = hit?.self ?? false;
+      const lastSeen =
+        peer?.LastSeen && !peer.LastSeen.startsWith("0001-01-01")
+          ? peer.LastSeen
+          : null;
+      const online = isSelf ? true : Boolean(peer?.Online);
+      // Probe GPU only when the box is a reachable GPU node and currently online.
+      const gpu = m.gpuHost && online ? await probeGpu(m.gpuHost) : null;
+      return {
+        key: m.key,
+        display: m.display,
+        host: m.host,
+        role: m.role,
+        controlled: m.controlled,
+        // Self is always "online" (we are running on it).
+        online,
+        os: peer?.OS ?? null,
+        lastSeen,
+        self: isSelf,
+        gpu,
+      } satisfies FleetMachine;
+    }),
+  );
 }
 
 type Pm2Proc = {
