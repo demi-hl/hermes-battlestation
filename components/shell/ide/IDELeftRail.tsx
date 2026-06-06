@@ -17,6 +17,9 @@ import {
   ReposIcon,
   ChevronRightIcon,
   ChevronUpDownIcon,
+  ClockIcon,
+  SkillsIcon,
+  CpuIcon,
 } from "@/components/shell/icons";
 import { BranchIcon } from "@/components/shell/icons";
 import type { WorkspacesResponse, RepoSummary, Workspace } from "@/lib/workspace-types";
@@ -28,6 +31,9 @@ export type CenterView =
   | "prs"
   | "automations"
   | "obsidian"
+  | "sessions"
+  | "cron"
+  | "skills"
   | "editor"
   | "terminal"
   | "diff"
@@ -47,6 +53,9 @@ const NAV: NavItemDef[] = [
   { id: "fleet", label: "Fleet", Icon: FleetIcon },
   { id: "automations", label: "Automations", Icon: AutomationIcon },
   { id: "obsidian", label: "Obsidian", Icon: VaultIcon },
+  { id: "sessions", label: "Sessions", Icon: ClockIcon },
+  { id: "cron", label: "Cron", Icon: AutomationIcon },
+  { id: "skills", label: "Skills", Icon: SkillsIcon },
   { id: "editor", label: "Editor", Icon: EditorIcon },
   { id: "terminal", label: "Terminal", Icon: TerminalIcon },
   { id: "diff", label: "Diff", Icon: DiffIcon },

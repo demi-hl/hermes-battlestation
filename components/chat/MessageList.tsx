@@ -6,6 +6,8 @@ import { Markdown } from "./markdown";
 import type { ChatMessage } from "./useChat";
 import type { ChatThread } from "@/lib/chat-types";
 import { cn } from "@/lib/utils";
+import { useWorkspace, repoLetters } from "@/components/shell/workspace-context";
+import { RepoAvatarBadge } from "@/components/shell/repo-avatar";
 
 export function MessageList({
   messages,
@@ -222,27 +224,17 @@ function Working({ elapsedMs, note }: { elapsedMs: number; note?: string }) {
 
 function EmptyThread({ thread }: { thread: ChatThread | null }) {
   const bound = thread?.repo;
+  const { repoAvatars } = useWorkspace();
+  const letters = bound ? (repoAvatars[bound]?.letters ?? repoLetters(bound)) : "GE";
+  const imgUrl = bound ? repoAvatars[bound]?.imageUrl : undefined;
   return (
     <div className="flex min-h-[40dvh] flex-col items-center justify-center gap-4 px-8 text-center">
-      {bound ? (
-        <div
-          className="relative grid h-16 w-16 place-items-center rounded-[calc(var(--theme-radius)+8px)] text-midground"
-          style={{ background: "color-mix(in srgb, var(--midground) 6%, transparent)" }}
-        >
-          <span className="arc-border" aria-hidden />
-          <span className="font-mondwest text-display text-lg">
-            {thread.repo!.slice(0, 2).toLowerCase()}
-          </span>
-        </div>
-      ) : (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src="/nous-logo.svg"
-          alt=""
-          draggable={false}
-          className="h-16 w-auto object-contain opacity-90"
-        />
-      )}
+      <RepoAvatarBadge
+        letters={letters}
+        imageUrl={imgUrl}
+        size={64}
+        className="opacity-90"
+      />
       <div className="animate-slide-up">
         <p className="font-mondwest text-display text-base tracking-wide text-midground">
           {bound ? bound : "general thread"}

@@ -64,7 +64,7 @@ function mkId(): string {
 }
 
 export function useChat() {
-  const { setActiveWorkspace, setStatus, setContextUsage, active } = useWorkspace();
+  const { setActiveWorkspace, setStatus, setContextUsage, active, model } = useWorkspace();
 
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [repos, setRepos] = useState<ChatRepo[]>([]);
@@ -252,7 +252,7 @@ export function useChat() {
         const res = await fetch("/api/chat/send", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ repo, message, skills }),
+          body: JSON.stringify({ repo, message, skills, model: model.id, provider: model.provider }),
           signal: ctrl.signal,
         });
         if (!res.ok || !res.body) {
@@ -354,7 +354,7 @@ export function useChat() {
         abortRef.current = null;
       }
     },
-    [sending, threads, activeThreadId, setStatus, setContextUsage, refreshThreads],
+    [sending, threads, activeThreadId, setStatus, setContextUsage, refreshThreads, model],
   );
 
   const stop = useCallback(() => {

@@ -39,6 +39,14 @@ export async function POST(req: Request) {
     );
   }
 
+  // Optional per-turn model/provider/skills (hermes -m / --provider / -s).
+  const cliArgs = ["chat", "-q", message, "--yolo", "--quiet"];
+  if (body.model) cliArgs.push("-m", body.model);
+  if (body.provider) cliArgs.push("--provider", body.provider);
+  if (Array.isArray(body.skills) && body.skills.length) {
+    cliArgs.push("-s", body.skills.join(","));
+  }
+
   const started = Date.now();
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -51,7 +59,7 @@ export async function POST(req: Request) {
       try {
         const child = spawn(
           process.env.HERMES_BIN ?? "hermes",
-          ["chat", "-q", message, "--yolo", "--quiet"],
+          cliArgs,
           { cwd, env: { ...process.env }, stdio: ["ignore", "pipe", "pipe"] },
         );
 

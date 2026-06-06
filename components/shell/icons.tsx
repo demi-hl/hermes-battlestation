@@ -127,6 +127,30 @@ export const ChevronUpDownIcon = (p: P) => (
   </svg>
 );
 
+export const ChevronDownIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="m6 9 6 6 6-6" />
+  </svg>
+);
+
+export const CompressIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M3 8V3h5M21 8V3h-5M3 16v5h5M21 16v5h-5" />
+    <path d="M8 3v5H3" stroke="none" fill="currentColor" />
+    <path d="M21 3v5h-5" stroke="none" fill="currentColor" />
+    <path d="M8 21v-5H3" stroke="none" fill="currentColor" />
+    <path d="M21 21v-5h-5" stroke="none" fill="currentColor" />
+    <circle cx="12" cy="12" r="2" stroke="none" fill="currentColor" opacity="0.4" />
+  </svg>
+);
+
+export const ClockIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="12" cy="12" r="9" />
+    <path d="M12 7v5l3 2" />
+  </svg>
+);
+
 export const CpuIcon = (p: P) => (
   <svg {...base(p)}>
     <rect x="6" y="6" width="12" height="12" rx="2" />
@@ -152,6 +176,16 @@ export const SendIcon = (p: P) => (
 export const CloseIcon = (p: P) => (
   <svg {...base(p)}>
     <path d="M6 6l12 12M18 6 6 18" />
+  </svg>
+);
+
+export const SkillsIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="4" y="4" width="6" height="6" rx="1.5" />
+    <rect x="14" y="4" width="6" height="6" rx="1.5" />
+    <path d="M7 15c0-2 2-3 5-3s5 1 5 3" />
+    <circle cx="7" cy="17" r="2" />
+    <circle cx="17" cy="17" r="2" />
   </svg>
 );
 

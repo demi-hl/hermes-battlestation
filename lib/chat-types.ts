@@ -105,6 +105,10 @@ export interface SendRequest {
   message: string;
   /** Skills to preload for this turn (hermes `-s`). */
   skills?: string[];
+  /** Model id for this turn (hermes `-m`), e.g. "claude-opus-4-8". */
+  model?: string;
+  /** Inference provider for this turn (hermes `--provider`). */
+  provider?: string;
 }
 
 // --- Agent-inline-edit contract (owned here; slice 3 renders against it) ------

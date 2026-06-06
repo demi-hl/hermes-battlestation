@@ -14,6 +14,9 @@ import { EditorPane } from "@/components/panes/EditorPane";
 import { TerminalPane } from "@/components/panes/TerminalPane";
 import { DiffPane } from "@/components/panes/DiffPane";
 import { SettingsPane } from "@/components/panes/SettingsPane";
+import { SessionsPane } from "@/components/panes/SessionsPane";
+import { CronPane } from "@/components/panes/CronPane";
+import { SkillsPane } from "@/components/panes/SkillsPane";
 
 // Views that get the right-hand source-control panel (repo-bound work).
 const WITH_SOURCE_PANEL = new Set<CenterView>(["agent", "editor", "diff"]);
@@ -40,7 +43,13 @@ function CenterPane({ view }: { view: CenterView }) {
       return <DiffPane />;
     case "settings":
       return <SettingsPane />;
-  }
+    case "sessions":
+      return <SessionsPane />;
+    case "cron":
+      return <CronPane />;
+    case "skills":
+      return <SkillsPane />;
+    }
 }
 
 /**
@@ -60,7 +69,9 @@ export function IDEShell() {
   const showSource = WITH_SOURCE_PANEL.has(view);
 
   return (
-    <div className="relative z-[1] flex h-[100dvh] w-full overflow-hidden">
+    <div className="relative z-[1] flex h-[100dvh] w-full overflow-hidden bg-[length:400px_346px]"
+      style={{ backgroundImage: 'url("/hermes-bg.svg")' }}
+    >
       <IDELeftRail view={view} onView={setView} />
 
       <main className="relative flex min-w-0 flex-1">
