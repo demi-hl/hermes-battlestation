@@ -108,6 +108,7 @@
         "AppImage",
         "deb"
       ],
+      "maintainer": "Nous Research <hello@nousresearch.com>",
       "category": "Development"
     },
     "mac": {
