@@ -1,4 +1,4 @@
-# Locals Only
+# Hermes Battlestation
 
 An alternative launcher for your local [Hermes](https://claude-code.nousresearch.com) agent — a
 desktop + mobile cockpit for the agent already running on your machine. Chat, repos, fleet, kanban,

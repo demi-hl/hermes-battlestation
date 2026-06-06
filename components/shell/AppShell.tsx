@@ -82,16 +82,17 @@ function DesktopSidebar({
     >
       {/* Brand + collapse toggle */}
       <div className="flex h-[56px] shrink-0 items-center gap-2 border-b border-border px-3">
-        <span className="flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md bg-accent text-[11px] font-black text-bg">
-          D
-        </span>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src="/nous-logo.svg"
+          alt="Nous"
+          draggable={false}
+          className="h-[22px] w-auto shrink-0"
+        />
         {!collapsed && (
-          <>
-            <span className="min-w-0 text-[13px] font-bold tracking-wide text-ink">
-              DEMI
-            </span>
-            <span className="ml-auto text-[9px] text-faint">ws</span>
-          </>
+          <span className="ml-auto font-mondwest text-display text-[0.58rem] tracking-[0.22em] text-text-tertiary">
+            battlestation
+          </span>
         )}
       </div>
 

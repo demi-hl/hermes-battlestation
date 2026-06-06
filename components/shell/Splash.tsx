@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { useEffect, useState } from "react";
 
 /**
- * Branded launch splash: the Locals Only mark on pure black, brief, before the
+ * Branded launch splash: the NOUS mark on pure black, brief, before the
  * shell settles. Sits above the entire stack (incl. the Backdrop) and fades
  * out. Honors reduced-motion by dismissing near-instantly.
  */
@@ -31,10 +31,10 @@ export function Splash() {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <motion.img
-            src="/nous-mark.svg"
+            src="/nous-logo.svg"
             alt=""
             draggable={false}
-            className="w-28 h-28 object-contain"
+            className="h-32 w-auto object-contain"
             initial={{ opacity: 0, scale: 0.97 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.7, ease: [0.16, 1, 0.3, 1] }}

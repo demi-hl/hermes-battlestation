@@ -109,7 +109,7 @@ async function createWindow() {
     height: 900,
     minWidth: 380,
     minHeight: 600,
-    title: "Locals Only",
+    title: "Hermes Battlestation",
     backgroundColor: "#041c1c",
     autoHideMenuBar: true,
     webPreferences: {

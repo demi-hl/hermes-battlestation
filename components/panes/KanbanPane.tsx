@@ -78,7 +78,7 @@ function Column({
   onOpen: (id: string) => void;
 }) {
   return (
-    <section className="flex w-[80vw] max-w-[280px] shrink-0 snap-start flex-col">
+    <section className="flex w-[80vw] max-w-[280px] shrink-0 snap-start flex-col lg:w-auto lg:max-w-none lg:flex-1 lg:shrink">
       <header className="mb-2 flex items-center gap-2 px-0.5">
         <span className="h-1.5 w-1.5 rounded-full" style={{ background: color }} />
         <span className="text-display font-mondwest text-[0.68rem] tracking-[0.12em] text-text-secondary">
@@ -149,7 +149,7 @@ export function KanbanPane() {
       ) : tasks.length === 0 ? (
         <EmptyBoard />
       ) : (
-        <div className="scrollbar-none flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-2">
+        <div className="scrollbar-none flex snap-x snap-mandatory gap-3 overflow-x-auto px-3 pb-2 lg:snap-none lg:items-start lg:overflow-x-visible">
           {byColumn.map((col) => (
             <Column
               key={col.id}
