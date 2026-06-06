@@ -56,6 +56,39 @@ ensure("node-pty -> standalone/node_modules", () => {
   copyDir(src, dest);
 });
 
+// 1b. Next 16 + Turbopack standalone tracing misses the compiled next-server
+//     runtime files that route/page handlers require at boot (notably
+//     app-route-turbo.runtime.prod.js). Without them every /api/* route throws
+//     "Cannot find module .../app-route-turbo.runtime.prod.js" and the booted
+//     server returns 500s (no repos, dead Kanban). Copy all *.runtime.prod.js.
+ensure("next-server runtime -> standalone", () => {
+  const src = path.join(
+    root,
+    "node_modules",
+    "next",
+    "dist",
+    "compiled",
+    "next-server",
+  );
+  const dest = path.join(
+    standalone,
+    "node_modules",
+    "next",
+    "dist",
+    "compiled",
+    "next-server",
+  );
+  if (!fs.existsSync(src)) throw new Error("compiled/next-server missing");
+  fs.mkdirSync(dest, { recursive: true });
+  let copied = 0;
+  for (const name of fs.readdirSync(src)) {
+    if (!name.endsWith(".runtime.prod.js")) continue;
+    fs.copyFileSync(path.join(src, name), path.join(dest, name));
+    copied++;
+  }
+  if (copied === 0) throw new Error("no *.runtime.prod.js found to copy");
+});
+
 // 2. static assets
 ensure("static -> standalone/.next/static", () => {
   const src = path.join(root, ".next", "static");
