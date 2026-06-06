@@ -47,6 +47,7 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 // Curated fallback — major providers + flagship tool-calling models. Used only
 // when the live caches are absent (fresh install with no model picker run yet).
+// Public build: every router imaginable so a fresh clone can pick any path.
 const STATIC_FALLBACK: ProviderModels[] = [
   {
     provider: "anthropic",
@@ -56,7 +57,7 @@ const STATIC_FALLBACK: ProviderModels[] = [
   {
     provider: "openai",
     label: "OpenAI",
-    models: ["gpt-5.5", "gpt-5.5-pro", "gpt-5.4-mini"],
+    models: ["gpt-5.5", "gpt-5.5-pro", "gpt-5.4-mini", "o4"],
   },
   {
     provider: "openrouter",
@@ -67,6 +68,8 @@ const STATIC_FALLBACK: ProviderModels[] = [
       "google/gemini-3.1-pro-preview",
       "x-ai/grok-4.3",
       "deepseek/deepseek-v4-pro",
+      "meta-llama/llama-4-405b-instruct",
+      "qwen/qwen-3-max",
     ],
   },
   {
@@ -74,13 +77,23 @@ const STATIC_FALLBACK: ProviderModels[] = [
     label: "Google",
     models: ["gemini-3.1-pro-preview", "gemini-3.5-flash"],
   },
-  { provider: "xai", label: "xAI", models: ["grok-4.3"] },
+  { provider: "xai", label: "xAI", models: ["grok-4.3", "grok-4.3-mini"] },
   {
     provider: "deepseek",
     label: "DeepSeek",
-    models: ["deepseek-v4-pro", "deepseek-chat"],
+    models: ["deepseek-v4-pro", "deepseek-chat", "deepseek-reasoner"],
   },
-  { provider: "groq", label: "Groq", models: ["llama-3.3-70b-versatile"] },
+  { provider: "groq", label: "Groq", models: ["llama-3.3-70b-versatile", "moonshotai/kimi-k2"] },
+  { provider: "mistral", label: "Mistral", models: ["mistral-large-latest", "codestral-latest"] },
+  { provider: "togetherai", label: "Together", models: ["meta-llama/Llama-4-405B-Instruct", "Qwen/Qwen3-235B"] },
+  { provider: "fireworks", label: "Fireworks", models: ["accounts/fireworks/models/qwen3-235b", "accounts/fireworks/models/deepseek-v4"] },
+  { provider: "deepinfra", label: "DeepInfra", models: ["meta-llama/Llama-4-Maverick", "deepseek-ai/DeepSeek-V4"] },
+  { provider: "cerebras", label: "Cerebras", models: ["llama-4-scout", "qwen-3-235b"] },
+  { provider: "novita", label: "Novita", models: ["deepseek/deepseek-v4", "qwen/qwen3-235b"] },
+  { provider: "nous", label: "Nous Portal", models: ["hermes-4-405b", "deepseek-v4-flash"] },
+  { provider: "ollama", label: "Ollama (local)", models: ["llama3.3", "qwen3", "deepseek-r1"] },
+  { provider: "moonshot", label: "Moonshot / Kimi", models: ["kimi-k2.5", "moonshot-v1-128k"] },
+  { provider: "zai", label: "z.ai / GLM", models: ["glm-4.6", "glm-4-plus"] },
 ];
 
 async function readJson<T>(file: string): Promise<T | null> {

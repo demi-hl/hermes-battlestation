@@ -205,6 +205,12 @@ export const ChartIcon = (p: P) => (
   </svg>
 );
 
+export const DownloadIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M12 3v12M8 11l4 4 4-4M4 19h16" />
+  </svg>
+);
+
 // Vault: a stylized obsidian gem (diamond facets).
 export const VaultIcon = (p: P) => (
   <svg {...base(p)}>

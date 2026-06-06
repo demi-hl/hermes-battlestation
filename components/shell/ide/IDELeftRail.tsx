@@ -22,6 +22,7 @@ import {
   CpuIcon,
   KeyIcon,
   ChartIcon,
+  DownloadIcon,
 } from "@/components/shell/icons";
 import { BranchIcon } from "@/components/shell/icons";
 import type { WorkspacesResponse, RepoSummary, Workspace } from "@/lib/workspace-types";
@@ -39,6 +40,7 @@ export type CenterView =
   | "config"
   | "keys"
   | "analytics"
+  | "onboarding"
   | "editor"
   | "terminal"
   | "diff"
@@ -64,6 +66,7 @@ const NAV: NavItemDef[] = [
   { id: "analytics", label: "Analytics", Icon: ChartIcon },
   { id: "config", label: "Config", Icon: SettingsIcon },
   { id: "keys", label: "API Keys", Icon: KeyIcon },
+  { id: "onboarding", label: "Get Hermes", Icon: DownloadIcon },
   { id: "editor", label: "Editor", Icon: EditorIcon },
   { id: "terminal", label: "Terminal", Icon: TerminalIcon },
   { id: "diff", label: "Diff", Icon: DiffIcon },

@@ -20,6 +20,7 @@ import { SkillsPane } from "@/components/panes/SkillsPane";
 import { RuntimeConfigPane } from "@/components/panes/RuntimeConfigPane";
 import { ApiKeysPane } from "@/components/panes/ApiKeysPane";
 import { AnalyticsPane } from "@/components/panes/AnalyticsPane";
+import { OnboardingPane } from "@/components/panes/OnboardingPane";
 
 // Views that get the right-hand source-control panel (repo-bound work).
 const WITH_SOURCE_PANEL = new Set<CenterView>(["agent", "editor", "diff"]);
@@ -58,6 +59,8 @@ function CenterPane({ view }: { view: CenterView }) {
       return <ApiKeysPane />;
     case "analytics":
       return <AnalyticsPane />;
+    case "onboarding":
+      return <OnboardingPane />;
     }
 }
 
