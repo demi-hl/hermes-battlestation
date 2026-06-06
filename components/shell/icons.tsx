@@ -225,3 +225,11 @@ export const VaultIcon = (p: P) => (
   </svg>
 );
 
+// Router: a hub/switch with an antenna — the OpenRouter dispatch pane.
+export const RouterIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3" y="14" width="18" height="7" rx="2" />
+    <path d="M7 14V8a5 5 0 0 1 10 0v6M7 17.5h.01M11 17.5h.01" />
+  </svg>
+);
+

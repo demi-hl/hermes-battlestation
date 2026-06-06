@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePolling } from "@/components/usePolling";
 import { relativeTime } from "@/lib/format";
@@ -111,11 +111,34 @@ const ShieldIcon = (p: P) => (
 /* ========================================================================= */
 
 // Stable ordering for groups; unknown groups fall to the end alphabetically.
-const GROUP_ORDER = ["LLM Providers", "Tools", "Messaging", "Other"];
+const GROUP_ORDER = [
+  "LLM Providers",
+  "Image Generation",
+  "Video Generation",
+  "Audio & Voice",
+  "Web & Search",
+  "Integrations",
+  "Messaging",
+  "Other",
+];
 
 function groupRank(group: string): number {
   const i = GROUP_ORDER.indexOf(group);
   return i === -1 ? GROUP_ORDER.length : i;
+}
+
+/** Self-contained media-query hook (mirrors AppShell's, kept local to avoid a
+ *  cross-module refactor). Used to default-collapse groups on small screens. */
+function useMediaQuery(query: string): boolean {
+  const [match, setMatch] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(query);
+    setMatch(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setMatch(e.matches);
+    mq.addEventListener("change", handler);
+    return () => mq.removeEventListener("change", handler);
+  }, [query]);
+  return match;
 }
 
 function matchesQuery(item: EnvKeyItem, query: string): boolean {
@@ -449,12 +472,25 @@ export function ApiKeysPane() {
     });
   };
 
-  // Auto-expand all groups on first load.
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
+
+  // First-load expand. Desktop: open everything (room to scroll). Mobile: with
+  // 8 groups, expand-all is a wall — open only LLM Providers + any group that
+  // already has a key set; the rest stay collapsed and one tap away.
+  const didInit = useRef(false);
   useEffect(() => {
-    if (groups.length > 0 && expanded.size === 0) {
+    if (didInit.current || groups.length === 0) return;
+    didInit.current = true;
+    if (isDesktop) {
       setExpanded(new Set(groups.map((g) => g.group)));
+    } else {
+      const open = new Set<string>(["LLM Providers"]);
+      for (const g of groups) {
+        if (g.items.some((i) => i.set)) open.add(g.group);
+      }
+      setExpanded(open);
     }
-  }, [groups]);
+  }, [groups, isDesktop]);
 
   return (
     <PullToRefresh onRefresh={reload}>

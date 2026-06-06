@@ -22,6 +22,7 @@ import { ApiKeysPane } from "@/components/panes/ApiKeysPane";
 import { AnalyticsPane } from "@/components/panes/AnalyticsPane";
 import { OnboardingPane } from "@/components/panes/OnboardingPane";
 import { McpPane } from "@/components/panes/McpPane";
+import { OpenRouterPane } from "@/components/panes/OpenRouterPane";
 
 // Views that get the right-hand source-control panel (repo-bound work).
 const WITH_SOURCE_PANEL = new Set<CenterView>(["agent", "editor", "diff"]);
@@ -64,7 +65,9 @@ function CenterPane({ view }: { view: CenterView }) {
       return <OnboardingPane />;
     case "mcp":
       return <McpPane />;
-    }
+    case "openrouter":
+      return <OpenRouterPane />;
+  }
 }
 
 /**

@@ -17,7 +17,8 @@ const ENV_PATH = path.join(HERMES_HOME, ".env");
 
 // Curated list of well-known keys with labels + group, so the UI can show a
 // useful form even for keys not yet set. Mirrors `hermes config show`.
-const KNOWN: { key: string; label: string; group: string }[] = [
+const KNOWN: { key: string; label: string; group: string; secret?: boolean }[] = [
+  // ── LLM Providers ──────────────────────────────────────────────────────
   { key: "OPENROUTER_API_KEY", label: "OpenRouter", group: "LLM Providers" },
   { key: "ANTHROPIC_API_KEY", label: "Anthropic", group: "LLM Providers" },
   { key: "OPENAI_API_KEY", label: "OpenAI", group: "LLM Providers" },
@@ -33,19 +34,53 @@ const KNOWN: { key: string; label: string; group: string }[] = [
   { key: "CEREBRAS_API_KEY", label: "Cerebras", group: "LLM Providers" },
   { key: "NOVITA_API_KEY", label: "Novita AI", group: "LLM Providers" },
   { key: "MOONSHOT_API_KEY", label: "Moonshot / Kimi", group: "LLM Providers" },
+  { key: "KIMI_API_KEY", label: "Kimi (Moonshot)", group: "LLM Providers" },
   { key: "ZAI_API_KEY", label: "z.ai / GLM", group: "LLM Providers" },
+  { key: "DASHSCOPE_API_KEY", label: "Alibaba / Qwen (DashScope)", group: "LLM Providers" },
+  { key: "NVIDIA_API_KEY", label: "NVIDIA NIM", group: "LLM Providers" },
+  { key: "HF_TOKEN", label: "HuggingFace", group: "LLM Providers" },
   { key: "NOUS_API_KEY", label: "Nous Portal", group: "LLM Providers" },
-  { key: "OLLAMA_HOST", label: "Ollama host (local)", group: "LLM Providers" },
-  { key: "FIRECRAWL_API_KEY", label: "Firecrawl", group: "Tools" },
-  { key: "TAVILY_API_KEY", label: "Tavily", group: "Tools" },
-  { key: "EXA_API_KEY", label: "Exa", group: "Tools" },
-  { key: "PARALLEL_API_KEY", label: "Parallel", group: "Tools" },
-  { key: "BROWSERBASE_API_KEY", label: "Browserbase", group: "Tools" },
-  { key: "FAL_KEY", label: "FAL (image gen)", group: "Tools" },
-  { key: "ELEVENLABS_API_KEY", label: "ElevenLabs (TTS)", group: "Tools" },
+  { key: "OLLAMA_HOST", label: "Ollama host (local)", group: "LLM Providers", secret: false },
+
+  // ── Image Generation ───────────────────────────────────────────────────
+  { key: "FAL_KEY", label: "FAL · FLUX / GPT-Image / Nano-Banana / Ideogram", group: "Image Generation" },
+  { key: "KREA_API_KEY", label: "Krea", group: "Image Generation" },
+  { key: "REPLICATE_API_TOKEN", label: "Replicate", group: "Image Generation" },
+
+  // ── Video Generation ───────────────────────────────────────────────────
+  // FAL_KEY (Image) and XAI_API_KEY (LLM) also drive video backends.
+  { key: "MINIMAX_API_KEY", label: "MiniMax · video & voice", group: "Video Generation" },
+  { key: "RUNWAY_API_KEY", label: "Runway", group: "Video Generation" },
+  { key: "KLING_API_KEY", label: "Kling", group: "Video Generation" },
+  { key: "LUMA_API_KEY", label: "Luma", group: "Video Generation" },
+
+  // ── Audio & Voice (TTS / STT) ──────────────────────────────────────────
+  { key: "ELEVENLABS_API_KEY", label: "ElevenLabs · TTS", group: "Audio & Voice" },
+  { key: "VOICE_TOOLS_OPENAI_KEY", label: "OpenAI Voice (TTS/STT key)", group: "Audio & Voice" },
+
+  // ── Web & Search ───────────────────────────────────────────────────────
+  { key: "EXA_API_KEY", label: "Exa", group: "Web & Search" },
+  { key: "TAVILY_API_KEY", label: "Tavily", group: "Web & Search" },
+  { key: "PARALLEL_API_KEY", label: "Parallel", group: "Web & Search" },
+  { key: "FIRECRAWL_API_KEY", label: "Firecrawl", group: "Web & Search" },
+  { key: "FIRECRAWL_API_URL", label: "Firecrawl URL (self-hosted)", group: "Web & Search", secret: false },
+  { key: "BRAVE_SEARCH_API_KEY", label: "Brave Search", group: "Web & Search" },
+  { key: "SEARXNG_URL", label: "SearXNG URL (self-hosted)", group: "Web & Search", secret: false },
+  { key: "BROWSERBASE_API_KEY", label: "Browserbase", group: "Web & Search" },
+  { key: "BROWSER_USE_API_KEY", label: "Browser Use", group: "Web & Search" },
+
+  // ── Integrations ───────────────────────────────────────────────────────
+  { key: "GITHUB_TOKEN", label: "GitHub", group: "Integrations" },
+  { key: "NOTION_API_KEY", label: "Notion", group: "Integrations" },
+  { key: "LINEAR_API_KEY", label: "Linear", group: "Integrations" },
+  { key: "AIRTABLE_API_KEY", label: "Airtable", group: "Integrations" },
+  { key: "TENOR_API_KEY", label: "Tenor (GIFs)", group: "Integrations" },
+
+  // ── Messaging ──────────────────────────────────────────────────────────
   { key: "TELEGRAM_BOT_TOKEN", label: "Telegram Bot", group: "Messaging" },
   { key: "DISCORD_BOT_TOKEN", label: "Discord Bot", group: "Messaging" },
   { key: "SLACK_BOT_TOKEN", label: "Slack Bot", group: "Messaging" },
+  { key: "SLACK_APP_TOKEN", label: "Slack App", group: "Messaging" },
 ];
 
 // Heuristic: treat as secret if name contains these tokens.
@@ -92,13 +127,14 @@ export async function GET() {
   for (const k of KNOWN) {
     const val = env.get(k.key) ?? "";
     seen.add(k.key);
+    const secret = k.secret ?? true;
     items.push({
       key: k.key,
       label: k.label,
       group: k.group,
       set: val.length > 0,
-      preview: redact(val),
-      secret: true,
+      preview: secret ? redact(val) : val.slice(0, 60),
+      secret,
     });
   }
   // Any other env keys actually present that aren't in the known list.

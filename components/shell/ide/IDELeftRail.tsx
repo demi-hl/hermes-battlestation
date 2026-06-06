@@ -24,6 +24,7 @@ import {
   ChartIcon,
   DownloadIcon,
   PlugIcon,
+  RouterIcon,
 } from "@/components/shell/icons";
 import { BranchIcon } from "@/components/shell/icons";
 import type { WorkspacesResponse, RepoSummary, Workspace } from "@/lib/workspace-types";
@@ -40,6 +41,7 @@ export type CenterView =
   | "skills"
   | "config"
   | "keys"
+  | "openrouter"
   | "analytics"
   | "onboarding"
   | "mcp"
@@ -68,6 +70,7 @@ const NAV: NavItemDef[] = [
   { id: "analytics", label: "Analytics", Icon: ChartIcon },
   { id: "config", label: "Config", Icon: SettingsIcon },
   { id: "keys", label: "API Keys", Icon: KeyIcon },
+  { id: "openrouter", label: "OpenRouter", Icon: RouterIcon },
   { id: "mcp", label: "MCP", Icon: PlugIcon },
   { id: "onboarding", label: "Get Hermes", Icon: DownloadIcon },
   { id: "editor", label: "Editor", Icon: EditorIcon },
