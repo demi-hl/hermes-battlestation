@@ -250,6 +250,65 @@ export async function repoSummary(ref: RepoRef): Promise<RepoSummary> {
   };
 }
 
+export interface CreateWorktreeResult {
+  branch: string;
+  path: string;
+  created: boolean;
+  base: string | null;
+}
+
+/**
+ * Create a git worktree for `branch`, checked out at a sibling path
+ * `<repo>-worktrees/<safe-branch>`. If the branch already exists it is checked
+ * out; otherwise it is created from `from` (defaults to the detected base).
+ * Everything runs via execFile argv — no client value touches a shell.
+ */
+export async function createWorktree(
+  ref: RepoRef,
+  branch: string,
+  from?: string,
+): Promise<CreateWorktreeResult> {
+  if (!SAFE_BRANCH.test(branch)) {
+    throw new Error("invalid branch name");
+  }
+  if (from && !SAFE_BRANCH.test(from)) {
+    throw new Error("invalid base ref");
+  }
+
+  const base = await detectBase(ref.root);
+  const startPoint = from || base || "HEAD";
+
+  // Already has a worktree for this branch? Return it.
+  const existing = await listWorktrees(ref.root);
+  const match = existing.find((w) => w.branch === branch);
+  if (match) {
+    return { branch, path: match.path, created: false, base };
+  }
+
+  const safeDir = branch.replace(/[/\\]+/g, "-").replace(/[^\w.-]+/g, "_");
+  const parent = `${ref.root}-worktrees`;
+  const dest = path.join(parent, safeDir);
+  await fs.mkdir(parent, { recursive: true });
+
+  // Does the branch ref already exist locally?
+  const hasBranch = await git(ref.root, [
+    "show-ref",
+    "--verify",
+    "--quiet",
+    `refs/heads/${branch}`,
+  ]);
+
+  const args = hasBranch.ok
+    ? ["worktree", "add", dest, branch]
+    : ["worktree", "add", "-b", branch, dest, startPoint];
+
+  const r = await git(ref.root, args, 20000);
+  if (!r.ok) {
+    throw new Error(r.stderr.trim() || "git worktree add failed");
+  }
+  return { branch, path: dest, created: true, base };
+}
+
 function sumNumstat(stdout: string): { adds: number; dels: number; files: number } {
   let adds = 0;
   let dels = 0;

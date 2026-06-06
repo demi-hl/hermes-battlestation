@@ -2,6 +2,9 @@
   "name": "demi-workspace",
   "version": "0.1.0",
   "private": true,
+  "description": "An alternative Hermes launcher — desktop + mobile cockpit for your local agent: chat, repos, fleet, kanban, terminal, editor.",
+  "author": "Locals Only",
+  "main": "electron/main.cjs",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -10,7 +13,13 @@
     "typecheck": "tsc --noEmit",
     "cap:sync": "cap sync",
     "cap:open:ios": "cap open ios",
-    "cap:build": "next build && cap copy"
+    "cap:build": "next build && cap copy",
+    "electron:dev": "next build && electron .",
+    "electron:rebuild": "electron-rebuild -f -w node-pty",
+    "dist": "next build && node scripts/prepare-standalone.cjs && electron-builder",
+    "dist:linux": "next build && node scripts/prepare-standalone.cjs && electron-builder --linux",
+    "dist:mac": "next build && node scripts/prepare-standalone.cjs && electron-builder --mac",
+    "dist:win": "next build && node scripts/prepare-standalone.cjs && electron-builder --win"
   },
   "dependencies": {
     "@capacitor/haptics": "^8.0.2",
@@ -44,13 +53,72 @@
     "@capacitor/cli": "^8.4.0",
     "@capacitor/core": "^8.4.0",
     "@capacitor/ios": "^8.4.0",
+    "@electron/rebuild": "^3.7.2",
     "@tailwindcss/postcss": "^4.3.0",
     "@types/node": "20.19.41",
     "@types/react": "19.2.16",
     "@types/react-dom": "^19",
+    "electron": "^33.4.11",
+    "electron-builder": "^25.1.8",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
     "tailwindcss": "^4",
     "typescript": "5.9.3"
+  },
+  "build": {
+    "appId": "ai.localsonly.cockpit",
+    "productName": "Locals Only",
+    "directories": {
+      "output": "release",
+      "buildResources": "build"
+    },
+    "files": [
+      "electron/**/*",
+      "!**/node_modules/**/*"
+    ],
+    "extraResources": [
+      {
+        "from": ".next/standalone",
+        "to": "standalone",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": ".next/static",
+        "to": "standalone/.next/static",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
+        "from": "public",
+        "to": "standalone/public",
+        "filter": [
+          "**/*"
+        ]
+      }
+    ],
+    "asarUnpack": [
+      "**/node-pty/**"
+    ],
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "Development"
+    },
+    "mac": {
+      "target": [
+        "dmg"
+      ],
+      "category": "public.app-category.developer-tools"
+    },
+    "win": {
+      "target": [
+        "nsis"
+      ]
+    }
   }
 }
