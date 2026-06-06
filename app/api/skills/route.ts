@@ -13,7 +13,7 @@ import type {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-const HOME = process.env.HOME ?? "/home/demi";
+const HOME = process.env.HOME ?? process.cwd();
 const SKILL_ROOTS = [
   `${HOME}/.hermes/skills`,
   "/usr/local/lib/hermes-agent/skills",

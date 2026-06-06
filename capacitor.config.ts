@@ -5,7 +5,7 @@ const config: CapacitorConfig = {
   appName: 'Hermes Agent',
   webDir: '.next',
   server: {
-    url: 'https://demi-pc-wsl.tailfce42a.ts.net',
+    url: process.env.CAP_SERVER_URL ?? 'http://localhost:9119',
     cleartext: false,
   },
   ios: {

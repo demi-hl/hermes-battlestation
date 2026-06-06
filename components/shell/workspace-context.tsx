@@ -27,25 +27,24 @@ export interface ModelOption {
   id: ModelId;
   /** Short display label, e.g. "Opus 4.8". */
   label: string;
-  /** Always anthropic for this app — NEVER OpenRouter (that would meter
-   *  per-message instead of using the flat-rate Max subscription). */
-  provider: "anthropic";
-  /** Subscription path. "Max" = the flat-rate Max OAuth path. */
-  plan: "Max";
+  /** Inference provider for the bound session. */
+  provider: string;
 }
 
 /**
- * Selectable models. All run on provider=anthropic via the Max subscription.
- * Opus 4.8 is the boot default (matches the desktop Hermes default); any
- * session the app spawns runs on the selected model+provider.
+ * Selectable models. Provider is configurable per deployment; the boot default
+ * matches the host agent's configured default. Any session the app spawns runs
+ * on the selected model + provider.
  */
+const PROVIDER = process.env.NEXT_PUBLIC_MODEL_PROVIDER ?? "anthropic";
+
 export const MODELS: ModelOption[] = [
-  { id: "claude-opus-4-8", label: "Opus 4.8", provider: "anthropic", plan: "Max" },
-  { id: "claude-sonnet-4-6", label: "Sonnet 4.6", provider: "anthropic", plan: "Max" },
-  { id: "claude-haiku-4-5", label: "Haiku 4.5", provider: "anthropic", plan: "Max" },
+  { id: "claude-opus-4-8", label: "Opus 4.8", provider: PROVIDER },
+  { id: "claude-sonnet-4-6", label: "Sonnet 4.6", provider: PROVIDER },
+  { id: "claude-haiku-4-5", label: "Haiku 4.5", provider: PROVIDER },
 ];
 
-/** Canonical default — the app boots with Opus 4.8 / Max selected. */
+/** Canonical default — the app boots with the first model selected. */
 export const DEFAULT_MODEL_ID: ModelId = "claude-opus-4-8";
 
 const MODEL_STORAGE_KEY = "locals-only-model";

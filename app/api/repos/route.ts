@@ -8,8 +8,9 @@ export const dynamic = "force-dynamic";
 
 export async function GET() {
   const env: ApiEnvelope<Repo[]> = await cached("repos", 60_000, async () => {
+    const org = process.env.GH_ORG ?? "";
     const r = await run(
-      "gh repo list demi-hl --limit 30 --json name,description,pushedAt,url",
+      `gh repo list ${org} --limit 30 --json name,description,pushedAt,url`,
       { timeoutMs: 12000 },
     );
     if (!r.ok) {

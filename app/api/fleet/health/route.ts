@@ -11,40 +11,25 @@ import type {
   MachineRole,
   SysStat,
 } from "@/lib/fleet/types";
+import { FLEET, BOT_PROC_RE, fleetNode, type FleetNode } from "@/lib/fleet/hosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
-// Known fleet boxes. `host` is matched against the tailnet peer's DNSName /
-// HostName (normalized). Controlled boxes are SSH-probed for bot health; the
-// rest are tailnet-status-only (never push creds to untrusted boxes).
-const MACHINES: {
-  key: string;
-  display: string;
-  host: string;
-  role: MachineRole;
-  controlled: boolean;
-  /** SSH alias for a read-only nvidia-smi probe. Set only for GPU nodes we can reach. */
-  gpuHost?: string;
-  /** SSH alias for a read-only CPU/RAM probe. "self" = probe locally (this box). */
-  sysHost?: string;
-  /** OS of the sys probe target — picks the probe command. */
-  sysOs?: "linux" | "darwin" | "windows";
-}[] = [
-  { key: "pc1", display: "PC #1", host: "pop-os", role: "PC", controlled: true, gpuHost: "self", sysHost: "self", sysOs: "linux" },
-  { key: "pc2", display: "PC #2", host: "desktop-f5siqio", role: "PC2", controlled: false, gpuHost: "gpu3070", sysHost: "gpu3070", sysOs: "windows" },
-  { key: "mac", display: "MacBook", host: "christophers-macbook-pro", role: "Mac", controlled: true, sysHost: "mac", sysOs: "darwin" },
-  { key: "vps", display: "VPS", host: "demi-poly", role: "VPS", controlled: true, sysHost: "demi-poly", sysOs: "linux" },
-];
-
-// Polymarket bot pm2 family — these are the bot-health processes (other pm2
-// jobs on the box, e.g. pokeagent / hlmedia, are rolled up as a count).
-const BOT_FAMILY = /^demi-(server|control|neg-risk)/i;
+// Fleet nodes come from env (lib/fleet/hosts.ts). Each node's tailnet match
+// name and SSH probe aliases are supplied at runtime; nothing is hardcoded so
+// the repo is safe to publish. A node with no env config is simply not probed.
+const ROLE: Record<string, MachineRole> = {
+  pc1: "PC",
+  pc2: "PC2",
+  mac: "Mac",
+  vps: "VPS",
+};
 
 function normName(s: string | undefined | null): string {
   if (!s) return "";
   // Strip the tailnet domain ("host.tailXXXX.ts.net.") to its first label,
-  // then normalize case + separators so "DESKTOP-F5SIQIO" matches the alias.
+  // then normalize case + separators so "DESKTOP-XXXXXX" matches the alias.
   return s
     .split(".")[0]
     .toLowerCase()
@@ -164,8 +149,8 @@ async function probeMachines(): Promise<FleetMachine[]> {
   const all = [self, ...peers];
   // Match on the tailnet DNSName/HostName, exact first then alias-as-prefix
   // (peer name starts with the alias). We deliberately do NOT match the other
-  // direction (alias starts with peer name) — that lets a short name like
-  // "demi" wrongly claim "demi-poly".
+  // direction (alias starts with peer name) — that lets a short prefix
+  // wrongly claim a longer peer name.
   const findPeer = (host: string): { peer: TsPeer; self: boolean } | null => {
     const want = normName(host);
     const candidates = all
@@ -178,8 +163,8 @@ async function probeMachines(): Promise<FleetMachine[]> {
   };
 
   return Promise.all(
-    MACHINES.map(async (m) => {
-      const hit = findPeer(m.host);
+    FLEET.map(async (m: FleetNode) => {
+      const hit = m.match ? findPeer(m.match) : null;
       const peer = hit?.peer;
       const isSelf = hit?.self ?? false;
       const lastSeen =
@@ -187,19 +172,19 @@ async function probeMachines(): Promise<FleetMachine[]> {
           ? peer.LastSeen
           : null;
       const online = isSelf ? true : Boolean(peer?.Online);
-      // Probe GPU + sys only when reachable. Self probes locally; others over SSH.
+      // Probe GPU + sys only when reachable. "self" probes locally; others over SSH.
       const [gpu, sys] = await Promise.all([
-        m.gpuHost && online ? probeGpu(m.gpuHost) : Promise.resolve(null),
-        m.sysHost && (online || isSelf) && m.sysOs
-          ? probeSys(m.sysHost, m.sysOs)
+        m.gpu && (online || m.gpu === "self") ? probeGpu(m.gpu) : Promise.resolve(null),
+        m.sys && (online || isSelf || m.sys === "self")
+          ? probeSys(m.sys, m.os)
           : Promise.resolve(null),
       ]);
       return {
         key: m.key,
         display: m.display,
-        host: m.host,
-        role: m.role,
-        controlled: m.controlled,
+        role: ROLE[m.key] ?? "aux",
+        // "controlled" = we run remote probes against it (SSH configured).
+        controlled: m.ssh !== undefined,
         // Self is always "online" (we are running on it).
         online,
         os: peer?.OS ?? null,
@@ -224,18 +209,29 @@ type Pm2Proc = {
 };
 
 async function probeBot(): Promise<BotHealth> {
-  const r = await run(sshCmd("demi-poly", "pm2 jlist", 8), { timeoutMs: 14000 });
+  const vps = fleetNode("vps");
   const lastTrade = {
     available: false as const,
     reason: "no clean last-trade source exposed by the bot; not fabricated",
   };
+  // No VPS SSH configured → bot health is simply unavailable, not an error.
+  if (!vps?.ssh) {
+    return {
+      reachable: false,
+      procs: [],
+      otherCount: 0,
+      lastTrade,
+      error: "vps not configured",
+    };
+  }
+  const r = await run(`${vps.ssh} 'pm2 jlist'`, { timeoutMs: 14000 });
   if (!r.ok) {
     return {
       reachable: false,
       procs: [],
       otherCount: 0,
       lastTrade,
-      error: r.stderr.trim().split("\n")[0] || "ssh demi-poly pm2 jlist failed",
+      error: r.stderr.trim().split("\n")[0] || "pm2 jlist failed",
     };
   }
   let list: Pm2Proc[] = [];
@@ -251,7 +247,7 @@ async function probeBot(): Promise<BotHealth> {
     };
   }
 
-  const family = list.filter((p) => BOT_FAMILY.test(p.name ?? ""));
+  const family = list.filter((p) => BOT_PROC_RE.test(p.name ?? ""));
   const procs: BotProcess[] = family.map((p) => {
     const status = p.pm2_env?.status ?? "unknown";
     const unstable = p.pm2_env?.unstable_restarts ?? 0;

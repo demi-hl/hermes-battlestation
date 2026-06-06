@@ -16,7 +16,7 @@ export function RepoList() {
           Repos
         </span>
         {data && (
-          <span className="font-mono text-[10px] text-faint">demi-hl · {data.length}</span>
+          <span className="font-mono text-[10px] text-faint">{data.length} repos</span>
         )}
       </div>
       <div className="min-h-0 flex-1 space-y-1 overflow-y-auto pr-0.5">

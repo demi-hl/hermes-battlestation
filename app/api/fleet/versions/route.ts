@@ -2,45 +2,34 @@ import { NextResponse } from "next/server";
 import { run } from "@/lib/exec";
 import { cached } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
+import { FLEET } from "@/lib/fleet/hosts";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 /**
  * Per-box version probe for the agent toolchain (Claude Code + Hermes).
- * Real SSH probes — no mock. Each box reports its installed Claude Code and
- * Hermes versions; we compare Claude Code against the npm `latest` tag to flag
- * an available update. Boxes are reached with their correct user/key per the
- * fleet-ssh-access map (PC local, gpu3070 alias for PC2, christophergervais@
- * for Mac, root@demi-poly for VPS).
+ * Real SSH probes — no mock. Each configured box reports its installed Claude
+ * Code and Hermes versions; we compare Claude Code against the npm `latest`
+ * tag to flag an available update. SSH prefixes come from env
+ * (lib/fleet/hosts.ts) — no hosts or usernames in source.
  */
 
 type BoxProbe = {
   key: string;
   label: string;
+  os: "linux" | "darwin" | "windows";
   // The command prefix that runs a remote command. Empty = local.
   sshPrefix: string;
 };
 
-const BOXES: BoxProbe[] = [
-  { key: "pc", label: "PC #1", sshPrefix: "" },
-  {
-    key: "pc2",
-    label: "PC #2",
-    sshPrefix: "ssh -o BatchMode=yes -o ConnectTimeout=6 gpu3070",
-  },
-  {
-    key: "mac",
-    label: "MacBook",
-    sshPrefix:
-      "ssh -o BatchMode=yes -o ConnectTimeout=6 christophergervais@christophers-macbook-pro",
-  },
-  {
-    key: "vps",
-    label: "VPS",
-    sshPrefix: "ssh -o BatchMode=yes -o ConnectTimeout=6 root@demi-poly",
-  },
-];
+// Build from the env-configured fleet; skip nodes with no SSH (unreachable).
+const BOXES: BoxProbe[] = FLEET.filter((n) => n.ssh !== undefined).map((n) => ({
+  key: n.key,
+  label: n.display,
+  os: n.os,
+  sshPrefix: n.ssh as string,
+}));
 
 export interface BoxVersions {
   key: string;
@@ -85,7 +74,7 @@ async function probeBox(
   // One round-trip: print both versions. PC2 is a Windows box (no `head`), so
   // keep the remote command POSIX-only where possible and tolerate cmd.exe by
   // not relying on unix pipes. `claude --version` prints a single line anyway.
-  const isWindows = box.key === "pc2";
+  const isWindows = box.os === "windows";
   const remote = isWindows
     ? "echo CC:& claude --version& echo HM:& hermes --version"
     : "echo CC:$(claude --version 2>/dev/null | head -1); " +

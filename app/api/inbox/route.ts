@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 const VAULT =
   process.env.OBSIDIAN_VAULT_PATH ??
-  "/mnt/c/Users/demig/iCloudDrive/Documents/Obsidian Vault";
+  `${process.env.HOME ?? process.cwd()}/Obsidian Vault`;
 
 function isToday(ms: number): boolean {
   const d = new Date(ms);

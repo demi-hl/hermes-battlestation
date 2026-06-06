@@ -11,15 +11,14 @@
 //
 // `--cli` forces the classic prompt_toolkit REPL path (NOT the node/PTY TUI),
 // which runs headless from a non-TTY pipe; `-q` sends one query; `-Q` prints
-// only the final response on stdout (session_id goes to stderr). The default
-// model + provider are the user's configured Hermes default (claude-opus-4-8
-// on the Anthropic Max path, with the billing bypass), which is exactly the
-// app's mandated default, so we do not pass -m/-provider and risk a mismatch.
+// only the final response on stdout (session_id goes to stderr). We do not pass
+// -m/-provider, so each session inherits the host agent's configured default
+// model + provider (avoiding a mismatch with the app's expectations).
 
 import { spawn } from "node:child_process";
 import { run } from "./exec";
 
-const HOME = process.env.HOME ?? "/home/demi";
+const HOME = process.env.HOME ?? process.cwd();
 
 /** Roots scanned for bindable repos. The chat hub binds a session per repo. */
 export const REPO_ROOTS = [`${HOME}/projects`, `${HOME}/agent`];

@@ -35,10 +35,10 @@ export function PolymarketPanel() {
       ) : !data || !data.reachable ? (
         <EmptyState
           title="Bot host unreachable"
-          sub={data?.error ?? "ssh demi-poly failed"}
+          sub={data?.error ?? "ssh to bot host failed"}
         />
       ) : data.name == null ? (
-        <EmptyState title="demi-server not found in pm2" sub={data.error ?? undefined} />
+        <EmptyState title="bot process not found in pm2" sub={data.error ?? undefined} />
       ) : (
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-2 font-mono">

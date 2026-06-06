@@ -22,7 +22,8 @@ export const dynamic = "force-dynamic";
 // given box; enumeration is graceful. We never SSH and never touch the repo
 // tree, only `git remote get-url` (read) + `gh` (GitHub API over the authed
 // CLI). Owner/repo is DERIVED from each origin, never hardcoded.
-const ROOTS = ["/home/demi/projects", "/home/demi/agent"];
+const HOME = process.env.HOME ?? process.cwd();
+const ROOTS = [`${HOME}/projects`, `${HOME}/agent`];
 
 const PR_FIELDS =
   "number,title,headRefName,baseRefName,additions,deletions,isDraft,statusCheckRollup,reviewDecision,updatedAt,url";
@@ -180,10 +181,10 @@ export async function GET(req: Request) {
   // Scoped: one repo by its local path (the active workspace). The path becomes
   // a shell cwd, so it is canonicalized FIRST (resolve collapses any `..`) and
   // only then checked against the home tree, defeating traversal like
-  // `/home/demi/../../etc` that a prefix check alone would wave through.
+  // `$HOME/../../etc` that a prefix check alone would wave through.
   if (path) {
     const safePath = resolve(path);
-    if (safePath !== "/home/demi" && !safePath.startsWith("/home/demi/")) {
+    if (safePath !== HOME && !safePath.startsWith(`${HOME}/`)) {
       return NextResponse.json<ApiEnvelope<PrsPayload>>({
         data: null,
         fetchedAt: new Date().toISOString(),
