@@ -87,9 +87,7 @@ export function IDEShell() {
   const showSource = WITH_SOURCE_PANEL.has(view);
 
   return (
-    <div className="relative z-[1] flex h-[100dvh] w-full overflow-hidden bg-[length:400px_346px]"
-      style={{ backgroundImage: 'url("/hermes-bg.svg")' }}
-    >
+    <div className="relative z-[1] flex h-[100dvh] w-full overflow-hidden">
       <IDELeftRail view={view} onView={setView} />
 
       <main className="relative flex min-w-0 flex-1">
