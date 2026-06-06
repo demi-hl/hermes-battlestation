@@ -55,6 +55,13 @@ function MachineRow({ m }: { m: FleetMachine }) {
           {m.host}
           {m.os ? ` · ${m.os}` : ""}
         </span>
+        {m.gpu && (
+          <span className="font-mono-ui tabular block truncate text-[0.56rem] text-text-disabled">
+            {m.gpu.name.replace(/^NVIDIA GeForce /, "")} · {m.gpu.utilPct}% ·{" "}
+            {Math.round(m.gpu.memUsedMB / 1024)}/{Math.round(m.gpu.memTotalMB / 1024)}G ·{" "}
+            {m.gpu.tempC}°C
+          </span>
+        )}
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-0.5">
