@@ -5,15 +5,15 @@ import { Backdrop } from "@/components/shell/Backdrop";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
-  title: "Hermes Agent",
+  title: "Locals Only",
   description:
-    "Hermes Agent — mobile hub. Chat, repos, fleet, and review, over Tailscale.",
-  applicationName: "Hermes Agent",
+    "Locals Only — cockpit for your local agent. Chat, repos, fleet, and review, over Tailscale.",
+  applicationName: "Locals Only",
   manifest: "/manifest.webmanifest",
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "Hermes",
+    title: "Locals Only",
   },
   icons: {
     icon: [

@@ -14,6 +14,13 @@ const nextConfig: NextConfig = {
   // so the build never tries to bundle the .node binary. Electron rebuilds it
   // against its own ABI via @electron/rebuild (see package.json postinstall).
   serverExternalPackages: ["node-pty"],
+  // The standalone tracer walks the project root and will otherwise sweep our
+  // own build output (release/, dist/) and stray PNGs INTO the standalone copy,
+  // which electron-builder then packs — recursively bloating the installer
+  // (saw 166MB -> 347MB). Exclude them from tracing for every route.
+  outputFileTracingExcludes: {
+    "*": ["release/**", "dist/**", "*.png", ".next/standalone/**"],
+  },
 };
 
 export default nextConfig;

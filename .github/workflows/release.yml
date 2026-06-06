@@ -1,0 +1,76 @@
+name: release
+
+# Build the desktop app for all three platforms and attach installers to a
+# GitHub Release. Triggers on a version tag (v1.2.3) or manual dispatch.
+# macOS DMG can only be built on macOS, Windows NSIS on Windows — hence the
+# OS matrix. Artifacts are unsigned (no certs in CI); users may need to allow
+# them past Gatekeeper / SmartScreen on first launch.
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            platform: linux
+          - os: macos-latest
+            platform: mac
+          - os: windows-latest
+            platform: win
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Rebuild native addons for Electron
+        run: npm run electron:rebuild
+
+      - name: Build installer
+        run: npm run dist:${{ matrix.platform }}
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # Do not auto-publish from electron-builder; we attach below.
+          EP_PRE_RELEASE: "false"
+
+      - name: Collect artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.platform }}-installers
+          path: |
+            release/*.AppImage
+            release/*.deb
+            release/*.dmg
+            release/*.exe
+          if-no-files-found: ignore
+
+  release:
+    needs: build
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          generate_release_notes: true

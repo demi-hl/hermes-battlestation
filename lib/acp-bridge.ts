@@ -84,7 +84,8 @@ class AcpBridge {
   private ensureProc(): Promise<void> {
     if (this.ready) return this.ready;
     this.ready = new Promise<void>((resolve, reject) => {
-      const child = spawn("hermes", ["acp", "--accept-hooks"], {
+      const bin = process.env.HERMES_BIN || "hermes";
+      const child = spawn(bin, ["acp", "--accept-hooks"], {
         cwd: HOME,
         env: {
           ...process.env,

@@ -3,6 +3,7 @@ import { cached } from "@/lib/cache";
 import os from "node:os";
 import path from "node:path";
 import { promises as fs } from "node:fs";
+import { resolvedVaultPath } from "@/lib/app-config";
 
 /**
  * Shared-vault git layer. The Obsidian vault is a git repo that every fleet
@@ -10,16 +11,16 @@ import { promises as fs } from "node:fs";
  * each box pulls to sync. This module reports that repo's state and drives
  * pull / commit-all / push — the three operations the sync pane needs.
  *
- * Vault path resolution: OBSIDIAN_VAULT_PATH, else "$HOME/Obsidian Vault".
- * No secrets, no hardcoded user paths.
+ * Vault path resolution (resolvedVaultPath): OBSIDIAN_VAULT_PATH env, then the
+ * in-app config, then "$HOME/Obsidian Vault". No secrets, no hardcoded user paths.
  */
 
-export function vaultPath(): string {
-  return process.env.OBSIDIAN_VAULT_PATH ?? path.join(os.homedir(), "Obsidian Vault");
+export async function vaultPath(): Promise<string> {
+  return resolvedVaultPath();
 }
 
 async function git(args: string[], timeoutMs = 12000) {
-  return runFile("git", args, { cwd: vaultPath(), timeoutMs });
+  return runFile("git", args, { cwd: await vaultPath(), timeoutMs });
 }
 
 export interface VaultAuthor {
@@ -51,7 +52,7 @@ export interface VaultStatus {
 
 export async function vaultStatus(): Promise<VaultStatus> {
   return cached("vault:status", 10_000, async () => {
-    const root = vaultPath();
+    const root = await vaultPath();
     const base: VaultStatus = {
       configured: !!process.env.OBSIDIAN_VAULT_PATH,
       isRepo: false,

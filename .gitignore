@@ -8,8 +8,9 @@
 /out/
 next-env.d.ts
 
-# production
-/build
+# electron-builder output (installers)
+/release/
+/dist/
 
 # misc
 .DS_Store
@@ -32,3 +33,4 @@ yarn-error.log*
 .playwright-mcp/
 *.log
 ios/App/App/public/
+.workflows/

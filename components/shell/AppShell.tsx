@@ -324,7 +324,7 @@ export function AppShell() {
     }
   };
 
-  const renderPane = (id: TabId) => {
+  const renderPane = (id: TabId, desktop = false) => {
     const Pane = getTab(id).Pane;
     return (
       <div
@@ -333,9 +333,12 @@ export function AppShell() {
         }}
         className="absolute inset-0 overflow-y-auto overscroll-contain"
         style={{
-          paddingTop: "calc(var(--app-header-h) + env(safe-area-inset-top) + 6px)",
-          paddingBottom:
-            "calc(var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom) + 8px)",
+          paddingTop: desktop
+            ? "var(--app-header-h)"
+            : "calc(var(--app-header-h) + env(safe-area-inset-top) + 6px)",
+          paddingBottom: desktop
+            ? "0px"
+            : "calc(var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom) + 8px)",
           WebkitOverflowScrolling: "touch",
         }}
       >
@@ -350,19 +353,9 @@ export function AppShell() {
     ------------------------------------------------ */
     <div className="flex h-dvh overflow-hidden" style={SHELL_VARS}>
       <DesktopSidebar activeTab={activeTab} onSelect={goTab} />
-      <div className="flex min-w-0 flex-1 flex-col">
+      <div className="relative flex min-w-0 flex-1 flex-col">
         <AppHeader />
-        <div
-          ref={(el) => {
-            scrollRefs.current[activeTab] = el;
-          }}
-          className="flex-1 overflow-y-auto overscroll-contain"
-          style={{
-            padding: "20px 28px",
-          }}
-        >
-          {renderPane(activeTab)}
-        </div>
+        <main className="relative min-h-0 flex-1">{renderPane(activeTab, true)}</main>
       </div>
     </div>
   ) : (

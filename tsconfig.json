@@ -38,6 +38,8 @@
   "exclude": [
     "node_modules",
     "ios",
-    "android"
+    "android",
+    "release",
+    "dist"
   ]
 }

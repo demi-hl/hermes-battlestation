@@ -3,6 +3,7 @@ import path from "node:path";
 import os from "node:os";
 import { runFile } from "@/lib/run-file";
 import { cached } from "@/lib/cache";
+import { resolvedRepoRoots } from "@/lib/app-config";
 import type {
   Workspace,
   RepoSummary,
@@ -32,7 +33,8 @@ export type {
 
 const HOME = os.homedir();
 
-/** Fixed roots we will enumerate git repos under. Nothing outside these is reachable. */
+/** Default roots when no user config is set. The resolved set (config overlay)
+ *  comes from resolvedRepoRoots(); this stays exported for back-compat. */
 export const ALLOWED_ROOTS = [
   path.join(HOME, "projects"),
   path.join(HOME, "agent"),
@@ -67,11 +69,12 @@ export interface RepoRef {
   root: string;
 }
 
-/** Enumerate git repos under the allowlist (basename = slug). Cached 30s. */
+/** Enumerate git repos under the resolved roots (basename = slug). Cached 30s. */
 export async function listRepos(): Promise<RepoRef[]> {
   return cached("wsfs:repos", 30_000, async () => {
+    const roots = await resolvedRepoRoots();
     const found: RepoRef[] = [];
-    for (const root of ALLOWED_ROOTS) {
+    for (const root of roots) {
       let entries: string[] = [];
       try {
         entries = await fs.readdir(root);

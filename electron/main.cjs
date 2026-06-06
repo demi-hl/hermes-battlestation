@@ -109,13 +109,17 @@ async function createWindow() {
     height: 900,
     minWidth: 380,
     minHeight: 600,
-    backgroundColor: "#0a0a0a",
+    title: "Locals Only",
+    backgroundColor: "#041c1c",
     autoHideMenuBar: true,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+
+  // Keep the window title fixed regardless of the page's <title>.
+  win.on("page-title-updated", (e) => e.preventDefault());
 
   // Open external links in the system browser, not a new Electron window.
   win.webContents.setWindowOpenHandler(({ url }) => {

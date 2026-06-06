@@ -16,10 +16,10 @@
     "cap:build": "next build && cap copy",
     "electron:dev": "next build && electron .",
     "electron:rebuild": "electron-rebuild -f -w node-pty",
-    "dist": "next build && node scripts/prepare-standalone.cjs && electron-builder",
-    "dist:linux": "next build && node scripts/prepare-standalone.cjs && electron-builder --linux",
-    "dist:mac": "next build && node scripts/prepare-standalone.cjs && electron-builder --mac",
-    "dist:win": "next build && node scripts/prepare-standalone.cjs && electron-builder --win"
+    "dist": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder",
+    "dist:linux": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder --linux",
+    "dist:mac": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder --mac",
+    "dist:win": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder --win"
   },
   "dependencies": {
     "@capacitor/haptics": "^8.0.2",
