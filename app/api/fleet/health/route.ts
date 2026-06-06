@@ -1,8 +1,9 @@
 import { NextResponse } from "next/server";
-import { run, sshCmd, shellQuote } from "@/lib/exec";
+import { run, sshReadOnly, isReadOnlyRemote, shellQuote } from "@/lib/exec";
 import { cached } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import type {
+  AgentStat,
   BotHealth,
   BotProcess,
   FleetHealth,
@@ -48,10 +49,15 @@ type TsPeer = {
 async function probeGpu(gpuHost: string): Promise<GpuStat | null> {
   const query =
     "nvidia-smi --query-gpu=name,memory.used,memory.total,utilization.gpu,temperature.gpu --format=csv,noheader,nounits";
-  const r =
-    gpuHost === "self"
-      ? await run(query, { timeoutMs: 9000 })
-      : await run(sshCmd(gpuHost, query, 6), { timeoutMs: 9000 });
+  let cmd: string;
+  if (gpuHost === "self") {
+    cmd = query;
+  } else {
+    const ssh = sshReadOnly(gpuHost, query, 6);
+    if (!ssh) return null; // refused by read-only guard
+    cmd = ssh;
+  }
+  const r = await run(cmd, { timeoutMs: 9000 });
   if (!r.ok) return null;
   const line = r.stdout.trim().split("\n")[0] ?? "";
   const parts = line.split(",").map((s) => s.trim());
@@ -98,9 +104,15 @@ async function probeSys(
   }
 
   const local = sysHost === "self";
-  const r = local
-    ? await run(`bash -c ${shellQuote(cmd)}`, { timeoutMs: 9000 })
-    : await run(sshCmd(sysHost, cmd, 6), { timeoutMs: 11000 });
+  let runCmd: string;
+  if (local) {
+    runCmd = `bash -c ${shellQuote(cmd)}`;
+  } else {
+    const ssh = sshReadOnly(sysHost, cmd, 6);
+    if (!ssh) return null; // refused by read-only guard
+    runCmd = ssh;
+  }
+  const r = await run(runCmd, { timeoutMs: local ? 9000 : 11000 });
   if (!r.ok) return null;
   const out = r.stdout;
 
@@ -127,6 +139,30 @@ async function probeSys(
   if (!parts || parts.length < 4 || !parts.every(Number.isFinite)) return null;
   const [cpuPct, cores, memUsedMB, memTotalMB] = parts;
   return { cpuPct, cores, memUsedMB, memTotalMB };
+}
+
+/** Probe a box's hermes agent endpoint — the fleet's "agents only" access.
+ *  A plain GET to the configured health URL; no shell, no SSH. Any HTTP
+ *  response (even 401/404) proves the agent is up and listening. */
+async function probeAgent(url: string): Promise<AgentStat> {
+  const started = Date.now();
+  try {
+    const ctrl = new AbortController();
+    const t = setTimeout(() => ctrl.abort(), 5000);
+    const res = await fetch(url, {
+      method: "GET",
+      signal: ctrl.signal,
+      redirect: "manual",
+    });
+    clearTimeout(t);
+    return {
+      reachable: true,
+      httpStatus: res.status,
+      latencyMs: Date.now() - started,
+    };
+  } catch {
+    return { reachable: false, httpStatus: null, latencyMs: null };
+  }
 }
 
 async function probeMachines(): Promise<FleetMachine[]> {
@@ -173,11 +209,13 @@ async function probeMachines(): Promise<FleetMachine[]> {
           : null;
       const online = isSelf ? true : Boolean(peer?.Online);
       // Probe GPU + sys only when reachable. "self" probes locally; others over SSH.
-      const [gpu, sys] = await Promise.all([
+      // Probe the agent endpoint independently — it's HTTP, not tied to ssh/tailnet.
+      const [gpu, sys, agent] = await Promise.all([
         m.gpu && (online || m.gpu === "self") ? probeGpu(m.gpu) : Promise.resolve(null),
         m.sys && (online || isSelf || m.sys === "self")
           ? probeSys(m.sys, m.os)
           : Promise.resolve(null),
+        m.agent ? probeAgent(m.agent) : Promise.resolve(null),
       ]);
       return {
         key: m.key,
@@ -192,6 +230,7 @@ async function probeMachines(): Promise<FleetMachine[]> {
         self: isSelf,
         gpu,
         sys,
+        agent,
       } satisfies FleetMachine;
     }),
   );
@@ -222,6 +261,17 @@ async function probeBot(): Promise<BotHealth> {
       otherCount: 0,
       lastTrade,
       error: "vps not configured",
+    };
+  }
+  // pm2 jlist is read-only; assert it against the allowlist before running so
+  // the bot probe shares the fleet's "telemetry only" guarantee.
+  if (!isReadOnlyRemote("pm2 jlist")) {
+    return {
+      reachable: false,
+      procs: [],
+      otherCount: 0,
+      lastTrade,
+      error: "pm2 jlist not permitted by read-only guard",
     };
   }
   const r = await run(`${vps.ssh} 'pm2 jlist'`, { timeoutMs: 14000 });

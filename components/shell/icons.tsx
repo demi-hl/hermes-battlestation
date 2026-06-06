@@ -154,3 +154,12 @@ export const CloseIcon = (p: P) => (
     <path d="M6 6l12 12M18 6 6 18" />
   </svg>
 );
+
+// Vault: a stylized obsidian gem (diamond facets).
+export const VaultIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M12 2 4 8.5 12 22l8-13.5L12 2Z" />
+    <path d="M4 8.5h16M12 2v20M8 8.5 12 22l4-13.5" />
+  </svg>
+);
+

@@ -107,6 +107,18 @@ export interface FleetMachine {
   gpu?: GpuStat | null;
   /** Live CPU/RAM readout (SSH). Null unless the box is probed for system load. */
   sys?: SysStat | null;
+  /** Live agent reachability. Null unless an agent endpoint is configured. */
+  agent?: AgentStat | null;
+}
+
+/** Agent endpoint reachability — the fleet's "agents only" access layer.
+ *  We GET the box's hermes agent/dashboard health URL; no shell, no SSH. */
+export interface AgentStat {
+  reachable: boolean;
+  /** HTTP status from the health probe, or null on transport failure. */
+  httpStatus: number | null;
+  /** Round-trip latency in ms when reachable. */
+  latencyMs: number | null;
 }
 
 export interface GpuStat {

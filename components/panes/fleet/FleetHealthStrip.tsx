@@ -68,6 +68,22 @@ function MachineRow({ m }: { m: FleetMachine }) {
             {Math.round(m.sys.memUsedMB / 1024)}/{Math.round(m.sys.memTotalMB / 1024)}G
           </span>
         )}
+        {m.agent && (
+          <span className="font-mono-ui block truncate text-[0.56rem]">
+            <span
+              style={{
+                color: m.agent.reachable
+                  ? "var(--color-success)"
+                  : "var(--text-disabled)",
+              }}
+            >
+              ● agent {m.agent.reachable ? "up" : "down"}
+            </span>
+            {m.agent.reachable && m.agent.latencyMs != null
+              ? ` · ${m.agent.latencyMs}ms`
+              : ""}
+          </span>
+        )}
       </div>
 
       <div className="flex shrink-0 flex-col items-end gap-0.5">

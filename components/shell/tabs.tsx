@@ -10,6 +10,7 @@ import {
   PullRequestIcon,
   AutomationIcon,
   SettingsIcon,
+  VaultIcon,
 } from "./icons";
 import { ChatPane } from "@/components/panes/ChatPane";
 import { ReposPane } from "@/components/panes/ReposPane";
@@ -21,6 +22,7 @@ import { KanbanPane } from "@/components/panes/KanbanPane";
 import { TasksPRsPane } from "@/components/panes/TasksPRsPane";
 import { AutomationsPane } from "@/components/panes/AutomationsPane";
 import { SettingsPane } from "@/components/panes/SettingsPane";
+import { ObsidianPane } from "@/components/panes/ObsidianPane";
 
 /**
  * Tab registry — the contract between the shell (slice 1) and the feature
@@ -39,6 +41,7 @@ export type TabId =
   | "fleet"
   | "kanban"
   | "prs"
+  | "obsidian"
   | "automations"
   | "settings";
 
@@ -62,6 +65,7 @@ export const TABS: TabDef[] = [
   { id: "fleet", label: "Fleet", shortLabel: "Fleet", Icon: FleetIcon, Pane: FleetPane },
   { id: "kanban", label: "Kanban", shortLabel: "Board", Icon: KanbanIcon, Pane: KanbanPane },
   { id: "prs", label: "Tasks & PRs", shortLabel: "PRs", Icon: PullRequestIcon, Pane: TasksPRsPane },
+  { id: "obsidian", label: "Obsidian", shortLabel: "Vault", Icon: VaultIcon, Pane: ObsidianPane },
   { id: "automations", label: "Automations", shortLabel: "Auto", Icon: AutomationIcon, Pane: AutomationsPane },
   { id: "settings", label: "Settings", shortLabel: "Settings", Icon: SettingsIcon, Pane: SettingsPane },
 ];

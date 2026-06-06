@@ -34,6 +34,10 @@ export interface FleetNode {
   gpu?: string;
   /** SSH alias for cpu/ram, "self" for local, undefined to skip. */
   sys?: string;
+  /** Agent reachability: URL of the box's hermes agent/dashboard health
+   *  endpoint (e.g. http://<peer>:9119). undefined = no agent probe. This is
+   *  the ONLY cross-box access the fleet performs beyond read-only telemetry. */
+  agent?: string;
   /** Whether this node hosts the pm2 bot-health rollup. */
   bot?: boolean;
 }
@@ -49,6 +53,7 @@ export const FLEET: FleetNode[] = [
     ssh: env("FLEET_PC1_SSH") ?? "",
     gpu: env("FLEET_PC1_GPU") ?? "self",
     sys: env("FLEET_PC1_SYS") ?? "self",
+    agent: env("FLEET_PC1_AGENT"),
   },
   {
     key: "pc2",
@@ -58,6 +63,7 @@ export const FLEET: FleetNode[] = [
     ssh: env("FLEET_PC2_SSH"),
     gpu: env("FLEET_PC2_GPU"),
     sys: env("FLEET_PC2_SYS"),
+    agent: env("FLEET_PC2_AGENT"),
   },
   {
     key: "mac",
@@ -66,6 +72,7 @@ export const FLEET: FleetNode[] = [
     match: env("FLEET_MAC_MATCH"),
     ssh: env("FLEET_MAC_SSH"),
     sys: env("FLEET_MAC_SYS"),
+    agent: env("FLEET_MAC_AGENT"),
   },
   {
     key: "vps",
@@ -74,6 +81,7 @@ export const FLEET: FleetNode[] = [
     match: env("FLEET_VPS_MATCH"),
     ssh: env("FLEET_VPS_SSH"),
     sys: env("FLEET_VPS_SYS"),
+    agent: env("FLEET_VPS_AGENT"),
     bot: true,
   },
 ];

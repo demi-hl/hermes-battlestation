@@ -36,9 +36,43 @@ export function run(
 }
 
 // Standard BatchMode ssh prefix: never prompt, fail fast, use existing keys.
+// Hardened: no TTY, no agent/X11 forwarding, no command execution beyond the
+// fixed remote string — the fleet uses SSH ONLY for read-only telemetry.
 export function sshCmd(host: string, remote: string, connectTimeout = 6): string {
   const safeRemote = remote.replace(/'/g, "'\\''");
-  return `ssh -o BatchMode=yes -o ConnectTimeout=${connectTimeout} ${host} '${safeRemote}'`;
+  return (
+    `ssh -o BatchMode=yes -o ConnectTimeout=${connectTimeout} ` +
+    `-o RequestTTY=no -o ForwardAgent=no -o ForwardX11=no -o ClearAllForwardings=yes ` +
+    `-T ${host} '${safeRemote}'`
+  );
+}
+
+// Read-only command allowlist for fleet SSH probes. A remote command must start
+// with one of these tokens or it is refused — this is what makes the fleet
+// "agents/telemetry only": it physically cannot run an arbitrary remote shell.
+const READONLY_REMOTE = [
+  "echo ",
+  "nvidia-smi ",
+  "pm2 jlist",
+  "C=$(nproc)", // linux sys one-liner
+  "C=$(sysctl", // darwin sys one-liner
+  "wmic ", // windows sys one-liner
+];
+
+export function isReadOnlyRemote(remote: string): boolean {
+  const r = remote.trimStart();
+  return READONLY_REMOTE.some((p) => r.startsWith(p));
+}
+
+/** Build a hardened, read-only-guarded ssh command. Returns null if the remote
+ *  command is not on the read-only allowlist (caller treats as unavailable). */
+export function sshReadOnly(
+  host: string,
+  remote: string,
+  connectTimeout = 6,
+): string | null {
+  if (!isReadOnlyRemote(remote)) return null;
+  return sshCmd(host, remote, connectTimeout);
 }
 
 // Single-quote a string for safe inclusion in a /bin/sh command line.
