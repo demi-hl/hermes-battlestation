@@ -172,11 +172,15 @@ async function createWindow() {
     title: "Hermes Battlestation",
     backgroundColor: "#041c1c",
     autoHideMenuBar: true,
+    show: false,
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
     },
   });
+
+  // Paint to the offscreen buffer first, then reveal — no white flash on launch.
+  win.once("ready-to-show", () => win.show());
 
   // Keep the window title fixed regardless of the page's <title>.
   win.on("page-title-updated", (e) => e.preventDefault());

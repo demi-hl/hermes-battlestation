@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'ai.hermes.agent',
-  appName: 'Hermes Agent',
+  appId: 'ai.nousresearch.battlestation',
+  appName: 'Hermes Battlestation',
   webDir: '.next',
   server: {
     url: process.env.CAP_SERVER_URL ?? 'http://localhost:9119',
