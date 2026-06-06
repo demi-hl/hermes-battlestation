@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/components/shell/haptics";
 import { NODE_META, isStale, type FleetAgent } from "@/lib/fleet/types";
-import { NodeChip, BillingChip, agoShort } from "./chips";
+import { NodeChip, agoShort } from "./chips";
 import { ChevronRightIcon } from "@/components/shell/icons";
 import { GitCommitIcon, LayersIcon } from "./icons";
 
@@ -115,7 +115,6 @@ export function AgentCard({
         </span>
         <span className="ml-auto flex shrink-0 items-center gap-1">
           <NodeChip node={agent.node} />
-          <BillingChip billing={agent.billing} />
         </span>
       </div>
 

@@ -67,13 +67,12 @@ export function ContextBar() {
           haptic(8);
           setModelOpen(true);
         }}
-        aria-label={`Model: ${model.label} on ${model.plan}. Tap to switch.`}
+        aria-label={`Model: ${model.label}. Tap to switch.`}
         className="flex shrink-0 items-center gap-1 rounded-full border border-border px-2 py-1 text-[0.7rem] text-midground transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
       >
         <span className="font-mondwest text-display tracking-wide">
           {model.label}
         </span>
-        <span className="text-text-tertiary">· {model.plan}</span>
         <ChevronUpDownIcon
           width={12}
           height={12}
@@ -151,10 +150,6 @@ function ModelSheet({
           />
         ))}
       </ul>
-      <p className="px-3 pt-2 text-[0.68rem] leading-relaxed text-text-tertiary">
-        All models run on the Anthropic Max subscription (flat rate). Never
-        OpenRouter.
-      </p>
     </Sheet>
   );
 }
@@ -193,7 +188,7 @@ function ModelRow({
             {option.label}
           </span>
           <span className="font-mono-ui text-[0.68rem] text-text-tertiary">
-            {option.id} · {option.provider} · {option.plan}
+            {option.id} · {option.provider}
           </span>
         </span>
         <CheckIcon

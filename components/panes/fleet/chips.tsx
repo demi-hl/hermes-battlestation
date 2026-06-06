@@ -1,10 +1,8 @@
 "use client";
 
 import {
-  BILLING_META,
   NODE_META,
   type AgentNode,
-  type BillingSub,
 } from "@/lib/fleet/types";
 
 /** Compact "Xs / Xm / Xh / Xd ago" from an epoch-ms instant. */
@@ -36,26 +34,6 @@ export function NodeChip({ node }: { node: AgentNode }) {
         className="h-1.5 w-1.5 rounded-full"
         style={{ background: meta.color, boxShadow: `0 0 5px ${meta.color}` }}
       />
-      {meta.label}
-    </span>
-  );
-}
-
-/** Billing chip — your-Max teal vs David-Max amber, so cap attribution is
- *  glanceable. Hidden for the unbilled VPS bot. */
-export function BillingChip({ billing }: { billing: BillingSub }) {
-  if (billing === "none") return null;
-  const meta = BILLING_META[billing];
-  return (
-    <span
-      className="font-mono-ui inline-flex shrink-0 items-center rounded-full px-1.5 py-0.5 text-[0.56rem] uppercase tracking-[0.1em]"
-      style={{
-        color: meta.color,
-        background: `color-mix(in srgb, ${meta.color} 10%, transparent)`,
-        border: `1px solid color-mix(in srgb, ${meta.color} 28%, transparent)`,
-      }}
-      title={`billed to ${meta.label}`}
-    >
       {meta.label}
     </span>
   );
