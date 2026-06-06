@@ -211,6 +211,12 @@ export const DownloadIcon = (p: P) => (
   </svg>
 );
 
+export const PlugIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M9 2v6M15 2v6M6 8h12v3a6 6 0 0 1-12 0V8ZM12 17v5" />
+  </svg>
+);
+
 // Vault: a stylized obsidian gem (diamond facets).
 export const VaultIcon = (p: P) => (
   <svg {...base(p)}>
