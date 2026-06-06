@@ -22,8 +22,32 @@ export const dynamic = "force-dynamic";
 
 const HERMES_HOME = process.env.HERMES_HOME || path.join(os.homedir(), ".hermes");
 const CACHE_FILE = path.join(HERMES_HOME, "openrouter_models_cache.json");
+// Applied pipeline lives in its OWN file — NEVER config.yaml. Applying a
+// pipeline here must never repoint Hermes' own agent loop (that would switch
+// the flat-rate Max OAuth path onto metered OpenRouter billing). This is a
+// preference doc the app reads, not a runtime model override.
+const PIPELINE_FILE = path.join(HERMES_HOME, "battlestation-pipeline.json");
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 const MODELS_URL = "https://openrouter.ai/api/v1/models";
+
+const STAGE_IDS = ["reasoning", "image_prompt", "image_gen", "vision"] as const;
+type StageId = (typeof STAGE_IDS)[number];
+
+interface SavedPipeline {
+  mode: Mode;
+  stages: Partial<Record<StageId, string>>;
+  savedAt: string;
+}
+
+async function readSavedPipeline(): Promise<SavedPipeline | null> {
+  try {
+    const raw = JSON.parse(await fs.readFile(PIPELINE_FILE, "utf8")) as SavedPipeline;
+    if (raw && typeof raw === "object" && raw.stages) return raw;
+  } catch {
+    /* none saved */
+  }
+  return null;
+}
 
 type ORPricing = { prompt?: string; completion?: string; image?: string };
 type ORArch = { input_modalities?: string[]; output_modalities?: string[] };
@@ -143,17 +167,23 @@ function buildStage(
   };
 }
 
-async function loadCatalog(): Promise<{ models: ORModel[]; source: "live" | "cache" | "offline" }> {
+async function loadCatalog(): Promise<{
+  models: ORModel[];
+  source: "live" | "cache" | "offline";
+  latencyMs: number | null;
+}> {
   // try live first
   try {
     const ac = new AbortController();
     const t = setTimeout(() => ac.abort(), 12_000);
+    const t0 = Date.now();
     const res = await fetch(MODELS_URL, {
       headers: { "User-Agent": "hermes-battlestation" },
       signal: ac.signal,
       cache: "no-store",
     });
     clearTimeout(t);
+    const latencyMs = Date.now() - t0;
     if (res.ok) {
       const json = (await res.json()) as { data?: ORModel[] };
       const models = json.data ?? [];
@@ -163,7 +193,7 @@ async function loadCatalog(): Promise<{ models: ORModel[]; source: "live" | "cac
           JSON.stringify({ at: Date.now(), models }),
           "utf8",
         ).catch(() => {});
-        return { models, source: "live" };
+        return { models, source: "live", latencyMs };
       }
     }
   } catch {
@@ -175,11 +205,11 @@ async function loadCatalog(): Promise<{ models: ORModel[]; source: "live" | "cac
       at: number;
       models: ORModel[];
     };
-    if (raw.models?.length) return { models: raw.models, source: "cache" };
+    if (raw.models?.length) return { models: raw.models, source: "cache", latencyMs: null };
   } catch {
     /* no cache */
   }
-  return { models: [], source: "offline" };
+  return { models: [], source: "offline", latencyMs: null };
 }
 
 /** Detect active free-model campaigns by vendor (e.g. NVIDIA Nemotron drop). */
@@ -208,8 +238,9 @@ function detectCampaigns(free: PickedModel[]): { name: string; vendor: string; b
 }
 
 export async function GET() {
-  const { models, source } = await loadCatalog();
+  const { models, source, latencyMs } = await loadCatalog();
   const all = models.map(toPicked);
+  const saved = await readSavedPipeline();
 
   // capability predicates
   const isText = (m: PickedModel) => m.inputs.includes("text") || m.inputs.length === 0;
@@ -283,13 +314,88 @@ export async function GET() {
     vision: all.filter(isVision).length,
   };
 
+  // compact catalog for client-side search across the whole list. Strip to the
+  // fields the search UI needs; keep payload small.
+  const catalog = all
+    .filter((m) => !m.router && !m.id.startsWith("~"))
+    .map((m) => ({
+      id: m.id,
+      ctx: m.ctx,
+      perM: m.perM,
+      free: m.free,
+      reasoning: m.reasoning,
+      tools: m.tools,
+      inputs: m.inputs,
+      outputs: m.outputs,
+    }))
+    .sort((a, b) => a.id.localeCompare(b.id));
+
+  // honest reachability telemetry — measured during THIS request's catalog
+  // fetch. null latency = served from cache / offline (no live round-trip).
+  const health = {
+    reachable: source === "live",
+    latencyMs,
+    status: source === "live" ? "online" : source === "cache" ? "cached" : "offline",
+  };
+
   return NextResponse.json({
     source,
     counts,
+    health,
     pipeline,
     modes,
     campaigns,
     freeModels: freeByNew.slice(0, 30),
+    catalog,
+    saved,
     fetchedAt: new Date().toISOString(),
   });
+}
+
+/**
+ * Apply / clear a pipeline. Writes ONLY to battlestation-pipeline.json — never
+ * config.yaml, never the `model` block. This is a saved preference the app
+ * reads back; it does NOT change which model Hermes' own agent loop runs, so it
+ * can't silently flip the flat-rate Max OAuth path onto metered billing.
+ * Body: { action: "apply", mode, stages: {stageId: modelId} } | { action: "clear" }.
+ */
+export async function POST(req: Request) {
+  let body: { action?: string; mode?: Mode; stages?: Record<string, string> };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+
+  if (body.action === "clear") {
+    await fs.unlink(PIPELINE_FILE).catch(() => {});
+    return NextResponse.json({ ok: true, cleared: true });
+  }
+
+  if (body.action !== "apply") {
+    return NextResponse.json({ error: "unknown action" }, { status: 400 });
+  }
+
+  const mode: Mode = ["cheapest", "free", "premium"].includes(body.mode as string)
+    ? (body.mode as Mode)
+    : "cheapest";
+
+  // whitelist stage ids + validate model-id shape (provider/model[:variant]).
+  const stages: Partial<Record<StageId, string>> = {};
+  const ID_RX = /^[A-Za-z0-9._\/:-]{1,128}$/;
+  for (const sid of STAGE_IDS) {
+    const v = body.stages?.[sid];
+    if (typeof v === "string" && v && ID_RX.test(v)) stages[sid] = v;
+  }
+  if (!Object.keys(stages).length) {
+    return NextResponse.json({ error: "no valid stages" }, { status: 400 });
+  }
+
+  const payload: SavedPipeline = { mode, stages, savedAt: new Date().toISOString() };
+  try {
+    await fs.writeFile(PIPELINE_FILE, JSON.stringify(payload, null, 2), "utf8");
+  } catch (e) {
+    return NextResponse.json({ error: String(e).slice(0, 200) }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true, saved: payload, path: PIPELINE_FILE });
 }

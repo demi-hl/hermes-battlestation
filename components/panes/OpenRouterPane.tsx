@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState, type SVGProps } from "react";
+import { useEffect, useMemo, useState, type SVGProps } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePolling } from "@/components/usePolling";
 import { relativeTime } from "@/lib/format";
@@ -14,6 +14,7 @@ import {
   Badge,
   RefreshButton,
 } from "./parts";
+import { SearchIcon } from "@/components/panes/pane-icons";
 
 /* ========================================================================= */
 
@@ -52,13 +53,39 @@ interface FreeModel extends PickedModel {
   created: number;
 }
 
+interface CatalogModel {
+  id: string;
+  ctx: number;
+  perM: number;
+  free: boolean;
+  reasoning: boolean;
+  tools: boolean;
+  inputs: string[];
+  outputs: string[];
+}
+
+interface SavedPipeline {
+  mode: Mode;
+  stages: Partial<Record<string, string>>;
+  savedAt: string;
+}
+
 interface OpenRouterPayload {
   source: "live" | "cache" | "offline";
   counts: { total: number; free: number; reasoning: number; imageOut: number; vision: number };
+  health: { reachable: boolean; latencyMs: number | null; status: string };
   pipeline: Stage[];
   modes: Record<Mode, { resolved: number; perMTotal: number; note: string }>;
   campaigns: Campaign[];
   freeModels: FreeModel[];
+  catalog: CatalogModel[];
+  saved: SavedPipeline | null;
+}
+
+/** Per-day usage rollup from /api/analytics (subset we need). */
+interface AnalyticsPayload {
+  totals: { cost: number; sessions: number; in: number; out: number };
+  models: { model: string; cost: number; sessions: number }[];
 }
 
 /* ========================================================================= */
@@ -239,20 +266,102 @@ export function OpenRouterPane() {
     "/api/openrouter",
     5 * 60_000,
   );
+  const { data: analytics } = usePolling<AnalyticsPayload>("/api/analytics?days=30", 60_000);
 
   const [mode, setMode] = useState<Mode>("cheapest");
+  const [search, setSearch] = useState("");
+  const [applying, setApplying] = useState(false);
+  const [savedAt, setSavedAt] = useState<string | null>(null);
 
   const counts = data?.counts;
   const pipeline = data?.pipeline ?? [];
   const modeInfo = data?.modes?.[mode];
   const campaigns = data?.campaigns ?? [];
   const freeModels = data?.freeModels ?? [];
+  const catalog = data?.catalog ?? [];
+  const health = data?.health;
+  const saved = data?.saved;
+
+  // sync mode to the saved pipeline once it loads
+  useEffect(() => {
+    if (saved?.mode) setMode(saved.mode);
+    if (saved?.savedAt) setSavedAt(saved.savedAt);
+  }, [saved?.savedAt, saved?.mode]);
 
   const modeCost = useMemo(() => {
     if (!modeInfo) return null;
     if (mode === "free") return "$0 · rate-limited";
     return `~$${modeInfo.perMTotal.toFixed(modeInfo.perMTotal < 10 ? 2 : 0)}/M blended`;
   }, [modeInfo, mode]);
+
+  // OpenRouter spend = sum of analytics cost for models whose id contains "/"
+  // (the OpenRouter slug shape provider/model). Hermes' own Max runs show up as
+  // bare "claude-*" model names and are excluded — this is OR metered spend only.
+  const orSpend = useMemo(() => {
+    if (!analytics?.models) return null;
+    const or = analytics.models.filter((m) => m.model.includes("/"));
+    const cost = or.reduce((a, m) => a + (m.cost || 0), 0);
+    const sessions = or.reduce((a, m) => a + (m.sessions || 0), 0);
+    return { cost, sessions, models: or.length };
+  }, [analytics]);
+
+  // estimate per-run pipeline cost: blended $/M * an assumed 8K-token run/stage.
+  const RUN_TOKENS = 8000;
+  const runEstimate = useMemo(() => {
+    if (!modeInfo) return null;
+    return (modeInfo.perMTotal * RUN_TOKENS) / 1_000_000;
+  }, [modeInfo]);
+
+  const filteredCatalog = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return [];
+    return catalog.filter((m) => m.id.toLowerCase().includes(q)).slice(0, 40);
+  }, [catalog, search]);
+
+  const applyPipeline = async () => {
+    if (applying || !modeInfo) return;
+    haptic(12);
+    setApplying(true);
+    try {
+      const stages: Record<string, string> = {};
+      for (const st of pipeline) {
+        const pick = st.picks[mode];
+        if (pick) stages[st.stage] = pick.id;
+      }
+      const res = await fetch("/api/openrouter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "apply", mode, stages }),
+      });
+      if (res.ok) {
+        const j = await res.json();
+        setSavedAt(j.saved?.savedAt ?? new Date().toISOString());
+        haptic(20);
+      }
+    } catch {
+      /* ignore */
+    } finally {
+      setApplying(false);
+    }
+  };
+
+  const clearPipeline = async () => {
+    if (applying) return;
+    haptic(8);
+    setApplying(true);
+    try {
+      await fetch("/api/openrouter", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "clear" }),
+      });
+      setSavedAt(null);
+    } catch {
+      /* ignore */
+    } finally {
+      setApplying(false);
+    }
+  };
 
   return (
     <PullToRefresh onRefresh={reload}>
@@ -284,6 +393,41 @@ export function OpenRouterPane() {
           <p className="mt-2 px-1 font-mono-ui text-[0.64rem] text-[var(--color-warning,#ffbd38)]">
             {error}
           </p>
+        )}
+
+        {/* health / latency strip */}
+        {health && (
+          <div className="mt-3 flex items-center gap-2 rounded-[var(--radius-md)] border border-border px-3 py-2">
+            <span
+              className="h-2 w-2 shrink-0 rounded-full"
+              style={{
+                background: health.reachable
+                  ? "var(--color-success,#4ade80)"
+                  : health.status === "cached"
+                  ? "var(--color-warning,#ffbd38)"
+                  : "var(--color-destructive,#fb2c36)",
+                boxShadow: health.reachable ? "0 0 7px var(--color-success,#4ade80)" : "none",
+              }}
+            />
+            <span className="font-mondwest text-display text-[0.66rem] uppercase tracking-[0.1em] text-midground">
+              {health.status}
+            </span>
+            <span className="ml-auto font-mono-ui text-[0.62rem] text-text-tertiary">
+              {health.latencyMs != null ? `${health.latencyMs}ms` : "no live round-trip"}
+            </span>
+            {orSpend != null && (
+              <>
+                <span className="h-3 w-px bg-border" />
+                <span
+                  className="font-mono-ui text-[0.62rem]"
+                  style={{ color: orSpend.cost > 0 ? "var(--color-warning,#ffbd38)" : "var(--text-tertiary)" }}
+                  title="OpenRouter metered spend, last 30d (excludes Max-OAuth runs)"
+                >
+                  ${orSpend.cost.toFixed(2)} 30d
+                </span>
+              </>
+            )}
+          </div>
         )}
 
         {/* body states */}
@@ -358,6 +502,117 @@ export function OpenRouterPane() {
                   <StageCard key={st.stage} stage={st} mode={mode} last={i === pipeline.length - 1} />
                 ))}
               </div>
+
+              {/* apply / clear — writes battlestation-pipeline.json only,
+                  NEVER Hermes' model config (no metered-billing repoint). */}
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={applyPipeline}
+                  disabled={applying}
+                  className={cn(
+                    "flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-md)] px-3 py-2 text-[0.78rem] font-medium transition-colors",
+                    applying
+                      ? "cursor-wait bg-[color-mix(in_srgb,var(--midground)_12%,transparent)] text-text-disabled"
+                      : "bg-midground text-[var(--color-background)] active:scale-[0.98]",
+                  )}
+                >
+                  <SparkIcon width={14} height={14} />
+                  {savedAt ? "Update pipeline" : "Apply pipeline"}
+                </button>
+                {savedAt && (
+                  <button
+                    type="button"
+                    onClick={clearPipeline}
+                    disabled={applying}
+                    className="rounded-[var(--radius-md)] border border-border px-3 py-2 text-[0.74rem] text-text-secondary transition-colors hover:text-midground active:scale-95"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <div className="mt-1.5 flex items-center justify-between px-1">
+                <span className="font-mono-ui text-[0.58rem] leading-snug text-text-tertiary">
+                  {runEstimate != null && mode !== "free"
+                    ? `≈ $${runEstimate.toFixed(4)} / run (4×8K tok)`
+                    : mode === "free"
+                    ? "free run — rate-limited"
+                    : ""}
+                </span>
+                <span className="font-mono-ui text-[0.56rem] text-text-tertiary">
+                  {savedAt ? `saved ${relativeTime(savedAt)}` : "not applied"}
+                </span>
+              </div>
+              <p className="mt-1 px-1 font-mono-ui text-[0.55rem] leading-relaxed text-text-disabled">
+                Saved as a preference (battlestation-pipeline.json). Does not change which model Hermes&apos; own agent runs.
+              </p>
+            </div>
+
+            {/* model search across the full catalog */}
+            <div className="mt-5">
+              <SectionLabel right={
+                <span className="font-mono-ui text-[0.6rem] text-text-tertiary">
+                  {counts ? `${catalog.length} indexed` : ""}
+                </span>
+              }>
+                Search All Models
+              </SectionLabel>
+              <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-border px-3 py-2">
+                <SearchIcon width={14} height={14} className="shrink-0 text-text-tertiary" />
+                <input
+                  type="text"
+                  placeholder="grok, qwen, gemini, free…"
+                  value={search}
+                  autoCapitalize="off"
+                  autoCorrect="off"
+                  spellCheck={false}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="w-full bg-transparent font-mono-ui text-[0.74rem] text-midground outline-none placeholder:text-text-disabled"
+                />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="shrink-0 font-mono-ui text-[0.6rem] text-text-tertiary hover:text-midground"
+                  >
+                    clear
+                  </button>
+                )}
+              </div>
+              {search && (
+                <ul className="mt-2 flex flex-col gap-1">
+                  {filteredCatalog.length === 0 ? (
+                    <li className="px-2 py-3 text-center font-mono-ui text-[0.66rem] text-text-tertiary">
+                      no model matches &ldquo;{search}&rdquo;
+                    </li>
+                  ) : (
+                    filteredCatalog.map((m) => (
+                      <li
+                        key={m.id}
+                        className="flex items-center gap-2 rounded-[var(--radius-sm)] border border-border px-2.5 py-1.5"
+                        style={{ background: "color-mix(in srgb, var(--midground) 2.5%, transparent)" }}
+                      >
+                        <span className="min-w-0 flex-1 truncate font-mono-ui text-[0.7rem] text-midground">
+                          {m.id}
+                        </span>
+                        {m.reasoning && <Badge tone="accent">R</Badge>}
+                        {m.outputs.includes("image") && <Badge tone="accent">img</Badge>}
+                        <span className="shrink-0 font-mono-ui text-[0.56rem] text-text-tertiary">
+                          {fmtCtx(m.ctx)}
+                        </span>
+                        <span
+                          className={cn(
+                            "shrink-0 font-mono-ui text-[0.56rem]",
+                            m.free ? "text-[var(--color-success,#4ade80)]" : "text-text-secondary",
+                          )}
+                        >
+                          {m.free ? "FREE" : m.perM < 0.01 ? "<$.01" : `$${m.perM.toFixed(m.perM < 100 ? 1 : 0)}`}
+                        </span>
+                      </li>
+                    ))
+                  )}
+                </ul>
+              )}
             </div>
 
             {/* campaigns */}
