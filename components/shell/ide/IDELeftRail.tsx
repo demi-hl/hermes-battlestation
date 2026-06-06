@@ -20,6 +20,8 @@ import {
   ClockIcon,
   SkillsIcon,
   CpuIcon,
+  KeyIcon,
+  ChartIcon,
 } from "@/components/shell/icons";
 import { BranchIcon } from "@/components/shell/icons";
 import type { WorkspacesResponse, RepoSummary, Workspace } from "@/lib/workspace-types";
@@ -34,6 +36,9 @@ export type CenterView =
   | "sessions"
   | "cron"
   | "skills"
+  | "config"
+  | "keys"
+  | "analytics"
   | "editor"
   | "terminal"
   | "diff"
@@ -56,6 +61,9 @@ const NAV: NavItemDef[] = [
   { id: "sessions", label: "Sessions", Icon: ClockIcon },
   { id: "cron", label: "Cron", Icon: AutomationIcon },
   { id: "skills", label: "Skills", Icon: SkillsIcon },
+  { id: "analytics", label: "Analytics", Icon: ChartIcon },
+  { id: "config", label: "Config", Icon: SettingsIcon },
+  { id: "keys", label: "API Keys", Icon: KeyIcon },
   { id: "editor", label: "Editor", Icon: EditorIcon },
   { id: "terminal", label: "Terminal", Icon: TerminalIcon },
   { id: "diff", label: "Diff", Icon: DiffIcon },

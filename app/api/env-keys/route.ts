@@ -1,0 +1,176 @@
+import { NextResponse } from "next/server";
+import { promises as fs } from "node:fs";
+import path from "node:path";
+
+export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
+
+const HOME = process.env.HOME ?? process.cwd();
+const HERMES_HOME = process.env.HERMES_HOME || path.join(HOME, ".hermes");
+const ENV_PATH = path.join(HERMES_HOME, ".env");
+
+/**
+ * Manage ~/.hermes/.env API keys from the UI. Values are REDACTED in the list
+ * (only set/unset + a short tail preview). Writes preserve comments + ordering.
+ * Known keys are grouped; unknown keys are shown under "other".
+ */
+
+// Curated list of well-known keys with labels + group, so the UI can show a
+// useful form even for keys not yet set. Mirrors `hermes config show`.
+const KNOWN: { key: string; label: string; group: string }[] = [
+  { key: "OPENROUTER_API_KEY", label: "OpenRouter", group: "LLM Providers" },
+  { key: "ANTHROPIC_API_KEY", label: "Anthropic", group: "LLM Providers" },
+  { key: "OPENAI_API_KEY", label: "OpenAI", group: "LLM Providers" },
+  { key: "DEEPSEEK_API_KEY", label: "DeepSeek", group: "LLM Providers" },
+  { key: "XAI_API_KEY", label: "xAI / Grok", group: "LLM Providers" },
+  { key: "GROQ_API_KEY", label: "Groq", group: "LLM Providers" },
+  { key: "GOOGLE_API_KEY", label: "Google AI", group: "LLM Providers" },
+  { key: "FIRECRAWL_API_KEY", label: "Firecrawl", group: "Tools" },
+  { key: "TAVILY_API_KEY", label: "Tavily", group: "Tools" },
+  { key: "EXA_API_KEY", label: "Exa", group: "Tools" },
+  { key: "BROWSERBASE_API_KEY", label: "Browserbase", group: "Tools" },
+  { key: "FAL_KEY", label: "FAL (image gen)", group: "Tools" },
+  { key: "ELEVENLABS_API_KEY", label: "ElevenLabs (TTS)", group: "Tools" },
+  { key: "TELEGRAM_BOT_TOKEN", label: "Telegram Bot", group: "Messaging" },
+  { key: "DISCORD_BOT_TOKEN", label: "Discord Bot", group: "Messaging" },
+  { key: "SLACK_BOT_TOKEN", label: "Slack Bot", group: "Messaging" },
+];
+
+// Heuristic: treat as secret if name contains these tokens.
+const SECRET_RX = /(KEY|TOKEN|SECRET|PASSWORD|PASS|CREDENTIAL|API)/i;
+
+function redact(value: string): string {
+  const v = value.trim();
+  if (!v) return "";
+  if (v.length <= 8) return "****";
+  return `${v.slice(0, 3)}…${v.slice(-4)}`;
+}
+
+/** Parse .env into ordered [key, value, rawLineIndex] preserving comments. */
+async function readEnv(): Promise<Map<string, string>> {
+  const map = new Map<string, string>();
+  let text: string;
+  try {
+    text = await fs.readFile(ENV_PATH, "utf8");
+  } catch {
+    return map;
+  }
+  for (const line of text.split("\n")) {
+    const t = line.trim();
+    if (!t || t.startsWith("#")) continue;
+    const eq = t.indexOf("=");
+    if (eq < 1) continue;
+    const key = t.slice(0, eq).trim();
+    let val = t.slice(eq + 1).trim();
+    // strip surrounding quotes
+    if ((val.startsWith('"') && val.endsWith('"')) || (val.startsWith("'") && val.endsWith("'"))) {
+      val = val.slice(1, -1);
+    }
+    map.set(key, val);
+  }
+  return map;
+}
+
+export async function GET() {
+  const env = await readEnv();
+  const seen = new Set<string>();
+
+  const items: { key: string; label: string; group: string; set: boolean; preview: string; secret: boolean }[] = [];
+
+  for (const k of KNOWN) {
+    const val = env.get(k.key) ?? "";
+    seen.add(k.key);
+    items.push({
+      key: k.key,
+      label: k.label,
+      group: k.group,
+      set: val.length > 0,
+      preview: redact(val),
+      secret: true,
+    });
+  }
+  // Any other env keys actually present that aren't in the known list.
+  for (const [k, v] of env) {
+    if (seen.has(k)) continue;
+    const secret = SECRET_RX.test(k);
+    items.push({
+      key: k,
+      label: k,
+      group: "Other",
+      set: v.length > 0,
+      preview: secret ? redact(v) : v.slice(0, 40),
+      secret,
+    });
+  }
+
+  return NextResponse.json({ items, envPath: ENV_PATH });
+}
+
+/** Set or update a key. Body: { key, value }. Rewrites that line, preserving rest. */
+export async function POST(req: Request) {
+  let body: { key?: string; value?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+  const key = (body.key ?? "").trim();
+  const value = String(body.value ?? "");
+  if (!/^[A-Z0-9_]+$/i.test(key)) {
+    return NextResponse.json({ error: "invalid key name" }, { status: 400 });
+  }
+
+  let text = "";
+  try {
+    text = await fs.readFile(ENV_PATH, "utf8");
+  } catch {
+    /* file may not exist yet */
+  }
+  const lines = text.split("\n");
+  const line = `${key}=${value}`;
+  let replaced = false;
+  for (let i = 0; i < lines.length; i++) {
+    const t = lines[i].trim();
+    if (t.startsWith("#")) continue;
+    const eq = t.indexOf("=");
+    if (eq > 0 && t.slice(0, eq).trim() === key) {
+      lines[i] = line;
+      replaced = true;
+      break;
+    }
+  }
+  if (!replaced) {
+    if (lines.length && lines[lines.length - 1].trim() === "") lines.splice(lines.length - 1, 1);
+    lines.push(line);
+  }
+  await fs.writeFile(ENV_PATH, lines.join("\n") + "\n", { mode: 0o600 });
+  await fs.chmod(ENV_PATH, 0o600).catch(() => {});
+  return NextResponse.json({ ok: true, key, set: value.length > 0 });
+}
+
+/** Delete a key. Body: { key }. */
+export async function DELETE(req: Request) {
+  let body: { key?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid json" }, { status: 400 });
+  }
+  const key = (body.key ?? "").trim();
+  if (!key) return NextResponse.json({ error: "key required" }, { status: 400 });
+
+  let text = "";
+  try {
+    text = await fs.readFile(ENV_PATH, "utf8");
+  } catch {
+    return NextResponse.json({ ok: true }); // nothing to delete
+  }
+  const lines = text.split("\n").filter((l) => {
+    const t = l.trim();
+    if (t.startsWith("#") || !t) return true;
+    const eq = t.indexOf("=");
+    return !(eq > 0 && t.slice(0, eq).trim() === key);
+  });
+  await fs.writeFile(ENV_PATH, lines.join("\n"), { mode: 0o600 });
+  return NextResponse.json({ ok: true, key, deleted: true });
+}

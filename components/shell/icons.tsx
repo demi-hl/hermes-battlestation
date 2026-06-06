@@ -189,6 +189,22 @@ export const SkillsIcon = (p: P) => (
   </svg>
 );
 
+export const KeyIcon = (p: P) => (
+  <svg {...base(p)}>
+    <circle cx="7.5" cy="15.5" r="4.5" />
+    <path d="M10.5 12.5 21 2M16 7l3 3M14 9l2.5 2.5" />
+  </svg>
+);
+
+export const ChartIcon = (p: P) => (
+  <svg {...base(p)}>
+    <path d="M3 3v18h18" />
+    <rect x="7" y="12" width="3" height="6" rx="0.5" />
+    <rect x="12" y="8" width="3" height="10" rx="0.5" />
+    <rect x="17" y="5" width="3" height="13" rx="0.5" />
+  </svg>
+);
+
 // Vault: a stylized obsidian gem (diamond facets).
 export const VaultIcon = (p: P) => (
   <svg {...base(p)}>

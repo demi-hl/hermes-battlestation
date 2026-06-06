@@ -17,6 +17,9 @@ import { SettingsPane } from "@/components/panes/SettingsPane";
 import { SessionsPane } from "@/components/panes/SessionsPane";
 import { CronPane } from "@/components/panes/CronPane";
 import { SkillsPane } from "@/components/panes/SkillsPane";
+import { RuntimeConfigPane } from "@/components/panes/RuntimeConfigPane";
+import { ApiKeysPane } from "@/components/panes/ApiKeysPane";
+import { AnalyticsPane } from "@/components/panes/AnalyticsPane";
 
 // Views that get the right-hand source-control panel (repo-bound work).
 const WITH_SOURCE_PANEL = new Set<CenterView>(["agent", "editor", "diff"]);
@@ -49,6 +52,12 @@ function CenterPane({ view }: { view: CenterView }) {
       return <CronPane />;
     case "skills":
       return <SkillsPane />;
+    case "config":
+      return <RuntimeConfigPane />;
+    case "keys":
+      return <ApiKeysPane />;
+    case "analytics":
+      return <AnalyticsPane />;
     }
 }
 

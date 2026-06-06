@@ -147,6 +147,30 @@ export function SessionsPane() {
     URL.revokeObjectURL(url);
   }, [payload]);
 
+  const handleRename = useCallback(
+    async (thread: ChatThread, title: string) => {
+      if (!thread.sessionId) return;
+      await fetch(`/api/sessions/${encodeURIComponent(thread.sessionId)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title }),
+      }).catch(() => {});
+      load();
+    },
+    [load],
+  );
+
+  const handleDelete = useCallback(
+    async (thread: ChatThread) => {
+      if (!thread.sessionId) return;
+      const res = await fetch(`/api/sessions/${encodeURIComponent(thread.sessionId)}`, {
+        method: "DELETE",
+      }).catch(() => null);
+      if (res?.ok) load();
+    },
+    [load],
+  );
+
   return (
     <div className="min-h-full pb-4">
       {/* Header */}
@@ -184,6 +208,8 @@ export function SessionsPane() {
                 history={histories.get(thread.id)}
                 historyLoading={historyLoading.has(thread.id)}
                 onToggle={() => toggle(thread)}
+                onRename={(title) => handleRename(thread, title)}
+                onDelete={() => handleDelete(thread)}
               />
             ))}
           </motion.ul>
@@ -303,6 +329,8 @@ function SessionRow({
   history,
   historyLoading,
   onToggle,
+  onRename,
+  onDelete,
 }: {
   thread: ChatThread;
   index: number;
@@ -310,8 +338,13 @@ function SessionRow({
   history: ChatMessage[] | undefined;
   historyLoading: boolean;
   onToggle: () => void;
+  onRename: (title: string) => void;
+  onDelete: () => void;
 }) {
   const isGeneral = !thread.repo;
+  const [renaming, setRenaming] = useState(false);
+  const [renameVal, setRenameVal] = useState(thread.title);
+  const [confirmDel, setConfirmDel] = useState(false);
   const statusColor = thread.sessionId
     ? "var(--color-success)"
     : "color-mix(in srgb, var(--midground) 20%, transparent)";
@@ -435,6 +468,84 @@ function SessionRow({
                 <p className="py-1 text-[0.72rem] text-text-tertiary">
                   Session not yet created.
                 </p>
+              )}
+
+              {/* Action row: rename + delete (only for real sessions) */}
+              {thread.sessionId && (
+                <div className="mt-2 flex items-center gap-2 border-t border-border/60 pt-2">
+                  {renaming ? (
+                    <>
+                      <input
+                        autoFocus
+                        value={renameVal}
+                        onChange={(e) => setRenameVal(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter") {
+                            onRename(renameVal.trim() || thread.title);
+                            setRenaming(false);
+                          } else if (e.key === "Escape") {
+                            setRenameVal(thread.title);
+                            setRenaming(false);
+                          }
+                        }}
+                        className="min-w-0 flex-1 rounded-[var(--radius-sm)] border border-border bg-transparent px-2 py-1 text-[0.74rem] text-midground outline-none focus:border-[color-mix(in_srgb,var(--midground)_30%,transparent)]"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          haptic(6);
+                          onRename(renameVal.trim() || thread.title);
+                          setRenaming(false);
+                        }}
+                        className="shrink-0 rounded-[var(--radius-sm)] bg-[color-mix(in_srgb,var(--midground)_12%,transparent)] px-2 py-1 text-[0.7rem] text-midground"
+                      >
+                        save
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setRenameVal(thread.title); setRenaming(false); }}
+                        className="shrink-0 px-1 text-[0.7rem] text-text-tertiary"
+                      >
+                        cancel
+                      </button>
+                    </>
+                  ) : confirmDel ? (
+                    <>
+                      <span className="flex-1 text-[0.7rem] text-text-secondary">Delete this session?</span>
+                      <button
+                        type="button"
+                        onClick={() => { haptic(10); onDelete(); setConfirmDel(false); }}
+                        className="shrink-0 rounded-[var(--radius-sm)] bg-[color-mix(in_srgb,var(--color-destructive)_20%,transparent)] px-2 py-1 text-[0.7rem] text-[color:var(--color-destructive)]"
+                      >
+                        delete
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmDel(false)}
+                        className="shrink-0 px-1 text-[0.7rem] text-text-tertiary"
+                      >
+                        cancel
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { haptic(4); setRenameVal(thread.title); setRenaming(true); }}
+                        className="rounded-[var(--radius-sm)] px-2 py-1 text-[0.7rem] text-text-tertiary transition-colors hover:text-midground"
+                      >
+                        rename
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { haptic(4); setConfirmDel(true); }}
+                        className="rounded-[var(--radius-sm)] px-2 py-1 text-[0.7rem] text-text-tertiary transition-colors hover:text-[color:var(--color-destructive)]"
+                      >
+                        delete
+                      </button>
+                    </>
+                  )}
+                </div>
               )}
             </div>
           </motion.div>
