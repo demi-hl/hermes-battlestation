@@ -54,11 +54,26 @@ function matchesQuery(skill: SkillEntry, query: string): boolean {
 
 function SkillToggle({ skill }: { skill: SkillEntry }) {
   const [enabled, setEnabled] = useState(skill.enabled);
+  const [busy, setBusy] = useState(false);
 
-  const handleToggle = () => {
+  const handleToggle = async () => {
+    if (busy) return;
     haptic(6);
-    setEnabled((prev) => !prev);
-    // TODO: call API to persist toggle — POST /api/skills/toggle { name, enabled }
+    const next = !enabled;
+    setEnabled(next); // optimistic
+    setBusy(true);
+    try {
+      const res = await fetch("/api/skills", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name: skill.name, enabled: next }),
+      });
+      if (!res.ok) setEnabled(!next); // revert on failure
+    } catch {
+      setEnabled(!next);
+    } finally {
+      setBusy(false);
+    }
   };
 
   return (
@@ -66,8 +81,10 @@ function SkillToggle({ skill }: { skill: SkillEntry }) {
       type="button"
       onClick={handleToggle}
       aria-pressed={enabled}
+      disabled={busy}
       className={cn(
         "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
+        busy && "opacity-60",
         enabled
           ? "bg-[var(--color-success,#4ade80)]"
           : "bg-[color-mix(in_srgb,var(--midground)_18%,transparent)]",
