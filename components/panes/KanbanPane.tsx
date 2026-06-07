@@ -14,6 +14,7 @@ import {
   type KanbanTask,
 } from "@/lib/kanban/types";
 import { KanbanTaskSheet } from "./kanban/KanbanTaskSheet";
+import { Button } from "@/components/ui";
 
 function created(task: KanbanTask): string {
   try {
@@ -226,21 +227,17 @@ export function KanbanPane() {
                   )}
                 </select>
                 <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className="rounded-[var(--radius-sm)] px-2.5 py-1 text-[0.7rem] text-text-tertiary transition-colors hover:text-midground active:scale-[0.96]"
-                  >
+                  <Button ghost size="sm" type="button" onClick={resetForm}>
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
+                    size="sm"
                     type="button"
                     disabled={!formTitle.trim() || creating}
                     onClick={createTask}
-                    className="rounded-[var(--radius-sm)] bg-[var(--accent)] px-3 py-1 text-[0.7rem] font-medium text-white transition-colors disabled:opacity-40 active:scale-[0.96]"
                   >
                     {creating ? "Creating…" : "Create"}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </div>

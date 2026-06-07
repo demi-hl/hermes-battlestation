@@ -14,6 +14,7 @@ import {
 } from "@/components/shell/icons";
 import { haptic } from "@/components/shell/haptics";
 import { cn } from "@/lib/utils";
+import { Button } from "@/components/ui";
 import type { ComponentType, SVGProps } from "react";
 
 interface RootStat {
@@ -231,19 +232,14 @@ function SetupSheet({
           placeholder="/home/you/Obsidian Vault"
         />
 
-        <button
+        <Button
           type="button"
           disabled={busy}
           onClick={save}
-          className={cn(
-            "flex w-full items-center justify-center rounded-[var(--radius-md)] px-4 py-2.5 text-[0.84rem] font-medium transition-colors",
-            busy
-              ? "cursor-wait bg-[color-mix(in_srgb,var(--midground)_12%,transparent)] text-text-disabled"
-              : "bg-midground text-[var(--color-background)] active:scale-[0.98]",
-          )}
+          className="w-full justify-center"
         >
           {busy ? "Saving…" : "Save setup"}
-        </button>
+        </Button>
       </div>
     </Sheet>
   );

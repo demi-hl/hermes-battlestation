@@ -15,6 +15,7 @@ import {
   RefreshButton,
 } from "./parts";
 import { SearchIcon } from "@/components/panes/pane-icons";
+import { Button } from "@/components/ui";
 
 /* ========================================================================= */
 
@@ -295,7 +296,7 @@ export function OpenRouterPane() {
   }, [modeInfo, mode]);
 
   // OpenRouter spend = sum of analytics cost for models whose id contains "/"
-  // (the OpenRouter slug shape provider/model). Hermes' own Max runs show up as
+  // (the OpenRouter slug shape provider/model). The agent's own runs show up as
   // bare "claude-*" model names and are excluded — this is OR metered spend only.
   const orSpend = useMemo(() => {
     if (!analytics?.models) return null;
@@ -506,29 +507,26 @@ export function OpenRouterPane() {
               {/* apply / clear — writes battlestation-pipeline.json only,
                   NEVER Hermes' model config (no metered-billing repoint). */}
               <div className="mt-3 flex items-center gap-2">
-                <button
+                <Button
                   type="button"
+                  size="sm"
                   onClick={applyPipeline}
                   disabled={applying}
-                  className={cn(
-                    "flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-md)] px-3 py-2 text-[0.78rem] font-medium transition-colors",
-                    applying
-                      ? "cursor-wait bg-[color-mix(in_srgb,var(--midground)_12%,transparent)] text-text-disabled"
-                      : "bg-midground text-[var(--color-background)] active:scale-[0.98]",
-                  )}
+                  prefix={<SparkIcon width={14} height={14} />}
+                  className="flex-1 justify-center"
                 >
-                  <SparkIcon width={14} height={14} />
                   {savedAt ? "Update pipeline" : "Apply pipeline"}
-                </button>
+                </Button>
                 {savedAt && (
-                  <button
+                  <Button
+                    ghost
+                    size="sm"
                     type="button"
                     onClick={clearPipeline}
                     disabled={applying}
-                    className="rounded-[var(--radius-md)] border border-border px-3 py-2 text-[0.74rem] text-text-secondary transition-colors hover:text-midground active:scale-95"
                   >
                     Clear
-                  </button>
+                  </Button>
                 )}
               </div>
               <div className="mt-1.5 flex items-center justify-between px-1">

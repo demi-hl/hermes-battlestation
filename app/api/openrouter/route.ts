@@ -23,8 +23,8 @@ export const dynamic = "force-dynamic";
 const HERMES_HOME = process.env.HERMES_HOME || path.join(os.homedir(), ".hermes");
 const CACHE_FILE = path.join(HERMES_HOME, "openrouter_models_cache.json");
 // Applied pipeline lives in its OWN file — NEVER config.yaml. Applying a
-// pipeline here must never repoint Hermes' own agent loop (that would switch
-// the flat-rate Max OAuth path onto metered OpenRouter billing). This is a
+// pipeline here must never repoint the agent's own loop (that would switch
+// the primary provider onto metered OpenRouter billing). This is a
 // preference doc the app reads, not a runtime model override.
 const PIPELINE_FILE = path.join(HERMES_HOME, "battlestation-pipeline.json");
 const CACHE_TTL_MS = 6 * 60 * 60 * 1000;
@@ -355,8 +355,8 @@ export async function GET() {
 /**
  * Apply / clear a pipeline. Writes ONLY to battlestation-pipeline.json — never
  * config.yaml, never the `model` block. This is a saved preference the app
- * reads back; it does NOT change which model Hermes' own agent loop runs, so it
- * can't silently flip the flat-rate Max OAuth path onto metered billing.
+ * reads back; it does NOT change which model the agent's own loop runs, so it
+ * can't silently flip the primary provider onto metered billing.
  * Body: { action: "apply", mode, stages: {stageId: modelId} } | { action: "clear" }.
  */
 export async function POST(req: Request) {

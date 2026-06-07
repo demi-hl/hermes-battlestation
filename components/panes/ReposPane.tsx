@@ -21,6 +21,7 @@ import {
   RefreshIcon,
   PlusIcon,
 } from "@/components/panes/pane-icons";
+import { Button } from "@/components/ui";
 import type {
   WorkspacesResponse,
   RepoSummary,
@@ -639,13 +640,9 @@ function ErrorState({
   return (
     <div className="flex flex-col items-center gap-3 px-8 py-12 text-center">
       <p className="max-w-[30ch] text-sm text-text-tertiary">{message}</p>
-      <button
-        type="button"
-        onClick={onRetry}
-        className="rounded-full border border-border px-4 py-1.5 text-[0.78rem] text-midground active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
-      >
+      <Button outlined size="sm" type="button" onClick={onRetry}>
         Retry
-      </button>
+      </Button>
     </div>
   );
 }

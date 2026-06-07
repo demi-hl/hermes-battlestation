@@ -20,6 +20,7 @@ import {
 import { FileTree } from "./editor/FileTree";
 import { AgentEditSheet } from "./editor/AgentEditSheet";
 import { langFor, extractSymbols } from "./editor/lang";
+import { Button } from "@/components/ui";
 import type { CodeEditorHandle } from "./editor/CodeEditor";
 
 const CodeEditor = dynamic(
@@ -663,13 +664,9 @@ function EmptyEditor({ onBrowse }: { onBrowse: () => void }) {
       <p className="max-w-[28ch] text-sm text-text-tertiary">
         Open the file tree to start editing the active workspace.
       </p>
-      <button
-        type="button"
-        onClick={onBrowse}
-        className="rounded-full border border-border px-4 py-1.5 text-[0.78rem] text-midground active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
-      >
+      <Button outlined size="sm" type="button" onClick={onBrowse}>
         Browse files
-      </button>
+      </Button>
     </div>
   );
 }

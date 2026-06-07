@@ -8,6 +8,7 @@ import type { ChatThread } from "@/lib/chat-types";
 import { cn } from "@/lib/utils";
 import { useWorkspace, repoLetters } from "@/components/shell/workspace-context";
 import { RepoAvatarBadge } from "@/components/shell/repo-avatar";
+import { Badge } from "@/components/ui/badge";
 
 export function MessageList({
   messages,
@@ -239,6 +240,9 @@ function EmptyThread({ thread }: { thread: ChatThread | null }) {
         <p className="font-mondwest text-display text-base tracking-wide text-midground">
           {bound ? bound : "general thread"}
         </p>
+        <div className="mt-2 flex justify-center">
+          <Badge tone="secondary">{bound ? "repo-bound" : "home"}</Badge>
+        </div>
         <p className="mx-auto mt-2 max-w-[34ch] text-[0.86rem] leading-relaxed text-text-tertiary">
           {bound
             ? `This thread is bound to the ${bound} repo. The agent runs in that working directory with its own persistent context.`
