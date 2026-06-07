@@ -66,16 +66,6 @@ export function SessionsPane() {
     return () => clearInterval(id);
   }, [load]);
 
-  // Auto-expand the first session once.
-  useEffect(() => {
-    if (didAutoExpand.current || !payload || payload.threads.length === 0)
-      return;
-    didAutoExpand.current = true;
-    setExpanded(new Set([payload.threads[0].id]));
-    fetchHistory(payload.threads[0].id, payload.threads[0].sessionId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [payload]);
-
   const fetchHistory = useCallback(
     async (threadId: string, sessionId: string | null) => {
       if (!sessionId) return;
@@ -106,6 +96,15 @@ export function SessionsPane() {
     },
     [histories],
   );
+
+  // Auto-expand the first session once.
+  useEffect(() => {
+    if (didAutoExpand.current || !payload || payload.threads.length === 0)
+      return;
+    didAutoExpand.current = true;
+    setExpanded(new Set([payload.threads[0].id]));
+    fetchHistory(payload.threads[0].id, payload.threads[0].sessionId);
+  }, [payload, fetchHistory]);
 
   const toggle = useCallback(
     (thread: ChatThread) => {

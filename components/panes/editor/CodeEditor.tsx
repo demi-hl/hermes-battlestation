@@ -51,9 +51,11 @@ export function CodeEditor({
   const viewRef = useRef<EditorView | null>(null);
   const langComp = useMemo(() => new Compartment(), []);
   const onChangeRef = useRef(onChange);
-  onChangeRef.current = onChange;
   const onReadyRef = useRef(onReady);
-  onReadyRef.current = onReady;
+  useEffect(() => {
+    onChangeRef.current = onChange;
+    onReadyRef.current = onReady;
+  });
 
   // Mount once.
   useEffect(() => {

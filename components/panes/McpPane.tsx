@@ -683,7 +683,7 @@ export function McpPane() {
     30_000,
   );
 
-  const servers = data?.servers ?? [];
+  const servers = useMemo(() => data?.servers ?? [], [data]);
   const configPath = data?.configPath ?? "~/.hermes/mcp.json";
 
   const enabledCount = useMemo(

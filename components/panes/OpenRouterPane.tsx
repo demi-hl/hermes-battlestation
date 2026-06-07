@@ -279,7 +279,7 @@ export function OpenRouterPane() {
   const modeInfo = data?.modes?.[mode];
   const campaigns = data?.campaigns ?? [];
   const freeModels = data?.freeModels ?? [];
-  const catalog = data?.catalog ?? [];
+  const catalog = useMemo(() => data?.catalog ?? [], [data]);
   const health = data?.health;
   const saved = data?.saved;
 

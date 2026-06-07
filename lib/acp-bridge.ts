@@ -292,7 +292,7 @@ class AcpBridge {
 
 // Module singleton — survives across requests within the Node server process.
 declare global {
-  // eslint-disable-next-line no-var
+   
   var __loAcpBridge: AcpBridge | undefined;
 }
 

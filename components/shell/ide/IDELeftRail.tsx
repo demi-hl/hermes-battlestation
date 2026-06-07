@@ -57,7 +57,7 @@ interface NavItemDef {
 }
 
 // Agent is the spine; the rest are the Hermes tabs reachable from the rail.
-const NAV: NavItemDef[] = [
+export const NAV: NavItemDef[] = [
   { id: "agent", label: "Agent", Icon: ChatIcon },
   { id: "kanban", label: "Kanban", Icon: KanbanIcon },
   { id: "prs", label: "Tasks & PRs", Icon: PullRequestIcon },
@@ -126,9 +126,6 @@ export function IDELeftRail({
 
   const pick = (repo: RepoSummary, ws: Workspace) => {
     setActiveWorkspace({ repo: repo.slug, path: ws.path, branch: ws.name });
-    if (view !== "agent" && view !== "editor" && view !== "terminal" && view !== "diff") {
-      onView("agent");
-    }
   };
 
   return (

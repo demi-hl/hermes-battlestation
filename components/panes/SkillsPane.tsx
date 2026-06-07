@@ -241,7 +241,7 @@ export function SkillsPane() {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const groups = data?.groups ?? [];
+  const groups = useMemo(() => data?.groups ?? [], [data]);
   const total = data?.total ?? 0;
   const cliCount = data?.cliCount ?? 0;
 
@@ -274,9 +274,10 @@ export function SkillsPane() {
 
   // Auto-expand all groups on first load.
   useEffect(() => {
-    if (groups.length > 0 && expanded.size === 0) {
-      setExpanded(new Set(groups.map((g) => g.category)));
-    }
+    if (groups.length === 0) return;
+    setExpanded((prev) =>
+      prev.size === 0 ? new Set(groups.map((g) => g.category)) : prev,
+    );
   }, [groups]);
 
   return (

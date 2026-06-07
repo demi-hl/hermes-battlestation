@@ -291,8 +291,8 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       barCollapsed, setBarCollapsed,
       compress,
     }),
-    [active, models, modelId, setModel, contextUsage, status, profiles, activeProfile,
-     activeProfileId, repoAvatars, activeSessions, notifications, barCollapsed, compress,
+    [active, models, model, setModel, contextUsage, status, profiles, activeProfile,
+     setActiveProfile, repoAvatars, activeSessions, notifications, barCollapsed, compress,
      setRepoAvatar, addSession, updateSession, removeSession, dismissNotification],
   );
 

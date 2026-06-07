@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint",
+    "lint": "eslint --max-warnings=28",
     "typecheck": "tsc --noEmit",
     "cap:sync": "cap sync",
     "cap:open:ios": "cap open ios",
@@ -48,6 +48,7 @@
     "node-pty": "^1.1.0",
     "react": "19.2.4",
     "react-dom": "19.2.4",
+    "react-resizable-panels": "4.11.2",
     "tailwind-merge": "^3.6.0",
     "web-push": "^3.6.7"
   },
@@ -65,6 +66,7 @@
     "electron-builder": "^25.1.8",
     "eslint": "^9",
     "eslint-config-next": "16.2.7",
+    "eslint-plugin-react-hooks": "^7.1.1",
     "tailwindcss": "^4",
     "typescript": "5.9.3"
   },

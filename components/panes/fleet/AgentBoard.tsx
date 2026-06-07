@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, LayoutGroup, motion } from "framer-motion";
 import { cn } from "@/lib/utils";
 import { haptic } from "@/components/shell/haptics";
@@ -95,15 +95,26 @@ export function AgentBoard({ agents }: { agents: FleetAgent[] }) {
   // Fixture-driven demo overlay: advance one agent a lane at a time so the
   // Framer layout transition between lanes is demonstrable standalone (real
   // lane changes arrive from the orchestrator poll in the integration phase).
-  const [advanced, setAdvanced] = useState<Record<string, AgentLane>>({});
-  const now = Date.now();
+  const [advanced, setAdvanced] = useState<
+    Record<string, { lane: AgentLane; ts: number }>
+  >({});
+
+  // Live clock for "time since last signal" displays. Tick once a second so
+  // relative timestamps stay fresh without reading Date.now() during render.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, []);
 
   const view = useMemo(
     () =>
       agents.map((a) =>
-        advanced[a.id] ? { ...a, lane: advanced[a.id], lastSignal: now } : a,
+        advanced[a.id]
+          ? { ...a, lane: advanced[a.id].lane, lastSignal: advanced[a.id].ts }
+          : a,
       ),
-    [agents, advanced, now],
+    [agents, advanced],
   );
 
   const byId = useMemo(() => {
@@ -132,7 +143,7 @@ export function AgentBoard({ agents }: { agents: FleetAgent[] }) {
     const idx = FLOW_LANE_ORDER.indexOf(target.lane as Exclude<AgentLane, "blocked">);
     const next = FLOW_LANE_ORDER[Math.min(idx + 1, FLOW_LANE_ORDER.length - 1)];
     haptic(8);
-    setAdvanced((prev) => ({ ...prev, [target.id]: next }));
+    setAdvanced((prev) => ({ ...prev, [target.id]: { lane: next, ts: Date.now() } }));
   };
 
   return (

@@ -9,6 +9,7 @@ import {
   type CSSProperties,
 } from "react";
 import { animate, motion, useMotionValue } from "framer-motion";
+import { useMediaQuery } from "@/components/useMediaQuery";
 import { AppHeader } from "./AppHeader";
 import { ContextBar } from "./ContextBar";
 import { BottomTabBar } from "./BottomTabBar";
@@ -33,18 +34,8 @@ const SHELL_VARS = {
   "--app-tabbar-h": "58px",
 } as CSSProperties;
 
-/** Bool media-query hook. Returns true once matched. */
-function useMediaQuery(query: string): boolean {
-  const [match, setMatch] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    setMatch(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setMatch(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, [query]);
-  return match;
-}
+/** Bool media-query hook — shared SSR-safe impl. */
+
 
 /** iOS-style decel spring for the snap-back / commit. Tuned to feel like the
  *  UIScrollView paging deceleration in Claude/Codex: firm, slightly

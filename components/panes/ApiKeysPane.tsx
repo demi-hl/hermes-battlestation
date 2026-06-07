@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { usePolling } from "@/components/usePolling";
+import { useMediaQuery } from "@/components/useMediaQuery";
 import { relativeTime } from "@/lib/format";
 import { haptic } from "@/components/shell/haptics";
 import { cn } from "@/lib/utils";
@@ -127,19 +128,9 @@ function groupRank(group: string): number {
   return i === -1 ? GROUP_ORDER.length : i;
 }
 
-/** Self-contained media-query hook (mirrors AppShell's, kept local to avoid a
- *  cross-module refactor). Used to default-collapse groups on small screens. */
-function useMediaQuery(query: string): boolean {
-  const [match, setMatch] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia(query);
-    setMatch(mq.matches);
-    const handler = (e: MediaQueryListEvent) => setMatch(e.matches);
-    mq.addEventListener("change", handler);
-    return () => mq.removeEventListener("change", handler);
-  }, [query]);
-  return match;
-}
+/** Bool media-query hook — shared SSR-safe impl, used to default-collapse
+ *  groups on small screens. */
+
 
 function matchesQuery(item: EnvKeyItem, query: string): boolean {
   if (!query) return true;
@@ -445,7 +436,7 @@ export function ApiKeysPane() {
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const items = data?.items ?? [];
+  const items = useMemo(() => data?.items ?? [], [data]);
   const envPath = data?.envPath ?? "~/.hermes/.env";
 
   const groups = useMemo(() => buildGroups(items), [items]);

@@ -531,3 +531,43 @@ export async function listChanges(root: string): Promise<ChangesResult> {
 
   return { branch, ahead, behind, entries };
 }
+
+export interface FileDiff {
+  path: string;
+  staged: boolean;
+  /** Unified diff text for the file (empty for binary/untracked). */
+  patch: string;
+  binary: boolean;
+}
+
+/** Unified `git diff` for a single file in the working tree. Read-only;
+ *  argv-only (no shell). `staged` selects the index diff (--cached). For
+ *  untracked files git has no diff, so we synthesize an all-added patch. */
+export async function getFileDiff(
+  root: string,
+  filePath: string,
+  staged: boolean,
+): Promise<FileDiff> {
+  const args = ["diff", "--no-color"];
+  if (staged) args.push("--cached");
+  args.push("--", filePath);
+  const res = await git(root, args);
+  let patch = res.ok ? res.stdout : "";
+
+  // Untracked file: no diff output. Show its contents as an all-added hunk.
+  if (!patch.trim() && !staged) {
+    const untracked = await git(root, [
+      "diff",
+      "--no-color",
+      "--no-index",
+      "/dev/null",
+      filePath,
+    ]);
+    // --no-index exits 1 when files differ, but still emits a valid patch.
+    if (untracked.stdout.trim()) patch = untracked.stdout;
+  }
+
+  const binary = /^Binary files /m.test(patch) || /\bGIT binary patch\b/.test(patch);
+  return { path: filePath, staged, patch: binary ? "" : patch, binary };
+}
+

@@ -430,7 +430,9 @@ function usePrDetail(target: { fullName: string; number: number } | null) {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    if (!target) {
+    const fullName = target?.fullName;
+    const number = target?.number;
+    if (fullName == null || number == null) {
       setDetail(null);
       setError(null);
       return;
@@ -439,7 +441,7 @@ function usePrDetail(target: { fullName: string; number: number } | null) {
     setLoading(true);
     setError(null);
     setDetail(null);
-    const u = `/api/prs/detail?repo=${encodeURIComponent(target.fullName)}&number=${target.number}`;
+    const u = `/api/prs/detail?repo=${encodeURIComponent(fullName)}&number=${number}`;
     fetch(u, { cache: "no-store" })
       .then((r) => r.json() as Promise<ApiEnvelope<PrDetail>>)
       .then((j) => {

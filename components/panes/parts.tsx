@@ -339,6 +339,7 @@ export function PullToRefresh({
   const scroller = useRef<HTMLElement | null>(null);
   const startY = useRef(0);
   const pulling = useRef(false);
+  const [isPulling, setIsPulling] = useState(false);
   const [pull, setPull] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -365,12 +366,14 @@ export function PullToRefresh({
       if (sc && sc.scrollTop > 0) return; // only at the very top
       startY.current = e.touches[0].clientY;
       pulling.current = true;
+      setIsPulling(true);
     };
     const onMove = (e: TouchEvent) => {
       if (!pulling.current || refreshing) return;
       const sc = scroller.current;
       if (sc && sc.scrollTop > 0) {
         pulling.current = false;
+        setIsPulling(false);
         setPull(0);
         return;
       }
@@ -387,6 +390,7 @@ export function PullToRefresh({
     const onEnd = async () => {
       if (!pulling.current) return;
       pulling.current = false;
+      setIsPulling(false);
       if (pull >= PULL_TRIGGER) {
         setRefreshing(true);
         setPull(PULL_TRIGGER);
@@ -443,7 +447,7 @@ export function PullToRefresh({
       <div
         style={{
           transform: `translateY(${pull}px)`,
-          transition: pulling.current ? "none" : "transform 0.32s cubic-bezier(0.16,1,0.3,1)",
+          transition: isPulling ? "none" : "transform 0.32s cubic-bezier(0.16,1,0.3,1)",
         }}
       >
         {children}

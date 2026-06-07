@@ -127,7 +127,7 @@ export function KanbanPane() {
     prevCountRef.current = data?.tasks.length ?? 0;
   }, [data]);
 
-  const tasks = data?.tasks ?? [];
+  const tasks = useMemo(() => data?.tasks ?? [], [data]);
   const byColumn = useMemo(() => {
     return KANBAN_COLUMNS.map((col) => ({
       ...col,

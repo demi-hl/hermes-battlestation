@@ -29,7 +29,7 @@ export function Splash() {
           exit={{ opacity: 0 }}
           transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
+          { }
           <motion.img
             src="/nous-logo.svg"
             alt=""
