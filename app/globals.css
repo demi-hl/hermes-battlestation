@@ -183,7 +183,7 @@ body {
   --theme-font-mono: ui-monospace, "SF Mono", "Cascadia Mono", "JetBrains Mono",
     Menlo, Consolas, monospace;
   --theme-font-display: var(--theme-font-sans);
-  --theme-base-size: 15px;
+  --theme-base-size: 16.5px;
   --theme-line-height: 1.55;
   --theme-letter-spacing: 0;
 

@@ -5,6 +5,7 @@ import { Sheet } from "@/components/shell/Sheet";
 import { haptic } from "@/components/shell/haptics";
 import { cn } from "@/lib/utils";
 import { SparkleIcon } from "@/components/panes/pane-icons";
+import { Button } from "@/components/ui";
 import {
   requestAgentEdit,
   type AgentEditResult,
@@ -210,17 +211,18 @@ export function AgentEditSheet({
                   </pre>
                 </div>
                 <div className="mt-2 flex gap-2">
-                  <button
+                  <Button
+                    ghost
                     type="button"
                     onClick={() => {
                       haptic(8);
                       setResult(null);
                     }}
-                    className="flex-1 rounded-[var(--radius-md)] border border-border py-2 text-sm text-text-secondary active:bg-[color-mix(in_srgb,var(--midground)_6%,transparent)]"
+                    className="flex-1 justify-center"
                   >
                     Reject
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="button"
                     onClick={() => {
                       haptic(12);
@@ -228,10 +230,10 @@ export function AgentEditSheet({
                       onClose();
                       reset();
                     }}
-                    className="flex-1 rounded-[var(--radius-md)] bg-midground py-2 text-sm font-medium text-background-base active:opacity-90"
+                    className="flex-1 justify-center"
                   >
                     Accept
-                  </button>
+                  </Button>
                 </div>
               </>
             )}

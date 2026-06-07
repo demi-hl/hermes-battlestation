@@ -19,6 +19,7 @@ import {
   BoltIcon,
 } from "./parts";
 import { PlusIcon } from "./pane-icons";
+import { Switch, Button } from "@/components/ui";
 
 /* ======================================================================== */
 /*  helpers                                                                 */
@@ -110,25 +111,13 @@ function CronToggle({
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleToggle}
+    <Switch
+      checked={job.enabled}
+      onCheckedChange={handleToggle}
       disabled={toggling}
-      aria-pressed={job.enabled}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-40",
-        job.enabled
-          ? "bg-[var(--color-success,#4ade80)]"
-          : "bg-[color-mix(in_srgb,var(--midground)_18%,transparent)]",
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform duration-200",
-          job.enabled ? "translate-x-[18px]" : "translate-x-[3px]",
-        )}
-      />
-    </button>
+      aria-label={job.enabled ? "Pause job" : "Resume job"}
+      className={cn(toggling && "opacity-40")}
+    />
   );
 }
 
@@ -343,13 +332,13 @@ function CreateForm({ onCreate }: { onCreate: () => void }) {
                   {error}
                 </p>
               )}
-              <button
+              <Button
                 type="submit"
+                size="sm"
                 disabled={submitting || !name.trim() || !schedule.trim()}
-                className="rounded-[var(--radius-sm)] border border-border px-3 py-1.5 font-mono-ui text-[0.7rem] uppercase tracking-[0.08em] text-midground transition-colors hover:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] disabled:opacity-40"
               >
                 {submitting ? "Creating…" : "Create"}
-              </button>
+              </Button>
             </div>
           </motion.form>
         )}

@@ -24,7 +24,7 @@ export function RepoAvatarBadge({
         src={imageUrl}
         alt={letters}
         draggable={false}
-        className={cn("shrink-0 rounded object-cover", className)}
+        className={cn("shrink-0 rounded-full object-cover", className)}
         style={{ width: size, height: size }}
       />
     );
@@ -33,7 +33,7 @@ export function RepoAvatarBadge({
   return (
     <span
       className={cn(
-        "flex shrink-0 items-center justify-center rounded bg-[color-mix(in_srgb,var(--midground)_14%,transparent)] font-mondwest text-[0.55rem] font-bold tracking-wide text-midground",
+        "flex shrink-0 items-center justify-center rounded-full border border-[color-mix(in_srgb,var(--midground)_10%,transparent)] bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] font-mondwest text-[0.5rem] font-medium uppercase tracking-wide text-text-secondary",
         className,
       )}
       style={{ width: size, height: size, lineHeight: 1 }}

@@ -37,7 +37,7 @@ const SYSTEM_MONO =
 const DEFAULT_TYPOGRAPHY: ThemeTypography = {
   fontSans: COLLAPSE_SANS,
   fontMono: SYSTEM_MONO,
-  baseSize: "15px",
+  baseSize: "16.5px",
   lineHeight: "1.55",
   letterSpacing: "0",
 };

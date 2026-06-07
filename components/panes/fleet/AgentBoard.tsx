@@ -14,6 +14,7 @@ import {
 } from "@/lib/fleet/types";
 import { AgentCard } from "./AgentCard";
 import { AdvanceIcon, RefreshIcon } from "./icons";
+import { Button } from "@/components/ui";
 
 const DESTRUCTIVE = "#fb2c36";
 
@@ -139,15 +140,16 @@ export function AgentBoard({ agents }: { agents: FleetAgent[] }) {
       <div className="mb-2.5 flex items-start justify-between gap-2 px-3">
         <CountHeader agents={topLevel} />
         <div className="flex shrink-0 items-center gap-1">
-          <button
+          <Button
+            outlined
+            size="sm"
             type="button"
             onClick={advance}
             aria-label="Demo: advance an agent to the next lane"
-            className="inline-flex items-center gap-1 rounded-full border border-border px-2 py-1 text-[0.6rem] text-text-secondary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+            prefix={<AdvanceIcon width={12} height={12} />}
           >
-            <AdvanceIcon width={12} height={12} />
             advance
-          </button>
+          </Button>
           {Object.keys(advanced).length > 0 && (
             <button
               type="button"

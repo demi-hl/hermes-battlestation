@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import type { SkillsPayload, SkillEntry } from "@/lib/chat-types";
 import { SearchIcon, RefreshIcon } from "@/components/panes/pane-icons";
 import { ChevronRightIcon } from "@/components/shell/icons";
+import { Switch } from "@/components/ui";
 import {
   SectionLabel,
   PaneSkeleton,
@@ -77,26 +78,13 @@ function SkillToggle({ skill }: { skill: SkillEntry }) {
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleToggle}
-      aria-pressed={enabled}
+    <Switch
+      checked={enabled}
+      onCheckedChange={handleToggle}
       disabled={busy}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
-        busy && "opacity-60",
-        enabled
-          ? "bg-[var(--color-success,#4ade80)]"
-          : "bg-[color-mix(in_srgb,var(--midground)_18%,transparent)]",
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform duration-200",
-          enabled ? "translate-x-[18px]" : "translate-x-[3px]",
-        )}
-      />
-    </button>
+      aria-label={enabled ? "Disable skill" : "Enable skill"}
+      className={cn(busy && "opacity-60")}
+    />
   );
 }
 

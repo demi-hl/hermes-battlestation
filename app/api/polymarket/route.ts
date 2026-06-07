@@ -27,10 +27,25 @@ export async function GET() {
     "polymarket",
     20_000,
     async () => {
+      const at = new Date().toISOString();
+      if (!HOST) {
+        const status: BotStatus = {
+          reachable: false,
+          name: null,
+          status: null,
+          restarts: null,
+          unstableRestarts: null,
+          uptimeMs: null,
+          cpu: null,
+          memBytes: null,
+          pnl: { available: false, reason: PNL_REASON },
+          error: "not configured — set POLY_HOST to enable bot telemetry",
+        };
+        return { data: status, fetchedAt: at };
+      }
       const r = await run(sshCmd(HOST, "pm2 jlist 2>/dev/null"), {
         timeoutMs: 14000,
       });
-      const at = new Date().toISOString();
       if (!r.ok) {
         const status: BotStatus = {
           reachable: false,

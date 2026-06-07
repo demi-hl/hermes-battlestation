@@ -28,17 +28,6 @@ export type FleetHost = {
   local: boolean;
 };
 
-export type MaxUsage = {
-  ok: boolean;
-  date: string | null;
-  calls: number | null;
-  tokens: number | null;
-  high: boolean;
-  throttleSignals: number;
-  note: string;
-  error?: string;
-};
-
 export type BuildJob = {
   name: string;
   status: string;

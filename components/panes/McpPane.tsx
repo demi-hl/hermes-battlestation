@@ -15,6 +15,7 @@ import {
   RefreshIcon,
 } from "./parts";
 import { PlusIcon, PlayIcon, TrashIcon } from "./pane-icons";
+import { Switch, Segmented, Button } from "@/components/ui";
 
 /* ========================================================================= */
 /*  types                                                                     */
@@ -174,26 +175,13 @@ function McpToggle({
   };
 
   return (
-    <button
-      type="button"
-      onClick={handleToggle}
-      aria-pressed={enabled}
+    <Switch
+      checked={enabled}
+      onCheckedChange={handleToggle}
       disabled={busy}
-      className={cn(
-        "relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors",
-        busy && "opacity-60",
-        enabled
-          ? "bg-[var(--color-success,#4ade80)]"
-          : "bg-[color-mix(in_srgb,var(--midground)_18%,transparent)]",
-      )}
-    >
-      <span
-        className={cn(
-          "inline-block h-3.5 w-3.5 rounded-full bg-white transition-transform duration-200",
-          enabled ? "translate-x-[18px]" : "translate-x-[3px]",
-        )}
-      />
-    </button>
+      aria-label={enabled ? "Disable server" : "Enable server"}
+      className={cn(busy && "opacity-60")}
+    />
   );
 }
 
@@ -579,26 +567,19 @@ function AddServerForm({ onAdded }: { onAdded: () => void }) {
               {/* transport toggle */}
               <div>
                 <label className={labelCls}>Transport</label>
-                <div className="inline-flex rounded-[var(--radius-sm)] border border-border p-0.5">
-                  {(["stdio", "http"] as McpTransport[]).map((t) => (
-                    <button
-                      key={t}
-                      type="button"
-                      onClick={() => {
-                        haptic(4);
-                        setTransport(t);
-                      }}
-                      aria-pressed={transport === t}
-                      className={cn(
-                        "rounded-[calc(var(--radius-sm)-2px)] px-3 py-1 font-mono-ui text-[0.66rem] uppercase tracking-[0.08em] transition-colors",
-                        transport === t
-                          ? "bg-[color-mix(in_srgb,var(--midground)_12%,transparent)] text-midground"
-                          : "text-text-tertiary hover:text-midground",
-                      )}
-                    >
-                      {t}
-                    </button>
-                  ))}
+                <div>
+                  <Segmented<McpTransport>
+                    size="md"
+                    options={[
+                      { label: "stdio", value: "stdio" },
+                      { label: "http", value: "http" },
+                    ]}
+                    value={transport}
+                    onChange={(t) => {
+                      haptic(4);
+                      setTransport(t);
+                    }}
+                  />
                 </div>
               </div>
 
@@ -664,13 +645,9 @@ function AddServerForm({ onAdded }: { onAdded: () => void }) {
                 </p>
               )}
 
-              <button
-                type="submit"
-                disabled={submitting || !valid}
-                className="rounded-[var(--radius-sm)] border border-border px-3 py-1.5 font-mono-ui text-[0.7rem] uppercase tracking-[0.08em] text-midground transition-colors hover:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] disabled:opacity-40"
-              >
+              <Button type="submit" size="sm" disabled={submitting || !valid}>
                 {submitting ? "Adding…" : "Add server"}
-              </button>
+              </Button>
             </div>
           </motion.form>
         )}

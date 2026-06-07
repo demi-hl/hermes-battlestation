@@ -8,6 +8,7 @@ import { haptic } from "@/components/shell/haptics";
 import { cn } from "@/lib/utils";
 import { RefreshIcon } from "@/components/panes/pane-icons";
 import { SectionLabel, PaneSkeleton, StateCard, PullToRefresh } from "./parts";
+import { Segmented } from "@/components/ui";
 import type { SVGProps } from "react";
 
 /* ========================================================================= */
@@ -158,35 +159,14 @@ export function AnalyticsPane() {
         </div>
 
         {/* period selector */}
-        <div className="mt-3 flex items-center gap-1 rounded-[var(--radius-md)] border border-border p-1">
-          {PERIODS.map((p) => {
-            const active = p === days;
-            return (
-              <button
-                key={p}
-                type="button"
-                onClick={() => pickPeriod(p)}
-                aria-pressed={active}
-                className={cn(
-                  "flex-1 rounded-[var(--radius-sm)] py-1.5 text-center font-mono-ui text-[0.7rem] tracking-[0.06em] transition-colors",
-                  active
-                    ? "text-midground"
-                    : "text-text-tertiary hover:text-text-secondary",
-                )}
-                style={
-                  active
-                    ? {
-                        background:
-                          "color-mix(in srgb, var(--midground) 12%, transparent)",
-                      }
-                    : undefined
-                }
-              >
-                {p}d
-              </button>
-            );
-          })}
-          <span className="ml-1 mr-1.5 shrink-0 font-mono-ui text-[0.56rem] text-text-tertiary">
+        <div className="mt-3 flex items-center gap-2">
+          <Segmented
+            size="md"
+            options={PERIODS.map((p) => ({ label: `${p}d`, value: String(p) }))}
+            value={String(days)}
+            onChange={(v) => pickPeriod(Number(v) as Period)}
+          />
+          <span className="ml-auto shrink-0 font-mono-ui text-[0.56rem] text-text-tertiary">
             {updatedAt ? relativeTime(updatedAt) : ""}
           </span>
         </div>
