@@ -13,7 +13,14 @@ import {
   VaultIcon,
   KeyIcon,
   RouterIcon,
+  ClockIcon,
+  SkillsIcon,
+  ChartIcon,
+  PlugIcon,
+  DownloadIcon,
+  HomeIcon,
 } from "./icons";
+import { TasksHomePane } from "@/components/panes/TasksHomePane";
 import { ChatPane } from "@/components/panes/ChatPane";
 import { ReposPane } from "@/components/panes/ReposPane";
 import { EditorPane } from "@/components/panes/EditorPane";
@@ -27,6 +34,13 @@ import { SettingsPane } from "@/components/panes/SettingsPane";
 import { ObsidianPane } from "@/components/panes/ObsidianPane";
 import { ApiKeysPane } from "@/components/panes/ApiKeysPane";
 import { OpenRouterPane } from "@/components/panes/OpenRouterPane";
+import { SessionsPane } from "@/components/panes/SessionsPane";
+import { CronPane } from "@/components/panes/CronPane";
+import { SkillsPane } from "@/components/panes/SkillsPane";
+import { AnalyticsPane } from "@/components/panes/AnalyticsPane";
+import { RuntimeConfigPane } from "@/components/panes/RuntimeConfigPane";
+import { McpPane } from "@/components/panes/McpPane";
+import { OnboardingPane } from "@/components/panes/OnboardingPane";
 
 /**
  * Tab registry — the contract between the shell (slice 1) and the feature
@@ -37,6 +51,7 @@ import { OpenRouterPane } from "@/components/panes/OpenRouterPane";
  */
 
 export type TabId =
+  | "tasks"
   | "chat"
   | "repos"
   | "editor"
@@ -46,8 +61,15 @@ export type TabId =
   | "kanban"
   | "prs"
   | "obsidian"
+  | "sessions"
+  | "cron"
+  | "skills"
+  | "analytics"
+  | "config"
   | "keys"
   | "openrouter"
+  | "mcp"
+  | "onboarding"
   | "automations"
   | "settings";
 
@@ -63,6 +85,7 @@ export interface TabDef {
 }
 
 export const TABS: TabDef[] = [
+  { id: "tasks", label: "Tasks", shortLabel: "Tasks", Icon: HomeIcon, Pane: TasksHomePane },
   { id: "chat", label: "Chat", shortLabel: "Chat", Icon: ChatIcon, Pane: ChatPane },
   { id: "repos", label: "Repos", shortLabel: "Repos", Icon: ReposIcon, Pane: ReposPane },
   { id: "editor", label: "Editor", shortLabel: "Editor", Icon: EditorIcon, Pane: EditorPane },
@@ -72,16 +95,23 @@ export const TABS: TabDef[] = [
   { id: "kanban", label: "Kanban", shortLabel: "Board", Icon: KanbanIcon, Pane: KanbanPane },
   { id: "prs", label: "Tasks & PRs", shortLabel: "PRs", Icon: PullRequestIcon, Pane: TasksPRsPane },
   { id: "obsidian", label: "Obsidian", shortLabel: "Vault", Icon: VaultIcon, Pane: ObsidianPane },
+  { id: "sessions", label: "Sessions", shortLabel: "Sessions", Icon: ClockIcon, Pane: SessionsPane },
+  { id: "cron", label: "Cron", shortLabel: "Cron", Icon: AutomationIcon, Pane: CronPane },
+  { id: "skills", label: "Skills", shortLabel: "Skills", Icon: SkillsIcon, Pane: SkillsPane },
+  { id: "analytics", label: "Analytics", shortLabel: "Stats", Icon: ChartIcon, Pane: AnalyticsPane },
+  { id: "config", label: "Config", shortLabel: "Config", Icon: SettingsIcon, Pane: RuntimeConfigPane },
   { id: "keys", label: "API Keys", shortLabel: "Keys", Icon: KeyIcon, Pane: ApiKeysPane },
   { id: "openrouter", label: "OpenRouter", shortLabel: "Router", Icon: RouterIcon, Pane: OpenRouterPane },
+  { id: "mcp", label: "MCP", shortLabel: "MCP", Icon: PlugIcon, Pane: McpPane },
+  { id: "onboarding", label: "Get Hermes", shortLabel: "Hermes", Icon: DownloadIcon, Pane: OnboardingPane },
   { id: "automations", label: "Automations", shortLabel: "Auto", Icon: AutomationIcon, Pane: AutomationsPane },
   { id: "settings", label: "Settings", shortLabel: "Settings", Icon: SettingsIcon, Pane: SettingsPane },
 ];
 
 /** Tabs shown directly in the bottom bar (the rest live behind "More").
- *  Chat + Repos are the load-bearing surfaces; Fleet is the command center;
- *  Tasks & PRs is the primary review surface. Reorder freely. */
-export const PRIMARY_TAB_IDS: TabId[] = ["chat", "repos", "fleet", "kanban", "prs"];
+ *  Tasks is the home; Chat is the agent spine; Fleet is the command center;
+ *  Kanban + PRs are the review surfaces. Reorder freely. */
+export const PRIMARY_TAB_IDS: TabId[] = ["tasks", "chat", "fleet", "kanban", "prs"];
 
 export const TAB_MAP: Record<TabId, TabDef> = Object.fromEntries(
   TABS.map((t) => [t.id, t]),
@@ -98,4 +128,4 @@ export const SECONDARY_TABS: TabDef[] = TABS.filter(
   (t) => !PRIMARY_TAB_IDS.includes(t.id),
 );
 
-export const DEFAULT_TAB_ID: TabId = "chat";
+export const DEFAULT_TAB_ID: TabId = "tasks";

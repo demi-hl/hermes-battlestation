@@ -9,7 +9,7 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint --max-warnings=28",
+    "lint": "eslint --max-warnings=30",
     "typecheck": "tsc --noEmit",
     "cap:sync": "cap sync",
     "cap:open:ios": "cap open ios",

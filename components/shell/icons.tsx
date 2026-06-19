@@ -25,6 +25,15 @@ export const ChatIcon = (p: P) => (
   </svg>
 );
 
+export const HomeIcon = (p: P) => (
+  <svg {...base(p)}>
+    <rect x="3.5" y="4" width="7" height="7" rx="1.6" />
+    <rect x="13.5" y="4" width="7" height="7" rx="1.6" />
+    <rect x="3.5" y="14" width="7" height="6" rx="1.6" />
+    <rect x="13.5" y="14" width="7" height="6" rx="1.6" />
+  </svg>
+);
+
 export const ReposIcon = (p: P) => (
   <svg {...base(p)}>
     <circle cx="6" cy="6" r="2.4" />

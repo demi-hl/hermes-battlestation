@@ -1,6 +1,6 @@
 "use client";
 
-import { useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { SendIcon, CloseIcon } from "@/components/shell/icons";
 import { SparkIcon, StopIcon } from "./icons";
@@ -26,6 +26,20 @@ export function Composer({
 }) {
   const [value, setValue] = useState("");
   const taRef = useRef<HTMLTextAreaElement>(null);
+
+  // Prefill from the Tasks home (Suggested chip / voice dictation). Drops the
+  // text in and focuses; never auto-sends so the user reviews first. Rides the
+  // same window CustomEvent bus as cross-tab nav.
+  useEffect(() => {
+    const onPrefill = (e: Event) => {
+      const text = (e as CustomEvent<{ text?: string }>).detail?.text;
+      if (!text) return;
+      setValue((prev) => (prev ? prev + " " + text : text));
+      requestAnimationFrame(() => taRef.current?.focus());
+    };
+    window.addEventListener("lo-prefill", onPrefill as EventListener);
+    return () => window.removeEventListener("lo-prefill", onPrefill as EventListener);
+  }, []);
 
   // Auto-grow up to a cap.
   useLayoutEffect(() => {

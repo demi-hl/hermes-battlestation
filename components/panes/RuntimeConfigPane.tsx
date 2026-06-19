@@ -182,11 +182,12 @@ function TextField({
   const { status, save } = useFieldSave(configKey);
   const [value, setValue] = useState(initial);
   const baseline = useRef(initial);
-
-  useEffect(() => {
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
     baseline.current = initial;
     setValue(initial);
-  }, [initial]);
+  }
 
   const commit = async () => {
     const next = value.trim();
@@ -230,11 +231,13 @@ function NumberField({
   const { status, save } = useFieldSave(configKey);
   const [value, setValue] = useState(String(initial ?? ""));
   const baseline = useRef(String(initial ?? ""));
-
-  useEffect(() => {
-    baseline.current = String(initial ?? "");
-    setValue(String(initial ?? ""));
-  }, [initial]);
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
+    const s = String(initial ?? "");
+    baseline.current = s;
+    setValue(s);
+  }
 
   const commit = async () => {
     const trimmed = value.trim();
@@ -281,11 +284,12 @@ function SelectField({
   const { status, save } = useFieldSave(configKey);
   const [value, setValue] = useState(initial);
   const baseline = useRef(initial);
-
-  useEffect(() => {
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
     baseline.current = initial;
     setValue(initial);
-  }, [initial]);
+  }
 
   const onChange = async (next: string) => {
     setValue(next); // optimistic
