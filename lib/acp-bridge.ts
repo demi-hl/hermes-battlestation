@@ -247,6 +247,11 @@ class AcpBridge {
   /**
    * Run one turn. Streams normalized events to `onEvent` and resolves when the
    * turn ends. Caller serializes turns (one active sink at a time).
+   *
+   * Guards the poisoned-session class: a persisted session id can survive a
+   * `session/load` (resolves OK) yet produce a dead turn — instant `end_turn`
+   * with zero content. When a LOADED (not fresh) session does that, we drop it
+   * from the map and retry once with a brand-new session.
    */
   async prompt(
     repo: string,
@@ -255,27 +260,72 @@ class AcpBridge {
     onEvent: (ev: AcpTurnEvent) => void,
   ): Promise<void> {
     await this.ensureProc();
-    const { id, isNew } = await this.resolveSession(repo, cwd);
+    let { id, isNew } = await this.resolveSession(repo, cwd);
 
-    this.sink = onEvent;
-    this.sinkSession = id;
-    this.toolKinds.clear();
-    onEvent({ kind: "session", sessionId: id, isNew });
+    for (let attempt = 0; attempt < 2; attempt++) {
+      this.sink = onEvent;
+      this.sinkSession = id;
+      this.toolKinds.clear();
+      let gotContent = false;
+      const wrapped = (ev: AcpTurnEvent) => {
+        if (ev.kind === "delta" || ev.kind === "thought" || ev.kind === "tool-start") {
+          gotContent = true;
+        }
+        // Swallow the synthetic done/error on a dead loaded session so we can
+        // retry transparently; otherwise pass everything through.
+        onEvent(ev);
+      };
 
-    try {
-      const res = (await this.rpc("session/prompt", {
-        sessionId: id,
-        prompt: [{ type: "text", text }],
-      })) as { stopReason?: string };
-      onEvent({ kind: "done", stopReason: res?.stopReason ?? "end_turn" });
-    } catch (e) {
-      onEvent({ kind: "error", error: e instanceof Error ? e.message : "prompt failed" });
-    } finally {
-      if (this.sinkSession === id) {
-        this.sink = null;
-        this.sinkSession = null;
+      this.sink = wrapped;
+      onEvent({ kind: "session", sessionId: id, isNew });
+
+      let stopReason = "end_turn";
+      let failed = false;
+      try {
+        const res = (await this.rpc("session/prompt", {
+          sessionId: id,
+          prompt: [{ type: "text", text }],
+        })) as { stopReason?: string };
+        stopReason = res?.stopReason ?? "end_turn";
+      } catch (e) {
+        failed = true;
+        // A loaded session may reject on prompt if its backing row was pruned.
+        if (attempt === 0 && !isNew) {
+          this.invalidate(repo, id);
+          const fresh = await this.resolveSession(repo, cwd);
+          id = fresh.id;
+          isNew = fresh.isNew;
+          continue;
+        }
+        onEvent({ kind: "error", error: e instanceof Error ? e.message : "prompt failed" });
+      } finally {
+        if (this.sinkSession === id) {
+          this.sink = null;
+          this.sinkSession = null;
+        }
       }
+
+      // Dead loaded session: resolved with no content. Retry once fresh.
+      if (!failed && !gotContent && !isNew && attempt === 0) {
+        this.invalidate(repo, id);
+        const fresh = await this.resolveSession(repo, cwd);
+        id = fresh.id;
+        isNew = fresh.isNew;
+        continue;
+      }
+
+      if (!failed) onEvent({ kind: "done", stopReason });
+      return;
     }
+  }
+
+  /** Forget a session that proved dead (stale id / pruned row). */
+  private invalidate(repo: string, id: string) {
+    if (this.repoSession.get(repo) === id) {
+      this.repoSession.delete(repo);
+      this.saveMap();
+    }
+    this.liveSessions.delete(id);
   }
 
   /** Cancel the in-flight turn for a repo's session. */

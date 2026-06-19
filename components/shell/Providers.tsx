@@ -28,6 +28,10 @@ export function Providers({ children }: { children: ReactNode }) {
     // Pin to the visual viewport — this prevents Safari from scrolling the
     // document when the keyboard opens (the scroll would hide content above).
     const pinToViewport = (vh: number) => {
+      // Expose the live visible height so the shell can size to it. `100dvh`
+      // does NOT shrink when the iOS keyboard opens, which buries the composer
+      // below the keyboard; the shell reads `--app-vh` instead.
+      root.style.setProperty("--app-vh", `${vh}px`);
       root.style.position = "fixed";
       root.style.top = "0";
       root.style.left = "0";

@@ -160,6 +160,18 @@ export function AppShell() {
   const scrollRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const isDesktop = useMediaQuery("(min-width: 1024px)");
 
+  // Cross-tab navigation bus (Tasks home → Chat, etc.). Fired via a window
+  // CustomEvent so panes never need the shell store wired in. Same pattern as
+  // the `lo-compress` action in workspace-context.
+  useEffect(() => {
+    const onNav = (e: Event) => {
+      const id = (e as CustomEvent<{ tab?: TabId }>).detail?.tab;
+      if (id) setActiveTab(id);
+    };
+    window.addEventListener("lo-nav", onNav as EventListener);
+    return () => window.removeEventListener("lo-nav", onNav as EventListener);
+  }, []);
+
   // ---- keyboard shortcuts (desktop only) ----
   useEffect(() => {
     if (!isDesktop) return;
@@ -350,8 +362,8 @@ export function AppShell() {
        MOBILE LAYOUT: pager + bottom tabs
     ------------------------------------------------ */
     <div
-      className="relative mx-auto h-[100dvh] w-full max-w-[560px] overflow-hidden"
-      style={SHELL_VARS}
+      className="relative mx-auto w-full max-w-[560px] overflow-hidden"
+      style={{ ...SHELL_VARS, height: "var(--app-vh, 100dvh)" }}
     >
       <AppHeader />
 
