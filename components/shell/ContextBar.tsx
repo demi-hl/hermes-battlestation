@@ -576,9 +576,17 @@ function ProfileEffort({ profile }: { profile: AgentProfile }) {
   };
 
   // "auto" = clear the override (config default). The 5 explicit levels follow.
+  // Short labels so all 6 chips fit grid-cols-6 in max-w-sm without colliding.
+  const SHORT: Record<string, string> = {
+    minimal: "min",
+    low: "low",
+    medium: "med",
+    high: "high",
+    xhigh: "xhi",
+  };
   const CHIPS: { value: string; label: string }[] = [
     { value: "", label: "auto" },
-    ...EFFORT_LEVELS.map((lvl) => ({ value: lvl, label: lvl })),
+    ...EFFORT_LEVELS.map((lvl) => ({ value: lvl, label: SHORT[lvl] ?? lvl })),
   ];
 
   return (
