@@ -51,6 +51,18 @@ export function ContextBar() {
 
   const [sheet, setSheet] = useState<"model" | "profile" | null>(null);
 
+  // Current global reasoning effort — surfaced as a tappable chip in the bar so
+  // it's one tap (not buried in the sheet). Re-read when the sheet closes, since
+  // the sheet's EffortSection may have just changed it.
+  const [effort, setEffort] = useState<string | null>(null);
+  const loadEffort = useCallback(() => {
+    fetch("/api/effort", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ effort?: string }>)
+      .then((j) => { if (j.effort) setEffort(j.effort); })
+      .catch(() => {});
+  }, []);
+  useEffect(() => { loadEffort(); }, [loadEffort]);
+
   const pct = contextUsage
     ? Math.min(100, Math.round((contextUsage.used / contextUsage.total) * 100))
     : null;
@@ -128,6 +140,20 @@ export function ContextBar() {
             <ChevronUpDownIcon width={12} height={12} className="text-text-tertiary" />
           </button>
 
+          {/* Effort chip — current reasoning effort; tap opens the sheet's
+              effort selector. One tap instead of digging into the sheet. */}
+          {effort && (
+            <button
+              type="button"
+              onClick={() => { haptic(8); setSheet("model"); }}
+              aria-label={`Reasoning effort: ${effort}. Tap to change.`}
+              title={`Reasoning effort: ${effort}`}
+              className="flex shrink-0 items-center rounded-full border border-border px-1.5 py-1 font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+            >
+              {effort}
+            </button>
+          )}
+
           {/* Active sessions dot badge */}
           {activeSessions.length > 0 && (
             <span className="flex shrink-0 items-center justify-center h-4 min-w-[16px] rounded-full bg-midground/20 px-1 font-mono-ui text-[0.55rem] text-midground">
@@ -162,37 +188,7 @@ export function ContextBar() {
                   <ChevronUpDownIcon width={10} height={10} className="text-text-tertiary" />
                 </button>
 
-                {/* Active sessions */}
-                {activeSessions.length > 0 && (
-                  <div className="flex flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none">
-                    <span className="shrink-0 font-mono-ui text-[0.58rem] uppercase tracking-wider text-text-tertiary">
-                      sessions
-                    </span>
-                    {activeSessions.slice(0, 5).map((s) => (
-                      <span
-                        key={s.repo}
-                        className="flex shrink-0 items-center gap-1 rounded-full border border-[color-mix(in_srgb,var(--midground)_18%,transparent)] px-1.5 py-0.5"
-                      >
-                        <RepoAvatarBadge
-                          letters={repoAvatars[s.repo]?.letters ?? repoLetters(s.repo)}
-                          imageUrl={repoAvatars[s.repo]?.imageUrl}
-                          size={12}
-                        />
-                        <span className="font-mono-ui text-[0.55rem] text-text-secondary">
-                          {s.repo}
-                        </span>
-                        {s.sessionId && (
-                          <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--color-success)]" />
-                        )}
-                      </span>
-                    ))}
-                    {activeSessions.length > 5 && (
-                      <span className="font-mono-ui text-[0.55rem] text-text-disabled">
-                        +{activeSessions.length - 5}
-                      </span>
-                    )}
-                  </div>
-                )}
+                <div className="min-w-0 flex-1" />
 
                 {/* Last-used model info */}
                 <span className="shrink-0 font-mono-ui tabular text-[0.62rem] text-text-disabled">
@@ -206,7 +202,7 @@ export function ContextBar() {
       <ProfileSheet
         open={sheet !== null}
         focus={sheet ?? "profile"}
-        onClose={() => setSheet(null)}
+        onClose={() => { setSheet(null); loadEffort(); }}
       />
     </>
   );
@@ -519,9 +515,13 @@ function ProfileRow({
         <span className="font-mondwest text-display text-[0.84rem] tracking-wide text-midground">
           {profile.label}
         </span>
-        <span className="font-mono-ui text-[0.68rem] text-text-tertiary">
-          {profile.model} · {profile.provider}
+        <span className="font-mono-ui text-[0.62rem] uppercase tracking-wider text-text-tertiary">
+          {profile.provider}
         </span>
+      </span>
+      {/* Model — right-aligned, the consistent right-hand column across rows. */}
+      <span className="shrink-0 text-right font-mono-ui text-[0.68rem] text-text-secondary">
+        {profile.model}
       </span>
       {profile.provider !== "anthropic" && (
         <span className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--color-warning)_50%,transparent)] px-1.5 py-0.5 font-mono-ui text-[0.5rem] uppercase tracking-wider text-[color:var(--color-warning)]">
