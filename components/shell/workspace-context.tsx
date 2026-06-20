@@ -209,7 +209,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
         const res = await fetch("/api/profiles", { cache: "no-store" });
         if (!res.ok) return;
         const data = (await res.json()) as {
-          profiles?: Array<{ id: string; label: string; model: string; provider: string }>;
+          profiles?: Array<{ id: string; label: string; model: string; provider: string; effort?: string }>;
         };
         if (data.profiles?.length) {
           setProfiles(
@@ -218,6 +218,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
               label: p.label,
               model: p.model,
               provider: p.provider,
+              effort: p.effort ?? "",
             })),
           );
         }
@@ -233,6 +234,25 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       localStorage.setItem(PROFILE_STORAGE_KEY, id);
     }
   }, []);
+
+  // Cross-pane bus: tapping a session (or its profile) in the Sessions pane
+  // switches the active brain to that session's profile, so the next turn runs
+  // under the same profile the session belongs to. Ignored if the profile id
+  // isn't in the live list (stale / unknown).
+  useEffect(() => {
+    const onSetProfile = (e: Event) => {
+      const id = (e as CustomEvent<{ profile?: string }>).detail?.profile;
+      if (!id) return;
+      setActiveProfileId((cur) => {
+        if (id === cur) return cur;
+        if (!profiles.some((p) => p.id === id)) return cur;
+        if (typeof window !== "undefined") localStorage.setItem(PROFILE_STORAGE_KEY, id);
+        return id;
+      });
+    };
+    window.addEventListener("lo-set-profile", onSetProfile as EventListener);
+    return () => window.removeEventListener("lo-set-profile", onSetProfile as EventListener);
+  }, [profiles]);
 
   const activeProfile = useMemo(
     () => profiles.find((p) => p.id === activeProfileId) ?? profiles[0],

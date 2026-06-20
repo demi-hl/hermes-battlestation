@@ -156,6 +156,11 @@ export function SessionsPane() {
   // select. Same window-event bus as the Tasks-home → Chat jump.
   const openInChat = useCallback((thread: ChatThread) => {
     haptic([6, 4, 8]);
+    // Default-list threads run under the "default" profile — switch the active
+    // brain to match so the resumed turn uses the same profile as the session.
+    window.dispatchEvent(
+      new CustomEvent("lo-set-profile", { detail: { profile: "default" } }),
+    );
     window.dispatchEvent(
       new CustomEvent("lo-open-session", { detail: { threadId: thread.id } }),
     );
@@ -261,6 +266,11 @@ export function SessionsPane() {
           onSelect={(p) => {
             haptic(6);
             setActiveProfile(p);
+            // Tapping a profile here is an explicit intent to use that brain —
+            // switch the live active profile to match.
+            window.dispatchEvent(
+              new CustomEvent("lo-set-profile", { detail: { profile: p } }),
+            );
           }}
         />
       )}

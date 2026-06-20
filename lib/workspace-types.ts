@@ -60,6 +60,9 @@ export interface AgentProfile {
   label: string;
   model: string;
   provider: string;
+  /** Reasoning effort from the profile's config.yaml: "" (model default) |
+   *  minimal | low | medium | high | xhigh. Editable per-profile in the picker. */
+  effort?: string;
   /** Optional skill bundle name loaded when this profile is active. */
   skills?: string[];
 }

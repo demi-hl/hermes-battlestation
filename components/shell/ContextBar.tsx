@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   useWorkspace,
   type AgentStatus,
@@ -305,20 +305,22 @@ function ProfileSheet({
 
   const ProfilesSection = (
     <div className="px-1 pb-2">
-      <span className="mb-1 block font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
+      <span className="mb-1 block text-center font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
         Profiles · the brain that runs your turns
       </span>
       <div className="flex flex-col gap-0.5">
         {profiles.map((p) => (
-          <ProfileRow
-            key={p.id}
-            profile={p}
-            active={p.id === activeProfile?.id}
-            onSelect={() => {
-              haptic(10);
-              setActiveProfile(p.id);
-            }}
-          />
+          <Fragment key={p.id}>
+            <ProfileRow
+              profile={p}
+              active={p.id === activeProfile?.id}
+              onSelect={() => {
+                haptic(10);
+                setActiveProfile(p.id);
+              }}
+            />
+            {p.id === activeProfile?.id && <ProfileEffort profile={p} />}
+          </Fragment>
         ))}
       </div>
     </div>
@@ -484,6 +486,63 @@ function EffortSection() {
       <span className="mt-1 block font-mono-ui text-[0.55rem] text-text-disabled">
         applies to the next turn (brains respawn)
       </span>
+    </div>
+  );
+}
+
+/** Per-profile reasoning effort. Writes the profile's own
+ *  agent.reasoning_effort via POST /api/profiles (the billing-safe agent block,
+ *  never the model block). Seeds from the profile's live config value. */
+function ProfileEffort({ profile }: { profile: AgentProfile }) {
+  const [effort, setEffort] = useState<string>(profile.effort ?? "");
+  const [saving, setSaving] = useState<string | null>(null);
+
+  const select = async (next: EffortLevel) => {
+    if (next === effort || saving) return;
+    haptic(10);
+    setSaving(next);
+    try {
+      const res = await fetch("/api/profiles", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ profile: profile.id, effort: next }),
+      });
+      if (res.ok) setEffort(next);
+    } catch {
+      /* leave current */
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div className="mx-auto mb-1 w-full max-w-sm px-3 pb-1">
+      <span className="mb-1 block text-center font-mono-ui text-[0.5rem] uppercase tracking-wider text-text-tertiary">
+        effort · {profile.label}
+      </span>
+      <div className="grid grid-cols-5 gap-1">
+        {EFFORT_LEVELS.map((lvl) => {
+          const on = lvl === effort;
+          const busy = saving === lvl;
+          return (
+            <button
+              key={lvl}
+              type="button"
+              onClick={() => select(lvl)}
+              aria-pressed={on}
+              className={cn(
+                "rounded-[var(--radius-md)] border px-1 py-2 text-center font-mono-ui text-[0.6rem] transition-colors",
+                on
+                  ? "border-transparent bg-midground text-background-base"
+                  : "border-border text-text-secondary active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
+                busy && "opacity-60",
+              )}
+            >
+              {lvl}
+            </button>
+          );
+        })}
+      </div>
     </div>
   );
 }

@@ -99,7 +99,7 @@ export async function GET() {
     const payload = await cached("profiles", 60_000, async () => {
       const bin = process.env.HERMES_BIN || "hermes";
       const { stdout } = await run(`${bin} profile list`, {
-        timeout: 12_000,
+        timeout: 30_000,
         env: EXEC_ENV,
       });
 
