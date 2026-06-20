@@ -14,6 +14,23 @@ const run = promisify(exec);
 const HOME = os.homedir();
 const HERMES_HOME = process.env.HERMES_HOME || path.join(HOME, ".hermes");
 
+/** Exec env with a sane PATH. systemd --user units inherit almost no PATH, so a
+ *  bare `hermes` (installed at ~/.local/bin) isn't found and every shell-out
+ *  fails. Prepend the common bin dirs so the CLI resolves regardless of how the
+ *  server was launched (systemd, Electron, dev). */
+const EXEC_ENV = {
+  ...process.env,
+  PATH: [
+    path.join(HOME, ".local", "bin"),
+    "/usr/local/bin",
+    "/usr/bin",
+    "/bin",
+    process.env.PATH ?? "",
+  ]
+    .filter(Boolean)
+    .join(":"),
+};
+
 /** Valid reasoning-effort levels (mirrors hermes_constants.VALID_REASONING_EFFORTS),
  *  plus "" meaning "use the model/provider default". */
 export const EFFORT_LEVELS = ["", "minimal", "low", "medium", "high", "xhigh"] as const;
@@ -83,7 +100,7 @@ export async function GET() {
       const bin = process.env.HERMES_BIN || "hermes";
       const { stdout } = await run(`${bin} profile list`, {
         timeout: 12_000,
-        env: process.env,
+        env: EXEC_ENV,
       });
 
       const parsed: { id: string; model: string; active: boolean }[] = [];
@@ -160,7 +177,7 @@ export async function POST(req: Request) {
   const bin = process.env.HERMES_BIN || "hermes";
   // Empty string clears the key; the CLI accepts an empty value.
   const cmd = `${bin} -p ${profile} config set agent.reasoning_effort '${effort}'`;
-  const r = await run(cmd, { timeout: 15_000, env: process.env }).then(
+  const r = await run(cmd, { timeout: 15_000, env: EXEC_ENV }).then(
     () => ({ ok: true, err: "" }),
     (e: { stderr?: string; message?: string }) => ({
       ok: false,

@@ -258,6 +258,13 @@ export function AppShell() {
               : "calc(var(--app-header-h) + env(safe-area-inset-top))",
           paddingBottom,
           WebkitOverflowScrolling: "touch",
+          // iOS WKWebView smears composited scroll content (live-session dots,
+          // row borders) when momentum-scrolling over the fixed
+          // mix-blend-mode:difference Backdrop layers. Isolating the scroller
+          // into its own stacking context + GPU layer forces it to repaint
+          // independently, killing the smear. No visual change otherwise.
+          isolation: "isolate",
+          transform: "translateZ(0)",
         }}
       >
         <Pane />
