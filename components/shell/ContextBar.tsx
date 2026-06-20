@@ -10,13 +10,32 @@ import {
 import type { AgentProfile } from "@/lib/workspace-types";
 import { Sheet } from "./Sheet";
 import { RepoAvatarBadge } from "./repo-avatar";
-import { ChevronUpDownIcon, CheckIcon, BranchIcon, CompressIcon, ChevronDownIcon } from "./icons";
+import { ChevronUpDownIcon, CheckIcon, BranchIcon, CompressIcon } from "./icons";
 import { haptic } from "./haptics";
+import { usePush } from "./usePush";
 import { cn } from "@/lib/utils";
+import { profileTint } from "@/lib/profile-color";
 import { AnimatePresence, motion } from "framer-motion";
 
 /** How long to show a notification before auto-dismiss. */
 const NOTIF_DURATION = 6000;
+
+/** Bucket models by provider for the picker, preserving the route's order
+ *  (default provider leads). Falls back to the raw provider id when the human
+ *  label is absent. */
+function groupModels(models: ModelOption[]): [string, ModelOption[]][] {
+  const order: string[] = [];
+  const byLabel = new Map<string, ModelOption[]>();
+  for (const m of models) {
+    const label = m.providerLabel ?? m.provider;
+    if (!byLabel.has(label)) {
+      byLabel.set(label, []);
+      order.push(label);
+    }
+    byLabel.get(label)!.push(m);
+  }
+  return order.map((label) => [label, byLabel.get(label)!]);
+}
 
 /**
  * Bottom context bar — always shows model name + context meter + compress.
@@ -25,12 +44,12 @@ const NOTIF_DURATION = 6000;
  */
 export function ContextBar() {
   const {
-    active, model, contextUsage, status, barCollapsed, setBarCollapsed,
+    active, model, contextUsage, status,
     activeSessions, profiles, activeProfile, setActiveProfile,
     notifications, dismissNotification, compress, repoAvatars,
   } = useWorkspace();
 
-  const [profileOpen, setProfileOpen] = useState(false);
+  const [sheet, setSheet] = useState<"model" | "profile" | null>(null);
 
   const pct = contextUsage
     ? Math.min(100, Math.round((contextUsage.used / contextUsage.total) * 100))
@@ -98,11 +117,11 @@ export function ContextBar() {
             </>
           )}
 
-          {/* Model name */}
+          {/* Model name — tap to switch the per-turn model */}
           <button
             type="button"
-            onClick={() => { haptic(8); setProfileOpen(true); }}
-            aria-label={`Model: ${model.label}. Profile: ${activeProfile?.label ?? "default"}. Tap to switch.`}
+            onClick={() => { haptic(8); setSheet("model"); }}
+            aria-label={`Model: ${model.label}. Tap to switch model.`}
             className="flex shrink-0 items-center gap-1 rounded-full border border-border px-2 py-1 text-[0.7rem] text-midground transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
           >
             <span className="font-mondwest text-display tracking-wide">{model.label}</span>
@@ -115,47 +134,38 @@ export function ContextBar() {
               {activeSessions.length}
             </span>
           )}
-
-          {/* Collapse toggle */}
-          <button
-            type="button"
-            onClick={() => setBarCollapsed(!barCollapsed)}
-            aria-label={barCollapsed ? "Expand" : "Collapse"}
-            className="flex shrink-0 items-center gap-0.5 text-[0.6rem] text-text-disabled transition-colors hover:text-text-tertiary"
-          >
-            <ChevronDownIcon
-              width={12}
-              height={12}
-              className={cn("transition-transform", barCollapsed ? "" : "rotate-180")}
-            />
-          </button>
         </div>
 
-        {/* ---- Collapsable section: active sessions + profile info ---- */}
-        <AnimatePresence>
-          {!barCollapsed && (
-            <motion.div
-              initial={{ height: 0, opacity: 0 }}
-              animate={{ height: "auto", opacity: 1 }}
-              exit={{ height: 0, opacity: 0 }}
-              transition={{ duration: 0.18, ease: "easeInOut" }}
-              className="overflow-hidden border-t border-border/50"
-            >
-              <div className="flex items-center gap-3 px-3 py-1.5">
-                {/* Profile */}
-                <span className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 px-2 py-0.5">
-                  <span className="font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
+        {/* ---- Profile + active-sessions row (always shown) ---- */}
+        <div className="overflow-hidden border-t border-border/50">
+          <div className="flex items-center gap-3 px-3 py-1.5">
+                {/* Profile — tap to switch the brain that runs your turns */}
+                <button
+                  type="button"
+                  onClick={() => { haptic(8); setSheet("profile"); }}
+                  aria-label={`Profile: ${activeProfile?.label ?? "default"}. Tap to switch.`}
+                  className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+                >
+                  <span
+                    className="h-1.5 w-1.5 shrink-0 rounded-full"
+                    style={{
+                      background: profileTint(activeProfile?.id ?? "default"),
+                      boxShadow: `0 0 5px ${profileTint(activeProfile?.id ?? "default")}`,
+                    }}
+                  />
+                  <span className="font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
                     profile
                   </span>
-                  <span className="font-mono-ui text-[0.6rem] text-midground">
+                  <span className="font-mono-ui text-[0.66rem] text-midground">
                     {activeProfile?.label ?? "default"}
                   </span>
-                </span>
+                  <ChevronUpDownIcon width={10} height={10} className="text-text-tertiary" />
+                </button>
 
                 {/* Active sessions */}
                 {activeSessions.length > 0 && (
                   <div className="flex flex-1 items-center gap-1.5 overflow-x-auto scrollbar-none">
-                    <span className="shrink-0 font-mono-ui text-[0.52rem] uppercase tracking-wider text-text-tertiary">
+                    <span className="shrink-0 font-mono-ui text-[0.58rem] uppercase tracking-wider text-text-tertiary">
                       sessions
                     </span>
                     {activeSessions.slice(0, 5).map((s) => (
@@ -185,17 +195,19 @@ export function ContextBar() {
                 )}
 
                 {/* Last-used model info */}
-                <span className="shrink-0 font-mono-ui tabular text-[0.55rem] text-text-disabled">
+                <span className="shrink-0 font-mono-ui tabular text-[0.62rem] text-text-disabled">
                   {model.id} · {model.provider}
                 </span>
-              </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
+          </div>
+        </div>
       </div>
 
-      {/* Profile + model sheet */}
-      <ProfileSheet open={profileOpen} onClose={() => setProfileOpen(false)} />
+      {/* Model / Profile sheet — left chip focuses profiles, right chip focuses models */}
+      <ProfileSheet
+        open={sheet !== null}
+        focus={sheet ?? "profile"}
+        onClose={() => setSheet(null)}
+      />
     </>
   );
 }
@@ -285,58 +297,190 @@ function ContextMeter({ pct }: { pct: number }) {
 
 function ProfileSheet({
   open,
+  focus,
   onClose,
 }: {
   open: boolean;
+  focus: "model" | "profile";
   onClose: () => void;
 }) {
   const { models, model, setModel, profiles, activeProfile, setActiveProfile } = useWorkspace();
+  const push = usePush();
+
+  const ProfilesSection = (
+    <div className="px-1 pb-2">
+      <span className="mb-1 block font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
+        Profiles · the brain that runs your turns
+      </span>
+      <div className="flex flex-col gap-0.5">
+        {profiles.map((p) => (
+          <ProfileRow
+            key={p.id}
+            profile={p}
+            active={p.id === activeProfile?.id}
+            onSelect={() => {
+              haptic(10);
+              setActiveProfile(p.id);
+            }}
+          />
+        ))}
+      </div>
+    </div>
+  );
+
+  const ModelsSection = (
+    <div className="px-1 pb-2">
+      <span className="mb-1 block font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
+        Models · per-turn override
+      </span>
+      <div className="flex flex-col gap-2">
+        {groupModels(models).map(([providerLabel, group]) => (
+          <div key={providerLabel} className="flex flex-col gap-0.5">
+            <span className="px-3 pb-0.5 pt-1 font-mono-ui text-[0.66rem] uppercase tracking-[0.14em] text-text-tertiary">
+              {providerLabel}
+            </span>
+            {group.map((m) => (
+              <ModelRow
+                key={`${m.provider}:${m.id}`}
+                option={m}
+                active={m.id === model.id}
+                onSelect={() => {
+                  haptic(10);
+                  setModel(m.id);
+                }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+
+  const first = focus === "model" ? ModelsSection : ProfilesSection;
+  const second = focus === "model" ? ProfilesSection : ModelsSection;
 
   return (
-    <Sheet open={open} onClose={onClose} title="Model & Profile" className="max-h-[90dvh]">
-      {/* Profiles */}
-      <div className="px-1 pb-2">
-        <span className="mb-1 block font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
-          Profiles
-        </span>
-        <div className="flex flex-col gap-0.5">
-          {profiles.map((p) => (
-            <ProfileRow
-              key={p.id}
-              profile={p}
-              active={p.id === activeProfile?.id}
-              onSelect={() => {
-                haptic(10);
-                setActiveProfile(p.id);
-              }}
-            />
-          ))}
+    <Sheet
+      open={open}
+      onClose={onClose}
+      title={focus === "model" ? "Model" : "Profile"}
+      className="max-h-[90dvh]"
+    >
+      {/* Notifications toggle — only when the platform supports web push. */}
+      {push.supported && (
+        <div className="mb-2 flex items-center justify-between rounded-[var(--radius-md)] border border-border px-3 py-2">
+          <span className="flex flex-col">
+            <span className="text-[0.8rem] text-text-primary">Push notifications</span>
+            <span className="font-mono-ui text-[0.6rem] text-text-tertiary">
+              {push.enabled ? "on · turns ping this device" : "off"}
+            </span>
+          </span>
+          <button
+            type="button"
+            disabled={push.enabled}
+            onClick={() => {
+              haptic(10);
+              void push.enable();
+            }}
+            className={cn(
+              "shrink-0 rounded-full px-3 py-1 text-[0.72rem] transition-colors",
+              push.enabled
+                ? "bg-[color-mix(in_srgb,var(--color-success)_20%,transparent)] text-[color:var(--color-success)]"
+                : "bg-midground text-background-base active:scale-95",
+            )}
+          >
+            {push.enabled ? "Enabled" : push.permission === "denied" ? "Blocked" : "Enable"}
+          </button>
         </div>
-      </div>
+      )}
 
-      {/* All models */}
-      <div className="border-t border-border px-1 pt-2">
-        <span className="mb-1 block font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
-          Models
-        </span>
-        <div className="flex flex-col gap-0.5">
-          {models.map((m) => (
-            <ModelRow
-              key={m.id}
-              option={m}
-              active={m.id === model.id}
-              onSelect={() => {
-                haptic(10);
-                setModel(m.id);
-              }}
-            />
-          ))}
-        </div>
+      {first}
+      <div className="border-t border-border pt-2">{second}</div>
+
+      {/* Reasoning effort — global agent setting; changing it respawns the
+          warm brains so the next turn runs at the new effort. */}
+      <div className="border-t border-border pt-2">
+        <EffortSection />
       </div>
 
       {/* Usage info */}
       <UsageFooter />
     </Sheet>
+  );
+}
+
+const EFFORT_LEVELS = ["minimal", "low", "medium", "high", "xhigh"] as const;
+type EffortLevel = (typeof EFFORT_LEVELS)[number];
+
+function EffortSection() {
+  const [effort, setEffort] = useState<EffortLevel | null>(null);
+  const [saving, setSaving] = useState<EffortLevel | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    fetch("/api/effort", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ effort?: string }>)
+      .then((j) => {
+        if (live && j.effort && (EFFORT_LEVELS as readonly string[]).includes(j.effort)) {
+          setEffort(j.effort as EffortLevel);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      live = false;
+    };
+  }, []);
+
+  const select = async (next: EffortLevel) => {
+    if (next === effort || saving) return;
+    haptic(10);
+    setSaving(next);
+    try {
+      const res = await fetch("/api/effort", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ effort: next }),
+      });
+      if (res.ok) setEffort(next);
+    } catch {
+      /* leave current */
+    } finally {
+      setSaving(null);
+    }
+  };
+
+  return (
+    <div className="px-1 pb-2">
+      <span className="mb-1.5 block font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
+        Reasoning effort · how hard the agent thinks
+      </span>
+      <div className="grid grid-cols-5 gap-1">
+        {EFFORT_LEVELS.map((lvl) => {
+          const on = lvl === effort;
+          const busy = saving === lvl;
+          return (
+            <button
+              key={lvl}
+              type="button"
+              onClick={() => select(lvl)}
+              aria-pressed={on}
+              className={cn(
+                "rounded-[var(--radius-md)] border px-1 py-1.5 text-center font-mono-ui text-[0.6rem] transition-colors",
+                on
+                  ? "border-transparent bg-midground text-background-base"
+                  : "border-border text-text-secondary active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
+                busy && "opacity-60",
+              )}
+            >
+              {lvl}
+            </button>
+          );
+        })}
+      </div>
+      <span className="mt-1 block font-mono-ui text-[0.55rem] text-text-disabled">
+        applies to the next turn (brains respawn)
+      </span>
+    </div>
   );
 }
 
@@ -361,6 +505,16 @@ function ProfileRow({
       {active && (
         <span className="absolute left-0 top-1/2 h-6 w-[3px] -translate-y-1/2 rounded-full bg-midground" />
       )}
+      <span
+        className="grid h-7 w-7 shrink-0 place-items-center rounded-full font-mono-ui text-[0.6rem] font-bold"
+        style={{
+          color: profileTint(profile.id),
+          background: `color-mix(in srgb, ${profileTint(profile.id)} 16%, transparent)`,
+          border: `1px solid color-mix(in srgb, ${profileTint(profile.id)} 30%, transparent)`,
+        }}
+      >
+        {profile.label.replace(/[^a-zA-Z0-9]/g, "").slice(0, 2).toUpperCase()}
+      </span>
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="font-mondwest text-display text-[0.84rem] tracking-wide text-midground">
           {profile.label}
@@ -369,6 +523,11 @@ function ProfileRow({
           {profile.model} · {profile.provider}
         </span>
       </span>
+      {profile.provider !== "anthropic" && (
+        <span className="shrink-0 rounded-full border border-[color-mix(in_srgb,var(--color-warning)_50%,transparent)] px-1.5 py-0.5 font-mono-ui text-[0.5rem] uppercase tracking-wider text-[color:var(--color-warning)]">
+          metered
+        </span>
+      )}
       <CheckIcon width={16} height={16} className={cn("shrink-0 text-midground transition-opacity", active ? "opacity-100" : "opacity-0")} />
     </button>
   );
@@ -401,8 +560,8 @@ function ModelRow({
         <span className="font-mondwest text-display text-[0.84rem] tracking-wide text-midground">
           {option.label}
         </span>
-        <span className="font-mono-ui text-[0.68rem] text-text-tertiary">
-          {option.id} · {option.provider}
+        <span className="font-mono-ui text-[0.68rem] text-text-tertiary truncate">
+          {option.id}
         </span>
       </span>
       <CheckIcon width={16} height={16} className={cn("shrink-0 text-midground transition-opacity", active ? "opacity-100" : "opacity-0")} />
@@ -421,10 +580,10 @@ function UsageFooter() {
   return (
     <div className="mt-3 border-t border-border px-1 pt-2 pb-1">
       <div className="flex items-center justify-between">
-        <span className="font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
+        <span className="font-mono-ui text-[0.62rem] uppercase tracking-wider text-text-tertiary">
           context window
         </span>
-        <span className="font-mono-ui tabular text-[0.6rem] text-text-disabled">
+        <span className="font-mono-ui tabular text-[0.64rem] text-text-tertiary">
           {contextUsage ? `${contextUsage.used.toLocaleString()} / ${contextUsage.total.toLocaleString()}` : ""}
         </span>
       </div>
@@ -435,9 +594,9 @@ function UsageFooter() {
         />
       </div>
       <div className="mt-0.5 flex justify-between">
-        <span className="font-mono-ui tabular text-[0.55rem] text-text-tertiary">{pct}% full</span>
+        <span className="font-mono-ui tabular text-[0.62rem] text-text-tertiary">{pct}% full</span>
         {pct > 70 && (
-          <span className="font-mono-ui text-[0.55rem] text-[color:var(--color-warning)]">consider compressing</span>
+          <span className="font-mono-ui text-[0.62rem] text-[color:var(--color-warning)]">consider compressing</span>
         )}
       </div>
     </div>

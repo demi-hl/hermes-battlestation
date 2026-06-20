@@ -8,7 +8,6 @@ import {
   useState,
   type CSSProperties,
 } from "react";
-import { animate, motion, useMotionValue } from "framer-motion";
 import { useMediaQuery } from "@/components/useMediaQuery";
 import { AppHeader } from "./AppHeader";
 import { ContextBar } from "./ContextBar";
@@ -16,7 +15,6 @@ import { BottomTabBar } from "./BottomTabBar";
 import { Splash } from "./Splash";
 import {
   getTab,
-  PRIMARY_TAB_IDS,
   PRIMARY_TABS,
   SECONDARY_TABS,
   DEFAULT_TAB_ID,
@@ -27,28 +25,15 @@ import { haptic } from "./haptics";
 import { cn } from "@/lib/utils";
 import { IDEShell } from "./ide/IDEShell";
 
-/** Layout heights consumed by the pane padding + chrome. */
+/** Layout heights consumed by the pane padding + chrome. The context bar is
+ *  TWO rows (the h-10 model/meter row + the always-visible profile/sessions
+ *  row), ~66px total — reserving only the top row let pane content slide under
+ *  the bar (audit P1). */
 const SHELL_VARS = {
-  "--app-header-h": "56px",
-  "--app-context-h": "40px",
-  "--app-tabbar-h": "58px",
+  "--app-header-h": "12px",
+  "--app-context-h": "66px",
+  "--app-tabbar-h": "54px",
 } as CSSProperties;
-
-/** Bool media-query hook — shared SSR-safe impl. */
-
-
-/** iOS-style decel spring for the snap-back / commit. Tuned to feel like the
- *  UIScrollView paging deceleration in Claude/Codex: firm, slightly
- *  overdamped, no visible bounce on commit. */
-const SNAP_SPRING = { type: "spring" as const, stiffness: 520, damping: 44, mass: 0.9 };
-
-/** Rubber-band resistance at the ends (no neighbor to reveal). Matches the
- *  iOS overscroll feel — you can pull, but it fights back ~2.5x harder. */
-function rubber(dx: number, width: number) {
-  const c = 0.55;
-  const r = Math.abs(dx);
-  return Math.sign(dx) * ((1 - 1 / (r * c / width + 1)) * width);
-}
 
 /**
  * Compact desktop sidebar nav. Shows all tabs (primary + secondary) with
@@ -151,9 +136,9 @@ function DesktopSidebar({
 
 /**
  * The mobile + desktop app shell. On narrow screens (<1024px) renders the
- * finger-tracked horizontal pager with a bottom tab bar. On wide screens
- * renders a left sidebar nav + full-width pane, with keyboard shortcuts
- * (Cmd+1–9, Cmd+0 for the last tab).
+ * active pane with a bottom tab bar (tap-to-switch; no swipe pager yet — see
+ * the "MOBILE LAYOUT" note below). On wide screens renders a left sidebar nav
+ * + full-width pane, with keyboard shortcuts (Cmd+1–9, Cmd+0 for the last tab).
  */
 export function AppShell() {
   const [activeTab, setActiveTab] = useState<TabId>(DEFAULT_TAB_ID);
@@ -170,6 +155,34 @@ export function AppShell() {
     };
     window.addEventListener("lo-nav", onNav as EventListener);
     return () => window.removeEventListener("lo-nav", onNav as EventListener);
+  }, []);
+
+  // Push deep-link: the service worker posts `lo-push-open` with a threadId when
+  // a notification is tapped. Switch to chat and hand the thread id to ChatHub
+  // via the existing `lo-open-session` bus. Also honor a `?thread=` cold-open.
+  useEffect(() => {
+    const openThread = (threadId?: string) => {
+      if (!threadId) return;
+      setActiveTab("chat");
+      window.dispatchEvent(
+        new CustomEvent("lo-open-session", { detail: { threadId } }),
+      );
+    };
+    const onSwMessage = (e: MessageEvent) => {
+      const data = e.data as { type?: string; threadId?: string } | undefined;
+      if (data?.type === "lo-push-open") openThread(data.threadId);
+    };
+    navigator.serviceWorker?.addEventListener("message", onSwMessage);
+    // Cold open via deep-link URL (?thread=<id>).
+    const url = new URL(window.location.href);
+    const t = url.searchParams.get("thread");
+    if (t) {
+      openThread(t);
+      url.searchParams.delete("thread");
+      window.history.replaceState({}, "", url.toString());
+    }
+    return () =>
+      navigator.serviceWorker?.removeEventListener("message", onSwMessage);
   }, []);
 
   // ---- keyboard shortcuts (desktop only) ----
@@ -217,122 +230,22 @@ export function AppShell() {
     [activeTab],
   );
 
-  // ---- pager state (mobile only) ----
-  const trackRef = useRef<HTMLDivElement>(null);
-  const widthRef = useRef(0);
-  const x = useMotionValue(0);
-  const [neighbor, setNeighbor] = useState<{ id: TabId; side: 1 | -1 } | null>(null);
-  const primaryIndex = PRIMARY_TAB_IDS.indexOf(activeTab);
-
-  useEffect(() => {
-    const measure = () => {
-      widthRef.current = trackRef.current?.clientWidth ?? window.innerWidth;
-    };
-    measure();
-    window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
-  }, []);
-
-  // ---- finger-tracked horizontal drag over the primary ring ----
-  const drag = useRef<{
-    startX: number;
-    startY: number;
-    t: number;
-    axis: "" | "x" | "y";
-    lastX: number;
-    lastT: number;
-    vx: number;
-  } | null>(null);
-
-  const onTouchStart = (e: React.TouchEvent) => {
-    if (e.touches.length !== 1) return;
-    const p = e.touches[0];
-    drag.current = {
-      startX: p.clientX,
-      startY: p.clientY,
-      t: Date.now(),
-      axis: "",
-      lastX: p.clientX,
-      lastT: Date.now(),
-      vx: 0,
-    };
-  };
-
-  const onTouchMove = (e: React.TouchEvent) => {
-    const d = drag.current;
-    if (!d || primaryIndex === -1) return;
-    const p = e.touches[0];
-    const dx = p.clientX - d.startX;
-    const dy = p.clientY - d.startY;
-
-    // Lock the gesture axis on first meaningful movement.
-    if (d.axis === "") {
-      if (Math.abs(dx) < 8 && Math.abs(dy) < 8) return;
-      d.axis = Math.abs(dx) > Math.abs(dy) * 1.25 ? "x" : "y";
-      if (d.axis === "x") haptic(4);
-    }
-    if (d.axis !== "x") return;
-
-    // Track velocity for the fling decision.
-    const now = Date.now();
-    const dt = now - d.lastT;
-    if (dt > 0) d.vx = (p.clientX - d.lastX) / dt; // px/ms
-    d.lastX = p.clientX;
-    d.lastT = now;
-
-    const width = widthRef.current || window.innerWidth;
-    const side: 1 | -1 = dx < 0 ? 1 : -1; // 1 = reveal next, -1 = reveal prev
-    const hasNeighbor = !!PRIMARY_TAB_IDS[primaryIndex + side];
-
-    // Mount the neighbour we're pulling toward.
-    if (hasNeighbor) {
-      const nid = PRIMARY_TAB_IDS[primaryIndex + side];
-      if (!neighbor || neighbor.id !== nid) setNeighbor({ id: nid, side });
-      x.set(dx);
-    } else {
-      if (neighbor) setNeighbor(null);
-      x.set(rubber(dx, width)); // edge resistance
-    }
-  };
-
-  const onTouchEnd = () => {
-    const d = drag.current;
-    drag.current = null;
-    if (!d || d.axis !== "x" || primaryIndex === -1) {
-      animate(x, 0, SNAP_SPRING);
-      return;
-    }
-    const width = widthRef.current || window.innerWidth;
-    const dx = x.get();
-    const side: 1 | -1 = dx < 0 ? 1 : -1;
-    const target = PRIMARY_TAB_IDS[primaryIndex + side];
-
-    // Commit if past 38% of the width OR a decisive fling (> 0.45 px/ms).
-    const fling = Math.abs(d.vx) > 0.45;
-    const past = Math.abs(dx) > width * 0.38;
-    if (target && (past || fling)) {
-      haptic(10);
-      const toIndex = PRIMARY_TAB_IDS.indexOf(target);
-      animate(x, -side * width, {
-        ...SNAP_SPRING,
-        velocity: d.vx * 1000, // px/ms -> px/s
-        onComplete: () => {
-          setActiveTab(target);
-          setNeighbor(null);
-          x.set(0);
-        },
-      });
-      void toIndex;
-    } else {
-      // Snap back home.
-      animate(x, 0, { ...SNAP_SPRING, velocity: d.vx * 1000 });
-    }
-  };
-
   const renderPane = (id: TabId, desktop = false) => {
     const Pane = getTab(id).Pane;
+    // Chat owns its own internal scroll + bottom-pinned composer. It only needs
+    // to clear the bottom chrome (context bar + tab bar + safe area). The
+    // keyboard is handled by the app-shrink in Providers (--app-vh tracks the
+    // visible height), so we must NOT also add --keyboard-inset here — that
+    // double-counts and floats the composer above the keyboard.
+    const isChat = id === "chat";
+    const paddingBottom = desktop
+      ? "0px"
+      : isChat
+        ? "calc((var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom)) * (1 - var(--kb-open, 0)))"
+        : "calc(var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom) + 8px)";
     return (
       <div
+        key={id}
         ref={(el) => {
           scrollRefs.current[id] = el;
         }}
@@ -340,10 +253,10 @@ export function AppShell() {
         style={{
           paddingTop: desktop
             ? "var(--app-header-h)"
-            : "calc(var(--app-header-h) + env(safe-area-inset-top) + 6px)",
-          paddingBottom: desktop
-            ? "0px"
-            : "calc(var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom) + 8px)",
+            : isChat
+              ? "calc(env(safe-area-inset-top) + 6px)"
+              : "calc(var(--app-header-h) + env(safe-area-inset-top))",
+          paddingBottom,
           WebkitOverflowScrolling: "touch",
         }}
       >
@@ -359,39 +272,29 @@ export function AppShell() {
     <IDEShell />
   ) : (
     /* ------------------------------------------------
-       MOBILE LAYOUT: pager + bottom tabs
+       MOBILE LAYOUT: active pane + bottom tabs (tap to switch).
+       NOTE: not a swipe pager — panes change on tab tap only. A finger-tracked
+       horizontal pager is a deliberate future feature (gesture conflicts with
+       pane scroll + the drag-to-dismiss sheets), not wired here on purpose.
     ------------------------------------------------ */
     <div
       className="relative mx-auto w-full max-w-[560px] overflow-hidden"
       style={{ ...SHELL_VARS, height: "var(--app-vh, 100dvh)" }}
     >
-      <AppHeader />
+      {activeTab !== "chat" && <AppHeader />}
 
-      <main
-        ref={trackRef}
-        className="absolute inset-0 overflow-hidden"
-        onTouchStart={onTouchStart}
-        onTouchMove={onTouchMove}
-        onTouchEnd={onTouchEnd}
-        onTouchCancel={onTouchEnd}
-      >
-        {/* Active pane — tracks the finger via x. */}
-        <motion.div className="absolute inset-0" style={{ x }}>
-          {renderPane(activeTab)}
-        </motion.div>
-
-        {/* Neighbour peeks in from the dragged side, offset by ±width. */}
-        {neighbor && (
-          <motion.div
-            className="absolute inset-0"
-            style={{ x, left: neighbor.side === 1 ? "100%" : "-100%" }}
-          >
-            {renderPane(neighbor.id)}
-          </motion.div>
-        )}
+      <main className="absolute inset-0 overflow-hidden">
+        {renderPane(activeTab)}
       </main>
 
-      <div className="absolute inset-x-0 bottom-0 z-30">
+      <div
+        className="absolute inset-x-0 bottom-0 z-30 transition-transform duration-200"
+        style={{
+          transform: "translateY(calc(var(--kb-open, 0) * 100%))",
+          willChange: "transform",
+          backfaceVisibility: "hidden",
+        }}
+      >
         <ContextBar />
         <BottomTabBar activeTab={activeTab} onSelect={goTab} />
       </div>

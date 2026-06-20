@@ -6,9 +6,26 @@ import { Markdown } from "./markdown";
 import type { ChatMessage } from "./useChat";
 import type { ChatThread } from "@/lib/chat-types";
 import { cn } from "@/lib/utils";
-import { useWorkspace, repoLetters } from "@/components/shell/workspace-context";
-import { RepoAvatarBadge } from "@/components/shell/repo-avatar";
 import { Badge } from "@/components/ui/badge";
+
+/** Human elapsed: counts seconds, rolls into `Nm Ss` past a minute. */
+function fmtElapsed(ms: number): string {
+  const secs = Math.max(0, Math.floor(ms / 1000));
+  return secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`;
+}
+
+/** Live wall-clock elapsed since `startTs`, re-rendering once a second while
+ *  `active`. Independent of the server status heartbeat (which stops on the
+ *  first streamed token), so the timer keeps ticking the whole turn. */
+function useLiveElapsed(startTs: number, active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active, startTs]);
+  return Math.max(0, now - startTs);
+}
 
 export function MessageList({
   messages,
@@ -83,8 +100,25 @@ export function MessageList({
             className={cn("flex", m.role === "user" ? "justify-end" : "justify-start")}
           >
             {m.role === "user" ? (
-              <div className="max-w-[86%] rounded-[calc(var(--theme-radius)+4px)] rounded-br-md border border-border bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] px-3.5 py-2 text-[0.92rem] leading-relaxed text-text-primary">
-                {m.text}
+              <div className="flex max-w-[86%] flex-col items-end gap-1.5">
+                {m.images && m.images.length > 0 && (
+                  <div className="flex flex-wrap justify-end gap-1.5">
+                    {m.images.map((src, i) => (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        key={i}
+                        src={src}
+                        alt=""
+                        className="h-28 w-28 rounded-[calc(var(--theme-radius)+4px)] border border-border object-cover"
+                      />
+                    ))}
+                  </div>
+                )}
+                {m.text && (
+                  <div className="rounded-[calc(var(--theme-radius)+4px)] rounded-br-md border border-border bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] px-3.5 py-2 text-[0.92rem] leading-relaxed text-text-primary">
+                    {m.text}
+                  </div>
+                )}
               </div>
             ) : (
               <AssistantBubble m={m} />
@@ -105,7 +139,7 @@ export function MessageList({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 8, scale: 0.9 }}
             transition={{ type: "spring", stiffness: 420, damping: 30 }}
-            className="fixed bottom-[calc(var(--app-context-h)+var(--app-tabbar-h)+env(safe-area-inset-bottom)+118px)] left-1/2 z-20 grid h-9 w-9 -translate-x-1/2 place-items-center rounded-full border border-border bg-[color-mix(in_srgb,var(--background-base)_82%,transparent)] text-midground shadow-lg backdrop-blur"
+            className="fixed bottom-[calc((var(--app-context-h)+var(--app-tabbar-h))*(1-var(--kb-open,0))+env(safe-area-inset-bottom)+118px)] left-1/2 z-20 grid h-9 w-9 -translate-x-1/2 place-items-center rounded-full border border-border bg-[color-mix(in_srgb,var(--background-base)_82%,transparent)] text-midground shadow-lg backdrop-blur"
           >
             <svg width={16} height={16} viewBox="0 0 24 24" fill="none" aria-hidden>
               <path d="M6 9l6 6 6-6" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
@@ -120,9 +154,12 @@ export function MessageList({
 function AssistantBubble({ m }: { m: ChatMessage }) {
   const hasText = !!m.text;
   const hasTools = !!m.tools?.length;
+  // Live timer ticks the whole time the turn is pending — not tied to the
+  // server heartbeat (which stops on first token).
+  const elapsed = useLiveElapsed(m.ts, !!m.pending);
   // Pure spinner only before any text/tool activity has arrived.
   if (m.pending && !hasText && !hasTools) {
-    return <Working elapsedMs={m.elapsedMs ?? 0} note={m.note} />;
+    return <Working elapsedMs={elapsed} note={m.note} />;
   }
   return (
     <div className="w-full max-w-full">
@@ -131,11 +168,16 @@ function AssistantBubble({ m }: { m: ChatMessage }) {
           hermes
         </span>
         {m.pending && (
-          <span
-            aria-hidden
-            className="h-2.5 w-2.5 shrink-0 rounded-full border border-midground/40 border-t-midground animate-spin-slow"
-            style={{ animationDuration: "0.9s" }}
-          />
+          <>
+            <span
+              aria-hidden
+              className="h-2.5 w-2.5 shrink-0 rounded-full border border-midground/40 border-t-midground animate-spin-slow"
+              style={{ animationDuration: "0.9s" }}
+            />
+            <span className="font-mono-ui tabular text-[0.6rem] text-text-tertiary">
+              {fmtElapsed(elapsed)}
+            </span>
+          </>
         )}
       </div>
 
@@ -203,8 +245,6 @@ function ToolTray({ tools }: { tools: NonNullable<ChatMessage["tools"]> }) {
 }
 
 function Working({ elapsedMs, note }: { elapsedMs: number; note?: string }) {
-  const secs = Math.floor(elapsedMs / 1000);
-  const label = secs >= 60 ? `${Math.floor(secs / 60)}m ${secs % 60}s` : `${secs}s`;
   return (
     <div className="relative flex w-full items-center gap-2.5 overflow-hidden rounded-[var(--radius-md)] px-1 py-1.5">
       <span
@@ -213,7 +253,7 @@ function Working({ elapsedMs, note }: { elapsedMs: number; note?: string }) {
         style={{ animationDuration: "0.9s" }}
       />
       <span className="font-mono-ui tabular text-[0.78rem] text-text-secondary">
-        working {label}
+        working {fmtElapsed(elapsedMs)}
       </span>
       <span className="h-3 flex-1 march opacity-40" aria-hidden />
       <span className="font-mono-ui text-[0.68rem] text-text-tertiary">
@@ -225,17 +265,8 @@ function Working({ elapsedMs, note }: { elapsedMs: number; note?: string }) {
 
 function EmptyThread({ thread }: { thread: ChatThread | null }) {
   const bound = thread?.repo;
-  const { repoAvatars } = useWorkspace();
-  const letters = bound ? (repoAvatars[bound]?.letters ?? repoLetters(bound)) : "GE";
-  const imgUrl = bound ? repoAvatars[bound]?.imageUrl : undefined;
   return (
-    <div className="flex min-h-[40dvh] flex-col items-center justify-center gap-4 px-8 text-center">
-      <RepoAvatarBadge
-        letters={letters}
-        imageUrl={imgUrl}
-        size={64}
-        className="opacity-90"
-      />
+    <div className="flex min-h-[40dvh] flex-col items-center justify-center gap-3 px-8 text-center">
       <div className="animate-slide-up">
         <p className="font-mondwest text-display text-base tracking-wide text-midground">
           {bound ? bound : "general thread"}

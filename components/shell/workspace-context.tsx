@@ -31,6 +31,8 @@ export interface ModelOption {
   label: string;
   /** Inference provider for the bound session. */
   provider: string;
+  /** Human provider name for grouping, e.g. "Anthropic", "xAI". */
+  providerLabel?: string;
 }
 
 /** Selectable models — loaded from the /api/models endpoint at boot. */
@@ -193,27 +195,56 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     document.documentElement.dataset.provider = models.find((m) => m.id === modelId)?.provider ?? "anthropic";
   }, [modelId, models]);
 
-  // Profiles
-  const [profiles] = useState<AgentProfile[]>(DEFAULT_PROFILES);
+  // Profiles — loaded live from /api/profiles (the real `hermes profile list`).
+  // Falls back to DEFAULT_PROFILES only if the API is unreachable.
+  const [profiles, setProfiles] = useState<AgentProfile[]>(DEFAULT_PROFILES);
   const [activeProfileId, setActiveProfileId] = useState<string>(() => {
     if (typeof window === "undefined") return "default";
     return localStorage.getItem(PROFILE_STORAGE_KEY) ?? "default";
   });
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/profiles", { cache: "no-store" });
+        if (!res.ok) return;
+        const data = (await res.json()) as {
+          profiles?: Array<{ id: string; label: string; model: string; provider: string }>;
+        };
+        if (data.profiles?.length) {
+          setProfiles(
+            data.profiles.map((p) => ({
+              id: p.id,
+              label: p.label,
+              model: p.model,
+              provider: p.provider,
+            })),
+          );
+        }
+      } catch {
+        /* keep DEFAULT_PROFILES */
+      }
+    })();
+  }, []);
 
   const setActiveProfile = useCallback((id: string) => {
     setActiveProfileId(id);
     if (typeof window !== "undefined") {
       localStorage.setItem(PROFILE_STORAGE_KEY, id);
     }
-    // Switch model to match the profile
-    const prof = DEFAULT_PROFILES.find((p) => p.id === id);
-    if (prof) setModel(prof.model);
-  }, [setModel]);
+  }, []);
 
   const activeProfile = useMemo(
     () => profiles.find((p) => p.id === activeProfileId) ?? profiles[0],
     [profiles, activeProfileId],
   );
+
+  // The model shown in the bar follows the active profile's configured model
+  // (the profile is the real selector; the standalone model picker is an
+  // optional per-turn override layered on top).
+  useEffect(() => {
+    if (activeProfile?.model) setModel(activeProfile.model);
+  }, [activeProfile, setModel]);
 
   // Repo avatars
   const [repoAvatars, setRepoAvatarsState] = useState<Record<string, RepoAvatar>>(loadAvatars);
@@ -249,8 +280,9 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     setNotifications((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
-  // Collapsable bar
-  const [barCollapsed, setBarCollapsed] = useState(false);
+  // Collapsable bar — default collapsed to reclaim the bottom band; the
+  // second row (profile + sessions) is one tap away via the chevron.
+  const [barCollapsed, setBarCollapsed] = useState(true);
 
   // Compress action — sends a /compress message to the active session
   const compress = useCallback(() => {

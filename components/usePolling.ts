@@ -20,9 +20,13 @@ export function usePolling<T>(url: string, intervalMs = 30_000): State<T> {
   const mounted = useRef(true);
 
   const load = useCallback(
-    async (signal?: AbortSignal) => {
+    async (signal?: AbortSignal, force = false) => {
+      if (mounted.current) setLoading(true);
       try {
-        const res = await fetch(url, { cache: "no-store", signal });
+        // A manual refresh appends refresh=1 so a route that server-caches can
+        // bust its entry and recompute; interval polls keep the cached value.
+        const u = force ? url + (url.includes("?") ? "&" : "?") + "refresh=1" : url;
+        const res = await fetch(u, { cache: "no-store", signal });
         const json = (await res.json()) as Record<string, unknown>;
         if (!mounted.current) return;
         // Tolerate both shapes: the ApiEnvelope `{data, fetchedAt}` wrapper
@@ -57,5 +61,5 @@ export function usePolling<T>(url: string, intervalMs = 30_000): State<T> {
     };
   }, [load, intervalMs]);
 
-  return { data, error, loading, updatedAt, reload: () => load() };
+  return { data, error, loading, updatedAt, reload: () => load(undefined, true) };
 }

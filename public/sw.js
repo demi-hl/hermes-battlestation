@@ -3,7 +3,7 @@
 // works offline. NEVER caches /api/* (live ops data) or any auth traffic, and
 // never touches non-GET requests. Self-hosted fonts + brand assets are
 // runtime-cached on first load by the same-origin GET branch below.
-const CACHE = "locals-only-v2";
+const CACHE = "locals-only-v4";
 const SHELL = [
   "/",
   "/manifest.webmanifest",
@@ -71,28 +71,50 @@ self.addEventListener("push", (e) => {
   }
   const { title = "Hermes", body = "", tag = "default", icon = "/icon-192.png", data: extra = {} } = data;
   e.waitUntil(
-    self.registration.showNotification(title, {
-      body,
-      icon,
-      tag,
-      badge: "/icon-192.png",
-      renotify: true,
-      vibrate: [100, 50, 100],
-      data: extra,
-      requireInteraction: true,
-    }),
+    // Suppress the alert when the app is already open AND focused/visible — a
+    // turn you're watching live shows inline, so only notify when backgrounded.
+    self.clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((wins) => {
+        const focused = wins.some(
+          (c) => c.focused || c.visibilityState === "visible",
+        );
+        if (focused) return;
+        return self.registration.showNotification(title, {
+          body,
+          icon,
+          tag,
+          badge: "/icon-192.png",
+          renotify: true,
+          vibrate: [100, 50, 100],
+          data: extra,
+          requireInteraction: true,
+        });
+      }),
   );
 });
 
 self.addEventListener("notificationclick", (e) => {
   e.notification.close();
-  const target = e.notification.data?.url || "/";
+  const extra = e.notification.data || {};
+  const threadId = extra.threadId || extra.thread || null;
+  // Prefer an explicit url; otherwise build a deep link from the threadId so a
+  // cold open still lands on the right thread.
+  const target =
+    extra.url || (threadId ? "/?thread=" + encodeURIComponent(threadId) : "/");
   e.waitUntil(
-    clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
-      for (const c of clients) {
-        if (c.url.startsWith(self.location.origin) && "focus" in c) return c.focus();
-      }
-      if (clients.openWindow) return clients.openWindow(target);
-    }),
+    clients
+      .matchAll({ type: "window", includeUncontrolled: true })
+      .then((wins) => {
+        for (const c of wins) {
+          if (c.url.startsWith(self.location.origin) && "focus" in c) {
+            // Hand the running app the threadId so it can deep-link in place
+            // without a full reload. The shell listens for this message.
+            c.postMessage({ type: "lo-push-open", threadId, url: target });
+            return c.focus();
+          }
+        }
+        if (clients.openWindow) return clients.openWindow(target);
+      }),
   );
 });

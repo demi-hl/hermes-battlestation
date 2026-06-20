@@ -1,6 +1,6 @@
 import { acpBridge, type AcpTurnEvent } from "@/lib/acp-bridge";
-import { resolveRepoCwd } from "@/lib/local-repos";
-import { tryLock, unlock, sessionTitleFor } from "@/lib/sessions";
+import { resolveBranchCwd } from "@/lib/local-repos";
+import { tryLock, unlock, sessionTitleForBranch } from "@/lib/sessions";
 import type { ChatStreamEvent, SendRequest } from "@/lib/chat-types";
 
 export const runtime = "nodejs";
@@ -31,10 +31,17 @@ export async function POST(req: Request) {
   if (!message) return new Response("empty message", { status: 400 });
 
   const repo = body.repo || "general";
-  const cwd = await resolveRepoCwd(repo);
+  const branch = body.branch?.trim() || null;
+  const cwd = await resolveBranchCwd(repo, branch);
   if (!cwd) return new Response("unknown repo", { status: 404 });
 
-  const title = sessionTitleFor(repo);
+  // Branch-aware session title: a specific branch gets its own session
+  // (lol-<repo>__<branch>) so branches run independently; the base/primary
+  // branch collapses to the plain repo session.
+  const title = sessionTitleForBranch(repo, branch);
+  // Bridge session key: the title uniquely identifies repo+branch, so the ACP
+  // session map (keyed by this string) keeps branches isolated.
+  const sessionKey = title;
   if (!tryLock(title)) {
     return new Response(
       JSON.stringify({ type: "error", error: "a turn is already running for this thread" }),
@@ -50,8 +57,54 @@ export async function POST(req: Request) {
     ? `Load and follow these skills before responding: ${skills.join(", ")}.\n\n${message}`
     : message;
 
+  // Image attachments (pasted/added in the composer) ride the turn as ACP
+  // image content blocks. Cap count + payload so a fat clipboard paste can't
+  // wedge the bridge; oversize/extra images are dropped silently.
+  const MAX_IMAGES = 6;
+  const MAX_IMG_CHARS = 12_000_000; // ~9MB decoded per image
+  const images = (Array.isArray(body.images) ? body.images : [])
+    .filter((im) => im && typeof im.data === "string" && im.data.length <= MAX_IMG_CHARS)
+    .slice(0, MAX_IMAGES)
+    .map((im) => ({ data: im.data, mime: typeof im.mime === "string" ? im.mime : "image/png" }));
+
+  // Which brain runs this turn. Profile is the real lever (spawns
+  // `hermes -p <profile> acp`); model/provider are optional per-turn overrides.
+  const target = {
+    profile: (body.profile || "default").trim() || "default",
+    model: body.model?.trim() || undefined,
+    provider: body.provider?.trim() || undefined,
+  };
+
   const started = Date.now();
   let heartbeat: ReturnType<typeof setInterval> | null = null;
+
+  // Accumulate the assistant's streamed text so a turn-complete push can show a
+  // preview. Fire-and-forget to /api/push/send — no-op (503) unless VAPID keys
+  // are set and a device subscribed via the notifications toggle. The service
+  // worker only surfaces the alert when the PWA is backgrounded; a focused tab
+  // shows the reply inline, so this never double-notifies a turn you watched.
+  let replyText = "";
+  let notified = false;
+  const notifyDone = async (text: string) => {
+    if (notified) return;
+    notified = true;
+    try {
+      const origin = new URL(req.url).origin;
+      const body = (text || "").trim().replace(/\s+/g, " ").slice(0, 140);
+      await fetch(`${origin}/api/push/send`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          title: repo === "general" ? "Hermes · general" : `Hermes · ${repo}`,
+          body: body || "Turn complete",
+          threadId: title,
+          tag: `turn-${title}`,
+        }),
+      });
+    } catch {
+      /* push is best-effort; never block the stream teardown */
+    }
+  };
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -85,6 +138,7 @@ export async function POST(req: Request) {
             break;
           case "delta":
             stopHeartbeat();
+            replyText += e.text;
             emit({ type: "delta", text: e.text });
             break;
           case "thought":
@@ -103,6 +157,7 @@ export async function POST(req: Request) {
             break;
           case "done":
             emit({ type: "done", elapsedMs: Date.now() - started });
+            void notifyDone(replyText);
             break;
           case "error":
             emit({ type: "error", error: e.error });
@@ -111,7 +166,7 @@ export async function POST(req: Request) {
       };
 
       try {
-        await acpBridge().prompt(repo, cwd, prompt, relay);
+        await acpBridge(target).prompt(sessionKey, cwd, prompt, relay, images);
       } catch (e) {
         emit({ type: "error", error: e instanceof Error ? e.message : "agent failed" });
         emit({ type: "done", elapsedMs: Date.now() - started });
@@ -128,7 +183,7 @@ export async function POST(req: Request) {
     },
     cancel() {
       if (heartbeat) clearInterval(heartbeat);
-      void acpBridge().cancel(repo);
+      void acpBridge(target).cancel(sessionKey);
       unlock(title);
     },
   });

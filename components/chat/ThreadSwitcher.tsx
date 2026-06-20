@@ -17,6 +17,8 @@ export function ThreadSwitcher({
   activeThreadId,
   onSelect,
   onStartRepo,
+  onNewSession,
+  onCreateBranch,
 }: {
   open: boolean;
   onClose: () => void;
@@ -25,8 +27,20 @@ export function ThreadSwitcher({
   activeThreadId: string;
   onSelect: (id: string) => void;
   onStartRepo: (repo: ChatRepo) => void;
+  onNewSession: () => void;
+  onCreateBranch: (branch: string) => Promise<{ ok: boolean; error?: string }>;
 }) {
   const [q, setQ] = useState("");
+  const [branching, setBranching] = useState(false);
+  const [branchName, setBranchName] = useState("");
+  const [branchErr, setBranchErr] = useState<string | null>(null);
+  const [branchBusy, setBranchBusy] = useState(false);
+
+  const activeThread = useMemo(
+    () => threads.find((t) => t.id === activeThreadId) ?? null,
+    [threads, activeThreadId],
+  );
+  const canBranch = !!activeThread?.repo;
 
   const boundRepoNames = useMemo(
     () => new Set(threads.map((t) => t.repo).filter(Boolean) as string[]),
@@ -61,6 +75,87 @@ export function ThreadSwitcher({
           className="flex-1 bg-transparent text-[0.85rem] text-text-primary outline-none placeholder:text-text-tertiary"
         />
       </div>
+
+      {/* Quick actions: fresh session + new git branch (repo threads only). */}
+      <div className="mb-2 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            haptic(10);
+            onNewSession();
+            onClose();
+          }}
+          className="flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-border px-2.5 py-2 text-[0.74rem] text-text-secondary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+        >
+          <PlusIcon width={14} height={14} />
+          New session
+        </button>
+        <button
+          type="button"
+          disabled={!canBranch}
+          onClick={() => {
+            haptic(10);
+            setBranchErr(null);
+            setBranching((v) => !v);
+          }}
+          className={cn(
+            "flex flex-1 items-center justify-center gap-1.5 rounded-[var(--radius-md)] border border-border px-2.5 py-2 text-[0.74rem] transition-colors",
+            canBranch
+              ? "text-text-secondary active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+              : "cursor-not-allowed text-text-disabled opacity-50",
+          )}
+        >
+          <BranchIcon width={13} height={13} />
+          New branch
+        </button>
+      </div>
+
+      {branching && canBranch && (
+        <div className="mb-2 flex flex-col gap-1.5 rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_4%,transparent)] p-2">
+          <div className="flex items-center gap-2">
+            <input
+              value={branchName}
+              onChange={(e) => setBranchName(e.target.value)}
+              placeholder="feat/my-change"
+              autoFocus
+              className="flex-1 bg-transparent font-mono-ui text-[0.78rem] text-text-primary outline-none placeholder:text-text-tertiary"
+            />
+            <button
+              type="button"
+              disabled={!branchName.trim() || branchBusy}
+              onClick={async () => {
+                const name = branchName.trim();
+                if (!name) return;
+                haptic(10);
+                setBranchBusy(true);
+                setBranchErr(null);
+                const res = await onCreateBranch(name);
+                setBranchBusy(false);
+                if (res.ok) {
+                  setBranchName("");
+                  setBranching(false);
+                  onClose();
+                } else {
+                  setBranchErr(res.error ?? "branch failed");
+                }
+              }}
+              className={cn(
+                "shrink-0 rounded-[var(--radius-sm)] px-2.5 py-1 text-[0.72rem] transition-colors",
+                branchName.trim() && !branchBusy
+                  ? "bg-midground text-background-base active:scale-95"
+                  : "bg-[color-mix(in_srgb,var(--midground)_12%,transparent)] text-text-tertiary",
+              )}
+            >
+              {branchBusy ? "..." : "Create"}
+            </button>
+          </div>
+          {branchErr && (
+            <span className="font-mono-ui text-[0.64rem] text-[color:var(--color-destructive)]">
+              {branchErr}
+            </span>
+          )}
+        </div>
+      )}
 
       <ul className="flex flex-col gap-0.5">
         {visibleThreads.map((t) => (

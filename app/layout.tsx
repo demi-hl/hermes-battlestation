@@ -60,6 +60,8 @@ s.setProperty("--midground","color-mix(in srgb, "+p[1]+" 100%, transparent)");
 s.setProperty("--foreground-base",p[2]);
 s.setProperty("--foreground","color-mix(in srgb, "+p[2]+" "+(p[3]*100)+"%, transparent)");
 s.setProperty("--foreground-alpha",String(p[3]));
+var bg=(localStorage.getItem("hermes-dashboard-bg")||"").trim();
+if(bg){s.setProperty("--background-base",bg);s.setProperty("--background","color-mix(in srgb, "+bg+" 100%, transparent)");s.setProperty("--background-alpha","1");}
 }catch(e){}})();`;
 
 export default function RootLayout({

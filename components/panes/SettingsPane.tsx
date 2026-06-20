@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useTheme } from "@/lib/themes";
 import { useWorkspace } from "@/components/shell/workspace-context";
-import { ThemeSheet } from "@/components/shell/ThemeSwitcher";
+import { ThemeSheet, BackgroundSheet } from "@/components/shell/ThemeSwitcher";
 import { Sheet } from "@/components/shell/Sheet";
 import {
   PaletteIcon,
@@ -11,6 +11,8 @@ import {
   ChevronRightIcon,
   ReposIcon,
   VaultIcon,
+  KeyIcon,
+  PlugIcon,
 } from "@/components/shell/icons";
 import { haptic } from "@/components/shell/haptics";
 import { cn } from "@/lib/utils";
@@ -46,8 +48,9 @@ interface SetupState {
  */
 export function SettingsPane() {
   const [themeOpen, setThemeOpen] = useState(false);
+  const [bgOpen, setBgOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
-  const { theme } = useTheme();
+  const { theme, bgOverride } = useTheme();
   const { model } = useWorkspace();
   const [setup, setSetup] = useState<SetupState | null>(null);
 
@@ -96,6 +99,16 @@ export function SettingsPane() {
             setThemeOpen(true);
           }}
         />
+        <Row
+          icon={PaletteIcon}
+          label="Background"
+          value={bgOverride ? bgOverride : "Theme default"}
+          hint="Canvas color, keeps theme accents"
+          onClick={() => {
+            haptic(10);
+            setBgOpen(true);
+          }}
+        />
       </section>
 
       <section className="flex flex-col gap-1.5">
@@ -105,6 +118,30 @@ export function SettingsPane() {
           label="Model"
           value={model.label}
           hint="Switch from the context bar"
+        />
+      </section>
+
+      <section className="flex flex-col gap-1.5">
+        <SectionLabel>Integrations</SectionLabel>
+        <Row
+          icon={KeyIcon}
+          label="API Keys"
+          value="manage"
+          hint="Provider credentials"
+          onClick={() => {
+            haptic(10);
+            window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "keys" } }));
+          }}
+        />
+        <Row
+          icon={PlugIcon}
+          label="MCP"
+          value="servers"
+          hint="Model Context Protocol servers"
+          onClick={() => {
+            haptic(10);
+            window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "mcp" } }));
+          }}
         />
       </section>
 
@@ -119,6 +156,7 @@ export function SettingsPane() {
       </section>
 
       <ThemeSheet open={themeOpen} onClose={() => setThemeOpen(false)} />
+      <BackgroundSheet open={bgOpen} onClose={() => setBgOpen(false)} />
       <SetupSheet
         open={setupOpen}
         onClose={() => setSetupOpen(false)}

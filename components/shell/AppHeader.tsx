@@ -14,13 +14,11 @@ export function AppHeader() {
 
   return (
     <header
-      className="absolute inset-x-0 top-0 z-30 flex items-end justify-end gap-3 border-b border-border px-4 pb-2"
+      className="absolute inset-x-0 top-0 z-30 flex items-end justify-end gap-3 px-4 pb-1"
       style={{
         height: "calc(var(--app-header-h) + env(safe-area-inset-top))",
         paddingTop: "env(safe-area-inset-top)",
-        background: "color-mix(in srgb, var(--background-base) 64%, transparent)",
-        backdropFilter: "blur(20px) saturate(150%)",
-        WebkitBackdropFilter: "blur(20px) saturate(150%)",
+        background: "transparent",
       }}
     >
       <button
@@ -30,9 +28,9 @@ export function AppHeader() {
           haptic(8);
           setThemeOpen(true);
         }}
-        className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full border border-border text-text-secondary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+        className="grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border text-text-secondary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
       >
-        <PaletteIcon width={18} height={18} />
+        <PaletteIcon width={17} height={17} />
       </button>
 
       <ThemeSheet open={themeOpen} onClose={() => setThemeOpen(false)} />

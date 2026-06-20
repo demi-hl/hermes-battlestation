@@ -170,6 +170,7 @@ export function TasksPRsPane() {
       <PrDetailSheet
         target={openPr}
         onClose={() => setOpenPr(null)}
+        onMerged={reload}
       />
     </>
   );
@@ -462,11 +463,52 @@ function usePrDetail(target: { fullName: string; number: number } | null) {
 function PrDetailSheet({
   target,
   onClose,
+  onMerged,
 }: {
   target: { fullName: string; number: number } | null;
   onClose: () => void;
+  onMerged: () => void;
 }) {
   const { detail, error, loading } = usePrDetail(target);
+  const [merging, setMerging] = useState(false);
+  const [mergeError, setMergeError] = useState<string | null>(null);
+  const [merged, setMerged] = useState(false);
+
+  // Reset merge UI whenever a different PR opens.
+  useEffect(() => {
+    setMerging(false);
+    setMergeError(null);
+    setMerged(false);
+  }, [target?.fullName, target?.number]);
+
+  const doMerge = async (method: "squash" | "merge" | "rebase") => {
+    if (!target) return;
+    haptic(14);
+    setMerging(true);
+    setMergeError(null);
+    try {
+      const res = await fetch("/api/prs/merge", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({
+          repo: target.fullName,
+          number: target.number,
+          method,
+          deleteBranch: true,
+        }),
+      });
+      const j = (await res.json()) as { ok?: boolean; error?: string };
+      if (!res.ok || !j.ok) throw new Error(j.error || "merge failed");
+      setMerged(true);
+      onMerged();
+      // Close after a beat so the success state is visible.
+      setTimeout(onClose, 900);
+    } catch (e) {
+      setMergeError(e instanceof Error ? e.message : "merge failed");
+    } finally {
+      setMerging(false);
+    }
+  };
 
   return (
     <Sheet
@@ -495,14 +537,34 @@ function PrDetailSheet({
             {error ?? "Could not load this pull request."}
           </motion.p>
         ) : (
-          <DetailBody key="body" detail={detail} />
+          <DetailBody
+            key="body"
+            detail={detail}
+            merging={merging}
+            merged={merged}
+            mergeError={mergeError}
+            onMerge={doMerge}
+          />
         )}
       </AnimatePresence>
     </Sheet>
   );
 }
 
-function DetailBody({ detail }: { detail: PrDetail }) {
+function DetailBody({
+  detail,
+  merging,
+  merged,
+  mergeError,
+  onMerge,
+}: {
+  detail: PrDetail;
+  merging: boolean;
+  merged: boolean;
+  mergeError: string | null;
+  onMerge: (method: "squash" | "merge" | "rebase") => void;
+}) {
+  const canMerge = detail.state === "OPEN" && !detail.isDraft;
   return (
     <motion.div
       initial={{ opacity: 0, y: 6 }}
@@ -578,6 +640,54 @@ function DetailBody({ detail }: { detail: PrDetail }) {
           <pre className="max-h-[34dvh] overflow-y-auto whitespace-pre-wrap rounded-xl border border-border bg-[color-mix(in_srgb,var(--midground)_3%,transparent)] p-3 font-mono-ui text-[0.72rem] leading-relaxed text-text-secondary">
             {detail.body.trim()}
           </pre>
+        </div>
+      )}
+
+      {/* Merge — squash by default; long flow lives behind the kebab on GitHub */}
+      {canMerge && (
+        <div className="mt-4">
+          {mergeError && (
+            <p className="mb-2 rounded-lg border border-[color-mix(in_srgb,var(--color-destructive)_40%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_10%,transparent)] px-3 py-2 text-[0.72rem] text-[color:var(--color-destructive)]">
+              {mergeError}
+            </p>
+          )}
+          <button
+            type="button"
+            disabled={merging || merged}
+            onClick={() => onMerge("squash")}
+            className={cn(
+              "flex w-full items-center justify-center gap-2 rounded-xl py-3 text-[0.84rem] font-medium transition-all active:scale-[0.99]",
+              merged
+                ? "bg-[color-mix(in_srgb,var(--color-success)_22%,transparent)] text-[color:var(--color-success)]"
+                : "bg-[color:var(--color-success,#3fb950)] text-background-base",
+              (merging || merged) && "opacity-90",
+            )}
+          >
+            {merged ? "Merged ✓" : merging ? "Merging…" : "Squash & merge"}
+          </button>
+          {!merged && (
+            <div className="mt-1.5 flex items-center gap-1.5">
+              <button
+                type="button"
+                disabled={merging}
+                onClick={() => onMerge("merge")}
+                className="flex-1 rounded-lg border border-border py-2 font-mono-ui text-[0.66rem] text-text-secondary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+              >
+                merge commit
+              </button>
+              <button
+                type="button"
+                disabled={merging}
+                onClick={() => onMerge("rebase")}
+                className="flex-1 rounded-lg border border-border py-2 font-mono-ui text-[0.66rem] text-text-secondary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+              >
+                rebase
+              </button>
+            </div>
+          )}
+          <p className="mt-1.5 text-center font-mono-ui text-[0.56rem] text-text-tertiary">
+            deletes the head branch after merge
+          </p>
         </div>
       )}
 

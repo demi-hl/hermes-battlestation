@@ -5,6 +5,7 @@ import { useWorkspace } from "@/components/shell/workspace-context";
 import type {
   ChatThread,
   ChatRepo,
+  ChatImage,
   ChatStreamEvent,
   ThreadsPayload,
 } from "@/lib/chat-types";
@@ -32,6 +33,8 @@ export interface ChatMessage {
   thought?: string;
   /** Live tool-call activity for this turn. */
   tools?: ToolActivity[];
+  /** Image attachments shown as thumbnails on a user bubble (data URLs). */
+  images?: string[];
 }
 
 const TRANSCRIPT_PREFIX = "lo-chat:v1:";
@@ -50,7 +53,13 @@ function loadTranscript(threadId: string): ChatMessage[] {
 function saveTranscript(threadId: string, msgs: ChatMessage[]) {
   if (typeof window === "undefined") return;
   try {
-    const trimmed = msgs.slice(-MAX_KEEP);
+    // Drop base64 image payloads before persisting — a single photo can exceed
+    // the ~5MB localStorage quota and silently fail the whole save. The live
+    // session keeps the thumbnails in memory; on reload the bubble just renders
+    // without them (the durable transcript is the backend's job anyway).
+    const trimmed = msgs.slice(-MAX_KEEP).map((m) =>
+      m.images ? { ...m, images: undefined } : m,
+    );
     window.localStorage.setItem(TRANSCRIPT_PREFIX + threadId, JSON.stringify(trimmed));
   } catch {
     /* quota / disabled storage — transcript is best-effort */
@@ -64,11 +73,14 @@ function mkId(): string {
 }
 
 export function useChat() {
-  const { setActiveWorkspace, setStatus, setContextUsage, active, model } = useWorkspace();
+  const { setActiveWorkspace, setStatus, setContextUsage, active, model, activeProfile } = useWorkspace();
 
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [repos, setRepos] = useState<ChatRepo[]>([]);
-  const [activeThreadId, setActiveThreadId] = useState<string>("general");
+  const [activeThreadId, setActiveThreadId] = useState<string>(() => {
+    if (typeof window === "undefined") return "general";
+    return localStorage.getItem("lo-active-thread") ?? "general";
+  });
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [sending, setSending] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(true);
@@ -86,7 +98,18 @@ export function useChat() {
     try {
       const res = await fetch("/api/chat/threads", { cache: "no-store" });
       const data = (await res.json()) as ThreadsPayload;
-      setThreads(data.threads ?? []);
+      // Merge, don't replace: keep locally-created shells (a repo thread opened
+      // from the Repos pane before it has a backend session) that the backend
+      // doesn't yet know about, so a mount-time refresh can't clobber the
+      // thread we just navigated into.
+      setThreads((prev) => {
+        const backend = data.threads ?? [];
+        const backendIds = new Set(backend.map((t) => t.id));
+        const shells = prev.filter(
+          (t) => !backendIds.has(t.id) && t.sessionId == null && !!t.repo,
+        );
+        return [...backend, ...shells];
+      });
       setRepos(data.repos ?? []);
       setThreadsError(data.error ?? null);
     } catch (e) {
@@ -106,18 +129,24 @@ export function useChat() {
   // localStorage is empty.
   useEffect(() => {
     setMessages(loadTranscript(activeThreadId));
+    if (typeof window !== "undefined") {
+      localStorage.setItem("lo-active-thread", activeThreadId);
+    }
   }, [activeThreadId]);
 
   useEffect(() => {
     let cancelled = false;
     const thread = threads.find((t) => t.id === activeThreadId);
     const repo = thread?.repo ?? "general";
+    const branch = thread?.branch ?? null;
     // Only hydrate threads that have a real backend session already.
     if (thread && thread.sessionId == null && thread.messageCount === 0) return;
     (async () => {
       try {
+        const qs = new URLSearchParams({ repo });
+        if (branch) qs.set("branch", branch);
         const res = await fetch(
-          `/api/chat/history?repo=${encodeURIComponent(repo)}`,
+          `/api/chat/history?${qs.toString()}`,
           { cache: "no-store" },
         );
         if (!res.ok) return;
@@ -155,7 +184,7 @@ export function useChat() {
         setActiveWorkspace({
           repo: thread.repo,
           path: thread.cwd,
-          branch: repo?.branch ?? "main",
+          branch: thread.branch ?? repo?.branch ?? "main",
         });
       }
       setContextUsage(thread?.usage ?? null);
@@ -192,24 +221,67 @@ export function useChat() {
     setActiveThreadId(id);
   }, []);
 
-  // Start (or focus) a thread for a repo that may not have a session yet.
-  const startRepoThread = useCallback((repo: ChatRepo) => {
-    setThreads((prev) => {
-      const existing = prev.find((t) => t.repo === repo.name);
-      if (existing) {
-        setActiveThreadId(existing.id);
-        return prev;
+  // Start (or focus) a thread for a repo/branch that may not have a session yet.
+  const startRepoThread = useCallback(
+    (repo: ChatRepo & { branch?: string | null; base?: string | null }) => {
+      const shell = makeRepoThread(
+        repo.name,
+        repo.path,
+        repo.branch ?? null,
+        repo.base ?? null,
+      );
+      setThreads((prev) => {
+        const existing = prev.find((t) => t.id === shell.id);
+        if (existing) {
+          setActiveThreadId(existing.id);
+          return prev;
+        }
+        setActiveThreadId(shell.id);
+        return [...prev, shell];
+      });
+    },
+    [],
+  );
+
+  // Open a repo's session from another surface (the Repos pane). On mobile the
+  // Chat pane is unmounted while you're on Repos, so a plain window event would
+  // fire into the void before ChatHub mounts. We hand off via localStorage
+  // (consumed on mount, below) AND a live event (for the already-mounted case).
+  useEffect(() => {
+    const open = (r: {
+      name: string;
+      path?: string | null;
+      branch?: string | null;
+      base?: string | null;
+    }) => {
+      if (!r?.name) return;
+      startRepoThread({
+        name: r.name,
+        path: r.path ?? "",
+        branch: r.branch ?? null,
+        base: r.base ?? null,
+      });
+    };
+    if (typeof window !== "undefined") {
+      try {
+        const raw = localStorage.getItem("lo-pending-repo");
+        if (raw) {
+          localStorage.removeItem("lo-pending-repo");
+          open(JSON.parse(raw));
+        }
+      } catch {
+        /* malformed handoff; ignore */
       }
-      const shell = makeRepoThread(repo.name, repo.path, repo.branch);
-      setActiveThreadId(shell.id);
-      return [...prev, shell];
-    });
-  }, []);
+    }
+    const onEvt = (e: Event) => open((e as CustomEvent).detail);
+    window.addEventListener("lo-open-repo", onEvt as EventListener);
+    return () => window.removeEventListener("lo-open-repo", onEvt as EventListener);
+  }, [startRepoThread]);
 
   const send = useCallback(
-    async (text: string, skills: string[] = []) => {
+    async (text: string, skills: string[] = [], images: ChatImage[] = []) => {
       const trimmed = text.trim();
-      if (!trimmed || sending) return;
+      if ((!trimmed && images.length === 0) || sending) return;
 
       // Slash commands: `/compress` → instruction to compress context.
       let message = trimmed;
@@ -220,16 +292,23 @@ export function useChat() {
             "Please compress our conversation – summarize all key context, decisions, and active state into a concise summary. Report the total token savings.",
           summary:
             "Please provide a summary of our conversation so far, including all key decisions, context, and open items.",
-          clear:
-            "Please ignore previous instructions and start fresh. Tell me what context you still have about this session.",
+          cost:
+            "Report this session's token usage and approximate cost so far — prompt tokens, completion tokens, and total.",
         };
         message = SLASH_MAP[cmd] ?? trimmed;
       }
 
       const thread = threads.find((t) => t.id === activeThreadId);
       const repo = thread?.repo ?? "general";
+      const branch = thread?.branch ?? null;
 
-      const userMsg: ChatMessage = { id: mkId(), role: "user", text: trimmed, ts: Date.now() };
+      const userMsg: ChatMessage = {
+        id: mkId(),
+        role: "user",
+        text: trimmed,
+        ts: Date.now(),
+        ...(images.length ? { images: images.map((im) => im.data) } : {}),
+      };
       const pendingMsg: ChatMessage = {
         id: mkId(),
         role: "assistant",
@@ -252,7 +331,7 @@ export function useChat() {
         const res = await fetch("/api/chat/send", {
           method: "POST",
           headers: { "content-type": "application/json" },
-          body: JSON.stringify({ repo, message, skills, model: model.id, provider: model.provider }),
+          body: JSON.stringify({ repo, branch, message, skills, images, profile: activeProfile?.id ?? "default", model: model.id, provider: model.provider }),
           signal: ctrl.signal,
         });
         if (!res.ok || !res.body) {
@@ -354,12 +433,67 @@ export function useChat() {
         abortRef.current = null;
       }
     },
-    [sending, threads, activeThreadId, setStatus, setContextUsage, refreshThreads, model],
+    [sending, threads, activeThreadId, setStatus, setContextUsage, refreshThreads, model, activeProfile],
   );
 
   const stop = useCallback(() => {
+    // Two-part stop: abort the HTTP stream locally AND tell the agent to cancel
+    // the turn server-side (the fetch-abort alone leaves the ACP turn running).
     abortRef.current?.abort();
-  }, []);
+    const thread = threads.find((t) => t.id === activeThreadId);
+    const repo = thread?.repo ?? "general";
+    void fetch("/api/chat/cancel", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ repo }),
+    }).catch(() => {
+      /* best-effort: local abort already happened */
+    });
+  }, [threads, activeThreadId]);
+
+  // Start a brand new session for the active thread's repo, discarding the
+  // current transcript binding so the next turn opens a fresh agent session.
+  const newSession = useCallback(async () => {
+    const thread = threads.find((t) => t.id === activeThreadId);
+    const repo = thread?.repo ?? "general";
+    try {
+      await fetch("/api/chat/new-session", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ repo }),
+      });
+    } catch {
+      /* the session is created lazily on next prompt anyway */
+    }
+    // Clear the local transcript for this thread so the new session starts clean.
+    if (typeof window !== "undefined") {
+      window.localStorage.removeItem(TRANSCRIPT_PREFIX + activeThreadId);
+    }
+    setMessages([]);
+    void refreshThreads();
+  }, [threads, activeThreadId, refreshThreads]);
+
+  // Create a git branch in the active thread's repo (no-op for general).
+  const createBranch = useCallback(
+    async (branch: string): Promise<{ ok: boolean; error?: string }> => {
+      const thread = threads.find((t) => t.id === activeThreadId);
+      const repo = thread?.repo;
+      if (!repo) return { ok: false, error: "bind a repo first" };
+      try {
+        const res = await fetch("/api/git/branch", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ repo, branch }),
+        });
+        const data = (await res.json()) as { ok: boolean; error?: string };
+        if (data.ok) void refreshThreads();
+        return data;
+      } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : "branch failed" };
+      }
+    },
+    [threads, activeThreadId, refreshThreads],
+  );
 
   return {
     threads,
@@ -374,21 +508,37 @@ export function useChat() {
     startRepoThread,
     send,
     stop,
+    newSession,
+    createBranch,
     refreshThreads,
   };
 }
 
-function makeRepoThread(repo: string, cwd: string | null, branch: string | null): ChatThread {
+function makeRepoThread(
+  repo: string,
+  cwd: string | null,
+  branch: string | null,
+  base?: string | null,
+): ChatThread {
   const slug = repo
     .toLowerCase()
     .replace(/[^a-z0-9._-]+/g, "-")
     .replace(/^-+|-+$/g, "");
+  // A specific (non-base) branch gets its own session id + title so branches
+  // run independently; the base branch collapses to the plain repo session.
+  const isBranch = !!branch && (!base || branch !== base);
+  const branchSlug = (branch ?? "")
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "");
+  const title = isBranch ? `lol-${slug}__${branchSlug}` : `lol-${slug}`;
   return {
-    id: `lol-${slug}`,
-    title: repo,
+    id: title,
+    title: isBranch ? `${repo} · ${branch}` : repo,
     repo,
+    branch: branch ?? null,
     cwd: cwd ?? "",
-    sessionTitle: `lol-${slug}`,
+    sessionTitle: title,
     sessionId: null,
     messageCount: 0,
     model: null,

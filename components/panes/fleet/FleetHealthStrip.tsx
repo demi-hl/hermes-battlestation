@@ -149,7 +149,7 @@ function BotCard({ bot }: { bot: FleetHealth["bot"] }) {
         </span>
         <div className="min-w-0 flex-1">
           <span className="block truncate text-[0.78rem] text-midground">
-            Polymarket bot
+            Vultr
           </span>
           <span className="font-mono-ui block text-[0.6rem] text-text-tertiary">
             VPS · pm2

@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { dashboardGet } from "@/lib/hermes";
 import { cached } from "@/lib/cache";
 import { run } from "@/lib/exec";
 import type { ApiEnvelope, CronList, CronJob } from "@/lib/types";
@@ -14,44 +13,68 @@ function sq(s: string): string {
   return `'${String(s).replace(/'/g, "'\\''")}'`;
 }
 
-type RawCron = {
-  id?: string;
-  name?: string;
-  schedule_display?: string;
-  schedule?: { display?: string };
-  last_status?: string | null;
-  enabled?: boolean;
-  next_run_at?: string | null;
-};
-
 export async function GET() {
   const env: ApiEnvelope<CronList> = await cached("cron", 30_000, async () => {
     const at = new Date().toISOString();
-    const res = await dashboardGet("/api/cron/jobs");
-    if (!res.ok || !Array.isArray(res.data)) {
+    // Shell the real `hermes cron list` CLI (same pattern as the profiles
+    // route). The old dashboardGet path scraped a session token off
+    // 127.0.0.1:9119 — but that IS this battlestation server, not the Hermes
+    // agent dashboard, so it always came back empty ("dashboard not running").
+    const res = await run(`${HERMES_BIN} cron list`, { timeoutMs: 12_000 });
+    if (!res.ok || !res.stdout.trim()) {
       return {
         data: {
           available: false,
           jobs: [],
-          note:
-            res.status === 0
-              ? "dashboard not running on 127.0.0.1:9119"
-              : `dashboard returned ${res.status}`,
+          note: res.stderr.trim() || "hermes cron list returned nothing",
         },
         fetchedAt: at,
       };
     }
-    const jobs: CronJob[] = (res.data as RawCron[]).map((j) => ({
-      id: j.id ?? "",
-      name: j.name ?? "unnamed",
-      schedule: j.schedule_display ?? j.schedule?.display ?? "",
-      lastStatus: j.last_status ?? null,
-      enabled: j.enabled ?? false,
-      nextRunAt: j.next_run_at ?? null,
-    }));
-    return { data: { available: true, jobs }, fetchedAt: at };
+    return { data: { available: true, jobs: parseCronList(res.stdout) }, fetchedAt: at };
   });
   return NextResponse.json(env);
+}
+
+/**
+ * Parse the boxed text output of `hermes cron list` into CronJob rows. Each job
+ * is a `  <12-hex-id> [active|paused]` header followed by indented
+ * `Key:  value` lines (Name / Schedule / Next run / Last run). The trailing
+ * token of "Last run: <iso>  ok|error" is the status.
+ */
+function parseCronList(stdout: string): CronJob[] {
+  const jobs: CronJob[] = [];
+  let cur: CronJob | null = null;
+  for (const raw of stdout.split("\n")) {
+    const header = raw.match(/^\s*([0-9a-f]{8,})\s+\[(active|paused)\]/i);
+    if (header) {
+      if (cur) jobs.push(cur);
+      cur = {
+        id: header[1],
+        name: "unnamed",
+        schedule: "",
+        lastStatus: null,
+        enabled: header[2].toLowerCase() === "active",
+        nextRunAt: null,
+      };
+      continue;
+    }
+    if (!cur) continue;
+    const kv = raw.match(/^\s*([A-Za-z ]+):\s+(.*)$/);
+    if (!kv) continue;
+    const key = kv[1].trim().toLowerCase();
+    const val = kv[2].trim();
+    if (key === "name") cur.name = val;
+    else if (key === "schedule") cur.schedule = val;
+    else if (key === "next run") cur.nextRunAt = val || null;
+    else if (key === "last run") {
+      // "2026-06-19T21:31:48-07:00  ok"  ->  status is the trailing word.
+      const m = val.match(/\s(ok|error|failed)\s*$/i);
+      cur.lastStatus = m ? m[1].toLowerCase() : null;
+    }
+  }
+  if (cur) jobs.push(cur);
+  return jobs;
 }
 
 /**

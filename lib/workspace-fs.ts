@@ -571,3 +571,154 @@ export async function getFileDiff(
   return { path: filePath, staged, patch: binary ? "" : patch, binary };
 }
 
+// ---------------------------------------------------------------------------
+// Prune: safely remove a stale worktree or merged branch
+// ---------------------------------------------------------------------------
+
+export interface PruneResult {
+  ok: boolean;
+  /** What we actually did: removed a worktree, deleted a branch, or nothing. */
+  action: "worktree-removed" | "branch-deleted" | "none";
+  /** Why a non-force prune was refused (clean check / merge check failed). */
+  reason?: string;
+  /** True when the entry is safe to prune without force (UI gates the swipe). */
+  safe?: boolean;
+}
+
+/** Is `branch` fully merged into the repo's base? (its tip is an ancestor of base) */
+async function isMerged(root: string, branch: string, base: string): Promise<boolean> {
+  // `git merge-base --is-ancestor <branch> <base>` exits 0 when branch is merged.
+  const r = await git(root, ["merge-base", "--is-ancestor", branch, base]);
+  return r.ok;
+}
+
+/** Does a checked-out worktree at `wtPath` have uncommitted changes? */
+async function worktreeDirty(wtPath: string): Promise<boolean> {
+  const r = await runFile("git", ["status", "--porcelain"], { cwd: wtPath, timeoutMs: 8000 });
+  if (!r.ok) return true; // can't verify clean → treat as dirty (refuse)
+  return r.stdout.trim().length > 0;
+}
+
+/**
+ * Prune a workspace entry. Safety model (force=false, the default):
+ *   - worktree: removed only if its working tree is clean (no uncommitted diff)
+ *   - branch:   deleted only if fully merged into the repo base
+ * force=true bypasses both checks (UI puts this behind an explicit confirm).
+ * The repo's base branch and the currently checked-out branch are never pruned.
+ * All git runs via execFile argv — no client value touches a shell.
+ */
+export async function pruneWorkspace(
+  ref: RepoRef,
+  name: string,
+  force = false,
+): Promise<PruneResult> {
+  if (!SAFE_BRANCH.test(name)) {
+    return { ok: false, action: "none", reason: "invalid name" };
+  }
+
+  const base = await detectBase(ref.root);
+  const current = (await git(ref.root, ["rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
+
+  if (name === base) {
+    return { ok: false, action: "none", reason: "base branch is protected" };
+  }
+  if (name === current) {
+    return { ok: false, action: "none", reason: "checked-out branch is protected" };
+  }
+
+  // Is this name a linked worktree (vs a plain branch)?
+  const worktrees = await listWorktrees(ref.root);
+  const wt = worktrees.find((w) => w.branch === name && w.path !== ref.root);
+
+  if (wt) {
+    if (!force) {
+      const dirty = await worktreeDirty(wt.path);
+      if (dirty) {
+        return {
+          ok: false,
+          action: "none",
+          safe: false,
+          reason: "worktree has uncommitted changes",
+        };
+      }
+    }
+    const args = ["worktree", "remove", wt.path];
+    if (force) args.push("--force");
+    const r = await git(ref.root, args, 20000);
+    if (!r.ok) {
+      return { ok: false, action: "none", reason: r.stderr.trim() || "worktree remove failed" };
+    }
+    return { ok: true, action: "worktree-removed", safe: true };
+  }
+
+  // Plain branch.
+  if (!force && base) {
+    const merged = await isMerged(ref.root, name, base);
+    if (!merged) {
+      return {
+        ok: false,
+        action: "none",
+        safe: false,
+        reason: `not merged into ${base}`,
+      };
+    }
+  }
+  // `-d` refuses an unmerged branch; `-D` force-deletes. We already gated on
+  // merge status above, so `-d` for safe and `-D` for force.
+  const r = await git(ref.root, ["branch", force ? "-D" : "-d", name]);
+  if (!r.ok) {
+    return { ok: false, action: "none", reason: r.stderr.trim() || "branch delete failed" };
+  }
+  return { ok: true, action: "branch-deleted", safe: true };
+}
+
+/**
+ * Compute prune safety for every workspace in a repo, so the UI can gray out
+ * (or force-confirm) the ones that aren't clean/merged. Read-only.
+ */
+export async function pruneStates(
+  ref: RepoRef,
+): Promise<Record<string, { prunable: boolean; reason: string }>> {
+  const base = await detectBase(ref.root);
+  const current = (await git(ref.root, ["rev-parse", "--abbrev-ref", "HEAD"])).stdout.trim();
+  const worktrees = await listWorktrees(ref.root);
+  const wtByBranch = new Map<string, string>();
+  for (const w of worktrees) if (w.branch && w.path !== ref.root) wtByBranch.set(w.branch, w.path);
+
+  const branchesR = await git(ref.root, [
+    "for-each-ref",
+    "--format=%(refname:short)",
+    "refs/heads",
+  ]);
+  const names = branchesR.ok
+    ? branchesR.stdout.split("\n").map((s) => s.trim()).filter(Boolean)
+    : [];
+
+  const out: Record<string, { prunable: boolean; reason: string }> = {};
+  for (const name of names) {
+    if (name === base) {
+      out[name] = { prunable: false, reason: "base" };
+      continue;
+    }
+    if (name === current) {
+      out[name] = { prunable: false, reason: "checked out" };
+      continue;
+    }
+    const wtPath = wtByBranch.get(name);
+    if (wtPath) {
+      const dirty = await worktreeDirty(wtPath);
+      out[name] = dirty
+        ? { prunable: false, reason: "uncommitted changes" }
+        : { prunable: true, reason: "clean worktree" };
+    } else if (base) {
+      const merged = await isMerged(ref.root, name, base);
+      out[name] = merged
+        ? { prunable: true, reason: "merged" }
+        : { prunable: false, reason: "unmerged" };
+    } else {
+      out[name] = { prunable: false, reason: "no base" };
+    }
+  }
+  return out;
+}
+

@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { haptic } from "@/components/shell/haptics";
 import { cn } from "@/lib/utils";
 import { relativeTime } from "@/lib/format";
+import { profileTint } from "@/lib/profile-color";
 import {
   SearchIcon,
   RefreshIcon,
@@ -16,6 +17,21 @@ import type {
   ThreadsPayload,
 } from "@/lib/chat-types";
 import type { ChatMessage } from "@/components/chat/useChat";
+
+// Cross-profile (read-only) browsing shapes — mirror lib/profile-sessions.ts.
+interface ProfileInfo {
+  name: string;
+  count: number;
+}
+interface ProfileSession {
+  id: string;
+  title: string | null;
+  source: string | null;
+  model: string | null;
+  messageCount: number;
+  lastActive: number | null;
+  used: number | null;
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -39,7 +55,25 @@ export function SessionsPane() {
     new Map(),
   );
   const [historyLoading, setHistoryLoading] = useState<Set<string>>(new Set());
-  const didAutoExpand = useRef(false);
+
+  // Cross-profile browsing. "default" = the rich thread view (resumable in
+  // chat). Any other profile = read-only history merged from that profile's
+  // own state.db. Profiles + counts come from /api/sessions/all (no param).
+  const [profiles, setProfiles] = useState<ProfileInfo[]>([]);
+  const [activeProfile, setActiveProfile] = useState<string>("default");
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch("/api/sessions/all", { cache: "no-store" });
+        if (!res.ok) return;
+        const body = (await res.json()) as { profiles?: ProfileInfo[] };
+        if (body.profiles?.length) setProfiles(body.profiles);
+      } catch {
+        /* keep just the default chip */
+      }
+    })();
+  }, []);
 
   const load = useCallback(async () => {
     setRefreshing(true);
@@ -97,14 +131,9 @@ export function SessionsPane() {
     [histories],
   );
 
-  // Auto-expand the first session once.
-  useEffect(() => {
-    if (didAutoExpand.current || !payload || payload.threads.length === 0)
-      return;
-    didAutoExpand.current = true;
-    setExpanded(new Set([payload.threads[0].id]));
-    fetchHistory(payload.threads[0].id, payload.threads[0].sessionId);
-  }, [payload, fetchHistory]);
+  // Sessions open as a clean collapsed list — tap a row to expand its history.
+  // (Previously auto-expanded the first thread, which dumped a transcript at the
+  // top of the list and read as clutter.)
 
   const toggle = useCallback(
     (thread: ChatThread) => {
@@ -122,6 +151,16 @@ export function SessionsPane() {
     },
     [fetchHistory],
   );
+
+  // Open a session in the Chat tab: switch tabs + tell ChatHub which thread to
+  // select. Same window-event bus as the Tasks-home → Chat jump.
+  const openInChat = useCallback((thread: ChatThread) => {
+    haptic([6, 4, 8]);
+    window.dispatchEvent(
+      new CustomEvent("lo-open-session", { detail: { threadId: thread.id } }),
+    );
+    window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "chat" } }));
+  }, []);
 
   const filtered = useMemo(() => {
     if (!payload) return [];
@@ -161,11 +200,40 @@ export function SessionsPane() {
 
   const handleDelete = useCallback(
     async (thread: ChatThread) => {
-      if (!thread.sessionId) return;
-      const res = await fetch(`/api/sessions/${encodeURIComponent(thread.sessionId)}`, {
-        method: "DELETE",
-      }).catch(() => null);
-      if (res?.ok) load();
+      // Forget the bridge mapping first so the thread can't be resurrected from
+      // the bridge map on the next /api/chat/threads fetch, then delete the row.
+      await fetch(`/api/chat/threads/forget`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: thread.id }),
+      }).catch(() => {});
+      if (thread.sessionId) {
+        await fetch(`/api/sessions/${encodeURIComponent(thread.sessionId)}`, {
+          method: "DELETE",
+        }).catch(() => {});
+      }
+      load();
+    },
+    [load],
+  );
+
+  const handleArchive = useCallback(
+    async (thread: ChatThread) => {
+      // Same as delete-from-list: drop the bridge mapping so the thread leaves
+      // the list, but keep the session row (archived) for history/recovery.
+      await fetch(`/api/chat/threads/forget`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ key: thread.id }),
+      }).catch(() => {});
+      if (thread.sessionId) {
+        await fetch(`/api/sessions/${encodeURIComponent(thread.sessionId)}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ archived: true }),
+        }).catch(() => {});
+      }
+      load();
     },
     [load],
   );
@@ -184,42 +252,530 @@ export function SessionsPane() {
         <SearchBar value={search} onChange={setSearch} />
       </div>
 
-      {/* Session list */}
-      <div className="px-2 pt-1">
-        {payload === null && !error ? (
-          <Skeleton />
-        ) : error && !payload ? (
-          <ErrorState message={error} onRetry={load} />
-        ) : filtered.length === 0 ? (
-          <p className="px-3 py-10 text-center text-sm text-text-tertiary">
-            {search
-              ? "No sessions match your search."
-              : "No sessions yet."}
-          </p>
-        ) : (
-          <motion.ul layout className="flex flex-col">
-            {filtered.map((thread, i) => (
-              <SessionRow
-                key={thread.id}
-                thread={thread}
-                index={i}
-                open={expanded.has(thread.id)}
-                history={histories.get(thread.id)}
-                historyLoading={historyLoading.has(thread.id)}
-                onToggle={() => toggle(thread)}
-                onRename={(title) => handleRename(thread, title)}
-                onDelete={() => handleDelete(thread)}
-              />
-            ))}
-          </motion.ul>
-        )}
-        {error && payload && (
-          <p className="px-3 pt-2 text-[0.66rem] text-text-tertiary">
-            Some data may be stale: {error}
-          </p>
-        )}
-      </div>
+      {/* Profile filter chips — default (resumable) + every other profile's
+          store (read-only history). Only shown when >1 profile exists. */}
+      {profiles.length > 1 && (
+        <ProfileChips
+          profiles={profiles}
+          active={activeProfile}
+          onSelect={(p) => {
+            haptic(6);
+            setActiveProfile(p);
+          }}
+        />
+      )}
+
+      {/* Body: default profile = rich threads; others = read-only history. */}
+      {activeProfile === "default" ? (
+        <DefaultSessions
+          payload={payload}
+          error={error}
+          filtered={filtered}
+          search={search}
+          expanded={expanded}
+          histories={histories}
+          historyLoading={historyLoading}
+          toggle={toggle}
+          openInChat={openInChat}
+          handleRename={handleRename}
+          handleDelete={handleDelete}
+          handleArchive={handleArchive}
+          load={load}
+        />
+      ) : (
+        <ProfileSessions profile={activeProfile} search={search} />
+      )}
     </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Profile filter chips
+// ---------------------------------------------------------------------------
+
+function ProfileChips({
+  profiles,
+  active,
+  onSelect,
+}: {
+  profiles: ProfileInfo[];
+  active: string;
+  onSelect: (p: string) => void;
+}) {
+  return (
+    <div className="flex gap-1.5 overflow-x-auto border-b border-border px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {profiles.map((p) => {
+        const on = p.name === active;
+        const tint = profileTint(p.name);
+        return (
+          <button
+            key={p.name}
+            type="button"
+            onClick={() => onSelect(p.name)}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5 rounded-full border px-2.5 py-1 text-[0.72rem] transition-colors",
+              on
+                ? "border-transparent bg-midground text-background-base"
+                : "border-border text-text-secondary active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
+            )}
+          >
+            <span
+              className="h-1.5 w-1.5 shrink-0 rounded-full"
+              style={{ background: tint, boxShadow: on ? "none" : `0 0 4px ${tint}` }}
+            />
+            <span className="font-mono-ui">{p.name}</span>
+            <span
+              className={cn(
+                "rounded-full px-1 font-mono-ui tabular text-[0.58rem]",
+                on ? "bg-background-base/20" : "text-text-tertiary",
+              )}
+            >
+              {p.count}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Default-profile session list (rich, resumable) — the original body
+// ---------------------------------------------------------------------------
+
+function DefaultSessions({
+  payload,
+  error,
+  filtered,
+  search,
+  expanded,
+  histories,
+  historyLoading,
+  toggle,
+  openInChat,
+  handleRename,
+  handleDelete,
+  handleArchive,
+  load,
+}: {
+  payload: ThreadsPayload | null;
+  error: string | null;
+  filtered: ChatThread[];
+  search: string;
+  expanded: Set<string>;
+  histories: Map<string, ChatMessage[]>;
+  historyLoading: Set<string>;
+  toggle: (t: ChatThread) => void;
+  openInChat: (t: ChatThread) => void;
+  handleRename: (t: ChatThread, title: string) => void;
+  handleDelete: (t: ChatThread) => void;
+  handleArchive: (t: ChatThread) => void;
+  load: () => void;
+}) {
+  return (
+    <div className="px-2 pt-1">
+      {payload === null && !error ? (
+        <Skeleton />
+      ) : error && !payload ? (
+        <ErrorState message={error} onRetry={load} />
+      ) : filtered.length === 0 ? (
+        <p className="px-3 py-10 text-center text-sm text-text-tertiary">
+          {search ? "No sessions match your search." : "No sessions yet."}
+        </p>
+      ) : (
+        <motion.ul layout className="flex flex-col">
+          {filtered.map((thread, i) => (
+            <SessionRow
+              key={thread.id}
+              thread={thread}
+              index={i}
+              open={expanded.has(thread.id)}
+              history={histories.get(thread.id)}
+              historyLoading={historyLoading.has(thread.id)}
+              onToggle={() => toggle(thread)}
+              onOpenInChat={() => openInChat(thread)}
+              onRename={(title) => handleRename(thread, title)}
+              onDelete={() => handleDelete(thread)}
+              onArchive={() => handleArchive(thread)}
+            />
+          ))}
+        </motion.ul>
+      )}
+      {error && payload && (
+        <p className="px-3 pt-2 text-[0.66rem] text-text-tertiary">
+          Some data may be stale: {error}
+        </p>
+      )}
+
+      {/* Every session in the store (not just the 2 live chat threads) so any
+          session can be archived or permanently deleted from the phone. */}
+      <AllSessionsList search={search} />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// All-sessions list (full store) — archive + delete any session
+// ---------------------------------------------------------------------------
+
+function AllSessionsList({ search }: { search: string }) {
+  const [sessions, setSessions] = useState<ProfileSession[] | null>(null);
+  const [busy, setBusy] = useState<Set<string>>(new Set());
+  const [confirmId, setConfirmId] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/sessions/all?profile=default", {
+        cache: "no-store",
+      });
+      const body = (await res.json()) as { sessions?: ProfileSession[] };
+      setSessions(body.sessions ?? []);
+    } catch {
+      setSessions([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    load();
+  }, [load]);
+
+  const act = useCallback(
+    async (id: string, kind: "archive" | "delete") => {
+      haptic(kind === "delete" ? 12 : 8);
+      setBusy((p) => new Set(p).add(id));
+      setConfirmId(null);
+      // Archive is reversible → optimistic remove. Permanent delete is NOT →
+      // keep the row until the server confirms 200, then drop it.
+      if (kind === "archive") {
+        setSessions((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
+      }
+      try {
+        const res = await fetch(`/api/sessions/${encodeURIComponent(id)}`, {
+          method: kind === "delete" ? "DELETE" : "PATCH",
+          headers:
+            kind === "archive"
+              ? { "Content-Type": "application/json" }
+              : undefined,
+          body: kind === "archive" ? JSON.stringify({ archived: true }) : undefined,
+        });
+        if (kind === "delete") {
+          if (res.ok) {
+            setSessions((prev) => (prev ? prev.filter((s) => s.id !== id) : prev));
+          } else {
+            haptic([8, 6, 12]); // delete failed — row stays put
+          }
+        }
+      } catch {
+        load(); // re-show on failure
+      } finally {
+        setBusy((p) => {
+          const n = new Set(p);
+          n.delete(id);
+          return n;
+        });
+      }
+    },
+    [load],
+  );
+
+  const filtered = useMemo(() => {
+    if (!sessions) return [];
+    const q = search.toLowerCase();
+    return sessions.filter(
+      (s) =>
+        (s.title ?? "").toLowerCase().includes(q) ||
+        (s.model ?? "").toLowerCase().includes(q),
+    );
+  }, [sessions, search]);
+
+  if (sessions === null) return null;
+
+  return (
+    <div className="mt-4 border-t border-border/60 pt-3">
+      <p className="flex items-center justify-between px-1 pb-2 font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
+        <span>all sessions · {sessions.length}</span>
+        <button
+          type="button"
+          onClick={() => {
+            haptic(6);
+            load();
+          }}
+          className="text-text-tertiary transition-colors active:text-midground"
+        >
+          refresh
+        </button>
+      </p>
+      {filtered.length === 0 ? (
+        <p className="px-3 py-6 text-center text-[0.8rem] text-text-tertiary">
+          {search ? "No sessions match your search." : "No sessions."}
+        </p>
+      ) : (
+        <ul className="flex flex-col">
+          {filtered.map((s) => (
+            <li
+              key={s.id}
+              className="flex items-center gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2"
+            >
+              <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-sm)] border border-border text-text-tertiary">
+                <BranchIcon width={14} height={14} />
+              </span>
+              <span className="flex min-w-0 flex-1 flex-col">
+                <span className="truncate text-[0.86rem] font-medium text-midground">
+                  {s.title?.trim() || "untitled session"}
+                </span>
+                <span className="flex items-center gap-1.5 font-mono-ui text-[0.66rem] text-text-tertiary">
+                  {s.model && (
+                    <>
+                      <ModelBadge model={s.model} />
+                      <span className="text-text-disabled">·</span>
+                    </>
+                  )}
+                  <span>{s.messageCount} msgs</span>
+                  {s.lastActive && (
+                    <>
+                      <span className="text-text-disabled">·</span>
+                      <span>
+                        {relativeTime(new Date(s.lastActive).toISOString())}
+                      </span>
+                    </>
+                  )}
+                </span>
+              </span>
+              <button
+                type="button"
+                aria-label="Archive session"
+                disabled={busy.has(s.id)}
+                onClick={() => act(s.id, "archive")}
+                className="shrink-0 rounded-[var(--radius-sm)] px-2 py-1 text-[0.66rem] text-text-tertiary transition-colors active:text-midground disabled:opacity-40"
+              >
+                archive
+              </button>
+              {confirmId === s.id ? (
+                <button
+                  type="button"
+                  aria-label="Confirm permanent delete"
+                  disabled={busy.has(s.id)}
+                  onClick={() => act(s.id, "delete")}
+                  className="shrink-0 rounded-[var(--radius-sm)] border border-[color-mix(in_srgb,var(--color-destructive)_50%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)] px-2 py-1 text-[0.66rem] font-medium text-[color:var(--color-destructive)] disabled:opacity-40"
+                >
+                  confirm?
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  aria-label="Delete session"
+                  disabled={busy.has(s.id)}
+                  onClick={() => {
+                    haptic(8);
+                    setConfirmId(s.id);
+                  }}
+                  className="shrink-0 rounded-[var(--radius-sm)] px-2 py-1 text-[0.66rem] text-text-tertiary transition-colors active:text-[color:var(--color-destructive)] disabled:opacity-40"
+                >
+                  delete
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Read-only cross-profile session list
+// ---------------------------------------------------------------------------
+
+function ProfileSessions({ profile, search }: { profile: string; search: string }) {
+  const [sessions, setSessions] = useState<ProfileSession[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let live = true;
+    setSessions(null);
+    setError(null);
+    setOpenId(null);
+    fetch(`/api/sessions/all?profile=${encodeURIComponent(profile)}`, { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ sessions?: ProfileSession[]; error?: string }>)
+      .then((j) => {
+        if (!live) return;
+        setSessions(j.sessions ?? []);
+        setError(j.error ?? null);
+      })
+      .catch(() => live && setError("request failed"));
+    return () => {
+      live = false;
+    };
+  }, [profile]);
+
+  const filtered = useMemo(() => {
+    if (!sessions) return [];
+    const q = search.toLowerCase();
+    return sessions.filter(
+      (s) =>
+        (s.title ?? "").toLowerCase().includes(q) ||
+        (s.model ?? "").toLowerCase().includes(q),
+    );
+  }, [sessions, search]);
+
+  if (sessions === null && !error) {
+    return (
+      <div className="px-2 pt-1">
+        <Skeleton />
+      </div>
+    );
+  }
+
+  return (
+    <div className="px-2 pt-1">
+      <p className="px-1 pb-2 font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
+        read-only · {profile} profile history
+      </p>
+      {filtered.length === 0 ? (
+        <p className="px-3 py-10 text-center text-sm text-text-tertiary">
+          {search ? "No sessions match your search." : "No sessions in this profile."}
+        </p>
+      ) : (
+        <ul className="flex flex-col">
+          {filtered.map((s) => (
+            <ProfileSessionRow
+              key={s.id}
+              profile={profile}
+              session={s}
+              open={openId === s.id}
+              onToggle={() => {
+                haptic(6);
+                setOpenId((cur) => (cur === s.id ? null : s.id));
+              }}
+            />
+          ))}
+        </ul>
+      )}
+      {error && (
+        <p className="px-3 pt-2 text-[0.66rem] text-text-tertiary">{error}</p>
+      )}
+    </div>
+  );
+}
+
+function ProfileSessionRow({
+  profile,
+  session,
+  open,
+  onToggle,
+}: {
+  profile: string;
+  session: ProfileSession;
+  open: boolean;
+  onToggle: () => void;
+}) {
+  const [history, setHistory] = useState<ChatMessage[] | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!open || history !== null) return;
+    let live = true;
+    setLoading(true);
+    fetch(
+      `/api/sessions/transcript?profile=${encodeURIComponent(profile)}&id=${encodeURIComponent(session.id)}`,
+      { cache: "no-store" },
+    )
+      .then((r) => r.json() as Promise<{ messages?: ChatMessage[] }>)
+      .then((j) => live && setHistory(j.messages ?? []))
+      .catch(() => live && setHistory([]))
+      .finally(() => live && setLoading(false));
+    return () => {
+      live = false;
+    };
+  }, [open, history, profile, session.id]);
+
+  const title = session.title?.trim() || "untitled session";
+  return (
+    <li>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-expanded={open}
+        className="flex w-full items-center gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2.5 text-left transition-colors active:bg-[color-mix(in_srgb,var(--midground)_5%,transparent)]"
+      >
+        <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-sm)] border border-border text-text-tertiary">
+          <BranchIcon width={15} height={15} />
+        </span>
+        <span className="flex min-w-0 flex-1 flex-col">
+          <span className="truncate text-[0.92rem] font-medium text-midground">{title}</span>
+          <span className="flex items-center gap-1.5 font-mono-ui text-[0.68rem] text-text-tertiary">
+            {session.model && (
+              <>
+                <ModelBadge model={session.model} />
+                <span className="text-text-disabled">·</span>
+              </>
+            )}
+            <span>{session.messageCount} msgs</span>
+            {session.lastActive && (
+              <>
+                <span className="text-text-disabled">·</span>
+                <span>{relativeTime(new Date(session.lastActive).toISOString())}</span>
+              </>
+            )}
+          </span>
+        </span>
+        <ChevronRightIcon
+          width={14}
+          height={14}
+          className={cn(
+            "shrink-0 text-text-tertiary transition-transform duration-200",
+            open && "rotate-90",
+          )}
+        />
+      </button>
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="ml-9 border-l border-border pl-3 pb-2">
+              {loading ? (
+                <div className="flex items-center gap-2 py-2">
+                  <span className="h-2 w-2 animate-pulse rounded-full bg-text-tertiary" />
+                  <span className="text-[0.72rem] text-text-tertiary">Loading history…</span>
+                </div>
+              ) : history && history.length > 0 ? (
+                <div className="flex flex-col gap-1">
+                  {history.slice(-8).map((msg) => (
+                    <div
+                      key={msg.id}
+                      className={cn(
+                        "rounded-[var(--radius-sm)] px-2 py-1 text-[0.76rem] leading-relaxed",
+                        msg.role === "user"
+                          ? "bg-[color-mix(in_srgb,var(--midground)_6%,transparent)] text-text-secondary"
+                          : "text-text-tertiary",
+                      )}
+                    >
+                      <span className="font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-disabled">
+                        {msg.role}
+                      </span>
+                      <p className="line-clamp-3">{msg.text}</p>
+                    </div>
+                  ))}
+                  {history.length > 8 && (
+                    <p className="text-[0.68rem] text-text-tertiary">
+                      +{history.length - 8} earlier messages
+                    </p>
+                  )}
+                </div>
+              ) : (
+                <p className="py-1 text-[0.72rem] text-text-tertiary">No messages.</p>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </li>
   );
 }
 
@@ -244,7 +800,7 @@ function Header({
         <img
           src="/nous-logo.svg"
           alt=""
-          className="h-full w-full object-cover opacity-95"
+          className="h-full w-full object-contain p-1 opacity-95"
         />
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
@@ -328,8 +884,10 @@ function SessionRow({
   history,
   historyLoading,
   onToggle,
+  onOpenInChat,
   onRename,
   onDelete,
+  onArchive,
 }: {
   thread: ChatThread;
   index: number;
@@ -337,8 +895,10 @@ function SessionRow({
   history: ChatMessage[] | undefined;
   historyLoading: boolean;
   onToggle: () => void;
+  onOpenInChat: () => void;
   onRename: (title: string) => void;
   onDelete: () => void;
+  onArchive: () => void;
 }) {
   const isGeneral = !thread.repo;
   const [renaming, setRenaming] = useState(false);
@@ -428,6 +988,15 @@ function SessionRow({
             className="overflow-hidden"
           >
             <div className="ml-9 border-l border-border pl-3 pb-2">
+              {/* Primary action: jump into this session in the Chat tab. */}
+              <button
+                type="button"
+                onClick={onOpenInChat}
+                className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-md)] bg-midground px-3 py-2 text-[0.78rem] font-medium text-background-base transition-transform active:scale-[0.98]"
+              >
+                Open in chat
+                <ChevronRightIcon width={13} height={13} />
+              </button>
               {historyLoading ? (
                 <div className="flex items-center gap-2 py-2">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-text-tertiary" />
@@ -534,6 +1103,13 @@ function SessionRow({
                         className="rounded-[var(--radius-sm)] px-2 py-1 text-[0.7rem] text-text-tertiary transition-colors hover:text-midground"
                       >
                         rename
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { haptic(6); onArchive(); }}
+                        className="rounded-[var(--radius-sm)] px-2 py-1 text-[0.7rem] text-text-tertiary transition-colors hover:text-midground"
+                      >
+                        archive
                       </button>
                       <button
                         type="button"

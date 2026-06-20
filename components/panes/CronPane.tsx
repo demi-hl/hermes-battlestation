@@ -143,7 +143,7 @@ function TriggerButton({ job }: { job: CronJob }) {
       disabled={running || !job.enabled}
       title="Trigger now"
       className={cn(
-        "grid h-7 w-7 shrink-0 place-items-center rounded-full transition-colors",
+        "grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors",
         "text-text-tertiary hover:text-midground active:scale-90",
         running && "animate-spin-slow text-[var(--color-info,#7dd3fc)]",
         (!job.enabled || running) && "opacity-40",

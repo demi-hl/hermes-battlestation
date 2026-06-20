@@ -57,7 +57,7 @@ export const FLEET: FleetNode[] = [
   },
   {
     key: "pc2",
-    display: "PC2 (David's)",
+    display: "PC2 (Yours)",
     os: "windows",
     match: env("FLEET_PC2_MATCH"),
     ssh: env("FLEET_PC2_SSH"),

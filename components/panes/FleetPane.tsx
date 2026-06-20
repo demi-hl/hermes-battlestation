@@ -6,6 +6,7 @@ import { usePolling } from "@/components/usePolling";
 import { resolveLane, type FleetAgent } from "@/lib/fleet/types";
 import { FleetHealthStrip } from "./fleet/FleetHealthStrip";
 import { AgentBoard } from "./fleet/AgentBoard";
+import { PullToRefresh } from "./parts";
 
 /** Fleet pane: compact fleet health summary + live agent kanban board.
  *  Agents fetched from /api/fleet/agents and lane-resolved (done requires
@@ -16,6 +17,7 @@ export function FleetPane() {
     loading,
     error,
     updatedAt,
+    reload,
   } = usePolling<FleetAgent[]>("/api/fleet/agents", 5_000);
 
   /* HARD RULE: enforce that `done` requires a real commit sha. */
@@ -25,6 +27,7 @@ export function FleetPane() {
   );
 
   return (
+    <PullToRefresh onRefresh={reload}>
     <motion.div
       initial={{ opacity: 0, y: 6 }}
       animate={{ opacity: 1, y: 0 }}
@@ -67,5 +70,6 @@ export function FleetPane() {
         )}
       </div>
     </motion.div>
+    </PullToRefresh>
   );
 }

@@ -17,12 +17,14 @@ export interface ChatRepo {
  *  (title `lol-<slug>`) plus the "general" thread (cwd = home). */
 export interface ChatThread {
   /** Stable thread id. "general" for the home thread, else the session title
-   *  `lol-<slug>`. */
+   *  `lol-<slug>` (repo) or `lol-<slug>__<branchslug>` (a specific branch). */
   id: string;
   /** Display title, e.g. the repo name or "general". */
   title: string;
   /** Repo binding (null for general). */
   repo: string | null;
+  /** Branch this thread is bound to (null = repo's base/primary checkout). */
+  branch?: string | null;
   /** Absolute cwd the bound session runs in. */
   cwd: string;
   /** Hermes session title `lol-<slug>` (or "general-locals-only"). */
@@ -102,13 +104,30 @@ export type ChatStreamEvent =
 export interface SendRequest {
   /** Repo name to bind (must match a server-side known repo), or "general". */
   repo: string;
+  /** Branch to run the turn against (null/omitted = repo base checkout). When
+   *  set, the session + cwd resolve to that branch's worktree. */
+  branch?: string | null;
   message: string;
   /** Skills to preload for this turn (hermes `-s`). */
   skills?: string[];
+  /** Profile to run this turn under (hermes `-p`), e.g. "macbook-sonnet".
+   *  This is the real brain selector: model + system prompt + toolset + .env. */
+  profile?: string;
   /** Model id for this turn (hermes `-m`), e.g. "claude-opus-4-8". */
   model?: string;
   /** Inference provider for this turn (hermes `--provider`). */
   provider?: string;
+  /** Image attachments for this turn. Each is a base64 data URL (or raw
+   *  base64) + mime type; the ACP bridge forwards them as image content blocks
+   *  so vision models can see pasted/attached photos. */
+  images?: ChatImage[];
+}
+
+/** One image attachment carried with a chat turn. `data` is a data URL
+ *  (`data:image/png;base64,...`) or raw base64; `mime` is the content type. */
+export interface ChatImage {
+  data: string;
+  mime: string;
 }
 
 // --- Agent-inline-edit contract (owned here; slice 3 renders against it) ------

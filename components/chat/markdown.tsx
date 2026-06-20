@@ -48,9 +48,25 @@ function splitFences(text: string): Block[] {
 }
 
 function renderProse(prose: string): ReactNode {
+  // Collapse 3+ blank lines to a single paragraph break, then split into
+  // paragraph groups on blank lines so spacing is consistent (one gap between
+  // paragraphs, not a gap per newline). Within a group, single newlines become
+  // soft line breaks so multi-line sentences stay together visually.
   const lines = prose.replace(/\n{3,}/g, "\n\n").split("\n");
   const nodes: ReactNode[] = [];
   let list: { ordered: boolean; items: string[] } | null = null;
+  let para: string[] = [];
+
+  const flushPara = (key: string) => {
+    if (!para.length) return;
+    const joined = para.join("\n");
+    nodes.push(
+      <p key={key} className="whitespace-pre-wrap break-words">
+        {inline(joined)}
+      </p>,
+    );
+    para = [];
+  };
 
   const flushList = (key: string) => {
     if (!list) return;
@@ -59,7 +75,7 @@ function renderProse(prose: string): ReactNode {
       L.ordered ? (
         <ol key={key} className="ml-4 list-decimal space-y-1 marker:text-text-tertiary">
           {L.items.map((it, i) => (
-            <li key={i}>{inline(it)}</li>
+            <li key={i} className="break-words pl-1">{inline(it)}</li>
           ))}
         </ol>
       ) : (
@@ -67,7 +83,7 @@ function renderProse(prose: string): ReactNode {
           {L.items.map((it, i) => (
             <li key={i} className="flex gap-2">
               <span className="mt-[0.5em] h-1 w-1 shrink-0 rounded-full bg-text-tertiary" />
-              <span>{inline(it)}</span>
+              <span className="min-w-0 break-words">{inline(it)}</span>
             </li>
           ))}
         </ul>
@@ -83,12 +99,14 @@ function renderProse(prose: string): ReactNode {
     const heading = line.match(/^(#{1,4})\s+(.*)$/);
 
     if (bullet) {
+      flushPara(`p${i}`);
       if (!list || list.ordered) flushList(`l${i}`);
       list = list ?? { ordered: false, items: [] };
       list.items.push(bullet[1]);
       return;
     }
     if (numbered) {
+      flushPara(`p${i}`);
       if (!list || !list.ordered) flushList(`l${i}`);
       list = list ?? { ordered: true, items: [] };
       list.items.push(numbered[1]);
@@ -97,6 +115,7 @@ function renderProse(prose: string): ReactNode {
     flushList(`l${i}`);
 
     if (heading) {
+      flushPara(`p${i}`);
       nodes.push(
         <p
           key={i}
@@ -107,17 +126,24 @@ function renderProse(prose: string): ReactNode {
       );
       return;
     }
-    if (!line.trim()) return;
-    nodes.push(<p key={i}>{inline(line)}</p>);
+    // Blank line = paragraph boundary; otherwise accumulate into the paragraph.
+    if (!line.trim()) {
+      flushPara(`p${i}`);
+      return;
+    }
+    para.push(line);
   });
   flushList("lend");
+  flushPara("pend");
   return <>{nodes}</>;
 }
 
-// Inline: `code`, **bold**.
+// Inline: `code`, **bold**, *italic*, [text](url). Order matters — code first
+// so backtick contents are never re-parsed as bold/italic/links.
 function inline(text: string): ReactNode {
   const parts: ReactNode[] = [];
-  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)/g;
+  const re =
+    /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*\n]+\*)|(\[[^\]]+\]\((?:https?:\/\/|\/)[^)\s]+\))/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let k = 0;
@@ -133,11 +159,35 @@ function inline(text: string): ReactNode {
           {tok.slice(1, -1)}
         </code>,
       );
-    } else {
+    } else if (tok.startsWith("**")) {
       parts.push(
         <strong key={k++} className="font-semibold text-midground">
           {tok.slice(2, -2)}
         </strong>,
+      );
+    } else if (tok.startsWith("[")) {
+      const lm = tok.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
+      if (lm) {
+        parts.push(
+          <a
+            key={k++}
+            href={lm[2]}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-midground underline decoration-text-tertiary underline-offset-2 break-all"
+          >
+            {lm[1]}
+          </a>,
+        );
+      } else {
+        parts.push(tok);
+      }
+    } else {
+      // *italic*
+      parts.push(
+        <em key={k++} className="italic">
+          {tok.slice(1, -1)}
+        </em>,
       );
     }
     last = re.lastIndex;

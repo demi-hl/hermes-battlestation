@@ -4,7 +4,9 @@ import { useState } from "react";
 import { motion } from "framer-motion";
 import {
   PRIMARY_TABS,
-  SECONDARY_TABS,
+  ALL_TABS,
+  PRIMARY_TAB_IDS,
+  HIDDEN_FROM_MORE,
   type TabDef,
   type TabId,
 } from "./tabs";
@@ -14,10 +16,11 @@ import { haptic } from "./haptics";
 import { cn } from "@/lib/utils";
 
 /**
- * Bottom tab bar (mobile nav). Renders the primary tabs plus a "More" entry
- * that opens a sheet for the rest. Active tab uses the theme's midground accent
- * with a shared-layout sliding indicator. Frosted, safe-area aware, haptic on
- * tap.
+ * Bottom tab bar (mobile nav). Renders a FIXED primary set (PRIMARY_TAB_IDS)
+ * plus a "More" entry that opens a sheet for the rest. Active tab uses the
+ * theme's midground accent with a shared-layout sliding indicator. Frosted,
+ * safe-area aware, haptic on tap. The bar is not user-customizable — to change
+ * what's pinned, edit PRIMARY_TAB_IDS in tabs.tsx.
  */
 export function BottomTabBar({
   activeTab,
@@ -27,7 +30,11 @@ export function BottomTabBar({
   onSelect: (id: TabId) => void;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
-  const moreActive = SECONDARY_TABS.some((t) => t.id === activeTab);
+
+  const moreTabs: TabDef[] = ALL_TABS.filter(
+    (t) => !PRIMARY_TAB_IDS.includes(t.id) && !HIDDEN_FROM_MORE.includes(t.id),
+  );
+  const moreActive = moreTabs.some((t) => t.id === activeTab);
 
   const select = (id: TabId) => {
     haptic(10);
@@ -39,13 +46,13 @@ export function BottomTabBar({
       aria-label="Primary"
       className="border-t border-border"
       style={{
-        background: "color-mix(in srgb, var(--background-base) 72%, transparent)",
+        background: "color-mix(in srgb, var(--background-base) 44%, transparent)",
         backdropFilter: "blur(22px) saturate(160%)",
         WebkitBackdropFilter: "blur(22px) saturate(160%)",
-        paddingBottom: "env(safe-area-inset-bottom)",
+        paddingBottom: "max(6px, calc(env(safe-area-inset-bottom) - 10px))",
       }}
     >
-      <ul className="flex h-[58px] items-stretch">
+      <ul className="flex h-[54px] items-stretch">
         {PRIMARY_TABS.map((tab) => (
           <TabButton
             key={tab.id}
@@ -71,7 +78,7 @@ export function BottomTabBar({
           >
             {moreActive && <ActiveIndicator />}
             <MoreIcon width={21} height={21} />
-            <span className="font-mono-ui text-[0.58rem] tracking-wide">
+            <span className="font-mono-ui text-[0.64rem] tracking-wide">
               More
             </span>
           </button>
@@ -80,7 +87,7 @@ export function BottomTabBar({
 
       <Sheet open={moreOpen} onClose={() => setMoreOpen(false)} title="More">
         <div className="grid grid-cols-3 gap-2 p-1.5">
-          {SECONDARY_TABS.map((tab) => {
+          {moreTabs.map((tab) => {
             const active = tab.id === activeTab;
             return (
               <button
@@ -140,7 +147,7 @@ function TabButton({
         >
           <tab.Icon width={21} height={21} />
         </motion.span>
-        <span className="relative z-[1] font-mono-ui text-[0.58rem] tracking-wide">
+        <span className="relative z-[1] font-mono-ui text-[0.64rem] tracking-wide">
           {tab.shortLabel}
         </span>
       </button>

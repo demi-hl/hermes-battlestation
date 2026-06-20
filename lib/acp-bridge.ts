@@ -6,10 +6,12 @@
 // its live `session/update` notifications — token-by-token text, reasoning, and
 // tool-call activity — straight to the browser.
 //
-// One adapter process is spawned per Node server and kept warm. Sessions are
-// multiplexed over it: each repo gets one ACP session (cwd = repo path), and
-// the adapter persists sessions to ~/.hermes/state.db so they survive a server
-// restart (we re-`session/load` lazily on the first turn after a cold start).
+// One adapter process is spawned PER PROFILE and kept warm. The spawn is
+// `hermes -p <profile> acp --accept-hooks`, so switching profile in the app
+// actually changes which brain (model + system prompt + toolset + .env) runs
+// the turn. Sessions are multiplexed over each adapter: each repo gets one ACP
+// session (cwd = repo path), persisted to a per-profile map so they survive a
+// server restart and never collide across profiles.
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
@@ -17,7 +19,6 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 
 const HOME = process.env.HOME ?? homedir();
-const MAP_PATH = join(HOME, ".hermes", "lo-acp-sessions.json");
 
 /** A streamed turn event, normalized from ACP `session/update`. */
 export type AcpTurnEvent =
@@ -30,12 +31,30 @@ export type AcpTurnEvent =
   | { kind: "done"; stopReason: string }
   | { kind: "error"; error: string };
 
+/** Which brain runs the turn. Profile is the lever; model/provider are
+ *  optional per-invocation overrides (`-m` / `--provider`). */
+export interface BridgeTarget {
+  profile: string;
+  model?: string;
+  provider?: string;
+}
+
 type Pending = {
   resolve: (v: unknown) => void;
   reject: (e: Error) => void;
 };
 
 type ToolKind = { name: string; title: string };
+
+/** Stable registry key for a (profile, model, provider) combo. */
+function targetKey(t: BridgeTarget): string {
+  return [t.profile || "default", t.model ?? "", t.provider ?? ""].join("|");
+}
+
+/** Filesystem-safe slug for the per-target session map file. */
+function targetSlug(t: BridgeTarget): string {
+  return targetKey(t).replace(/[^a-zA-Z0-9._-]/g, "_");
+}
 
 class AcpBridge {
   private child: ChildProcessWithoutNullStreams | null = null;
@@ -44,25 +63,36 @@ class AcpBridge {
   private pending = new Map<number, Pending>();
   private ready: Promise<void> | null = null;
 
+  private readonly target: BridgeTarget;
+  private readonly mapPath: string;
+
   // repo -> ACP session id (persisted across restarts).
   private repoSession = new Map<string, string>();
   // sessions we've created/loaded in THIS process (no reload needed).
   private liveSessions = new Set<string>();
 
   // The single in-flight turn's event sink. ACP gives no per-request session
-  // tagging on notifications, and we serialize turns globally (single user),
-  // so one active sink at a time is correct.
+  // tagging on notifications, and we serialize turns per adapter, so one active
+  // sink at a time is correct.
   private sink: ((ev: AcpTurnEvent) => void) | null = null;
   private sinkSession: string | null = null;
   private toolKinds = new Map<string, ToolKind>();
 
-  constructor() {
+  constructor(target: BridgeTarget) {
+    this.target = target;
+    // Default profile with no override keeps the legacy map path so existing
+    // general/repo sessions carry over. Everything else is namespaced.
+    const isLegacy =
+      (target.profile || "default") === "default" && !target.model && !target.provider;
+    this.mapPath = isLegacy
+      ? join(HOME, ".hermes", "lo-acp-sessions.json")
+      : join(HOME, ".hermes", `lo-acp-sessions__${targetSlug(target)}.json`);
     this.loadMap();
   }
 
   private loadMap() {
     try {
-      const raw = readFileSync(MAP_PATH, "utf8");
+      const raw = readFileSync(this.mapPath, "utf8");
       const obj = JSON.parse(raw) as Record<string, string>;
       for (const [k, v] of Object.entries(obj)) this.repoSession.set(k, v);
     } catch {
@@ -75,17 +105,26 @@ class AcpBridge {
       mkdirSync(join(HOME, ".hermes"), { recursive: true });
       const obj: Record<string, string> = {};
       for (const [k, v] of this.repoSession) obj[k] = v;
-      writeFileSync(MAP_PATH, JSON.stringify(obj));
+      writeFileSync(this.mapPath, JSON.stringify(obj));
     } catch {
       /* best-effort */
     }
+  }
+
+  /** `hermes -p <profile> [-m <model>] [--provider <prov>] acp --accept-hooks` */
+  private spawnArgs(): string[] {
+    const args = ["-p", this.target.profile || "default"];
+    if (this.target.model) args.push("-m", this.target.model);
+    if (this.target.provider) args.push("--provider", this.target.provider);
+    args.push("acp", "--accept-hooks");
+    return args;
   }
 
   private ensureProc(): Promise<void> {
     if (this.ready) return this.ready;
     this.ready = new Promise<void>((resolve, reject) => {
       const bin = process.env.HERMES_BIN || "hermes";
-      const child = spawn(bin, ["acp", "--accept-hooks"], {
+      const child = spawn(bin, this.spawnArgs(), {
         cwd: HOME,
         env: {
           ...process.env,
@@ -258,9 +297,23 @@ class AcpBridge {
     cwd: string,
     text: string,
     onEvent: (ev: AcpTurnEvent) => void,
+    images: { data: string; mime: string }[] = [],
   ): Promise<void> {
     await this.ensureProc();
     let { id, isNew } = await this.resolveSession(repo, cwd);
+
+    // Build the ACP prompt content blocks: the text turn plus any image
+    // attachments as image content blocks (the adapter forwards these to the
+    // model as image_url parts so vision models can see pasted photos). `data`
+    // is sent as raw base64 — strip the data-URL prefix if present.
+    const promptBlocks: Record<string, unknown>[] = [{ type: "text", text }];
+    for (const img of images) {
+      const raw = img.data.startsWith("data:")
+        ? img.data.slice(img.data.indexOf(",") + 1)
+        : img.data;
+      if (!raw) continue;
+      promptBlocks.push({ type: "image", data: raw, mimeType: img.mime || "image/png" });
+    }
 
     for (let attempt = 0; attempt < 2; attempt++) {
       this.sink = onEvent;
@@ -284,7 +337,7 @@ class AcpBridge {
       try {
         const res = (await this.rpc("session/prompt", {
           sessionId: id,
-          prompt: [{ type: "text", text }],
+          prompt: promptBlocks,
         })) as { stopReason?: string };
         stopReason = res?.stopReason ?? "end_turn";
       } catch (e) {
@@ -328,6 +381,25 @@ class AcpBridge {
     this.liveSessions.delete(id);
   }
 
+  /** Tear down the adapter process so the next turn respawns it fresh. Used
+   *  when a global setting the adapter reads at boot changes (e.g. reasoning
+   *  effort in config.yaml) — the warm process would otherwise keep the old
+   *  value for the life of the server. Session ids are persisted to disk, so
+   *  they survive the respawn (cold session/load on next turn). */
+  kill(): void {
+    const child = this.child;
+    this.child = null;
+    this.ready = null;
+    this.liveSessions.clear();
+    if (child) {
+      try {
+        child.kill("SIGTERM");
+      } catch {
+        /* already gone */
+      }
+    }
+  }
+
   /** Cancel the in-flight turn for a repo's session. */
   async cancel(repo: string): Promise<void> {
     const id = this.repoSession.get(repo);
@@ -338,15 +410,86 @@ class AcpBridge {
       /* best-effort */
     }
   }
+
+  /**
+   * Public cancel entry point for the stop-turn route. Fires the existing
+   * session/cancel RPC for this repo's session (best-effort, swallows errors).
+   * Returns true when a session id was known for the repo (i.e. a cancel was
+   * attempted), false when there was nothing to cancel on this bridge.
+   */
+  async cancelByRepo(repo: string): Promise<boolean> {
+    const id = this.repoSession.get(repo);
+    if (!id) return false;
+    await this.cancel(repo);
+    return true;
+  }
 }
 
-// Module singleton — survives across requests within the Node server process.
+// Module singleton registry — one warm bridge per (profile, model, provider),
+// surviving across requests within the Node server process.
 declare global {
    
-  var __loAcpBridge: AcpBridge | undefined;
+  var __loAcpBridges: Map<string, AcpBridge> | undefined;
 }
 
-export function acpBridge(): AcpBridge {
-  if (!global.__loAcpBridge) global.__loAcpBridge = new AcpBridge();
-  return global.__loAcpBridge;
+export function acpBridge(target: BridgeTarget = { profile: "default" }): AcpBridge {
+  if (!global.__loAcpBridges) global.__loAcpBridges = new Map<string, AcpBridge>();
+  const key = targetKey(target);
+  let bridge = global.__loAcpBridges.get(key);
+  if (!bridge) {
+    bridge = new AcpBridge(target);
+    global.__loAcpBridges.set(key, bridge);
+  }
+  return bridge;
+}
+
+/**
+ * Cancel a repo's in-flight turn across EVERY warm bridge. The mobile client
+ * only knows the repo, not which (profile, model, provider) bridge actually ran
+ * the turn, so we fan the cancel out to all live bridges in the registry and
+ * let each one no-op when it has no session for that repo. Best-effort: errors
+ * are swallowed per bridge so one bad bridge cannot block the others. Returns
+ * the number of bridges that had a session for the repo and were asked to
+ * cancel (0 when nothing was in flight anywhere).
+ */
+export async function cancelAllForRepo(repo: string): Promise<number> {
+  const registry = global.__loAcpBridges;
+  if (!registry) return 0;
+  let cancelled = 0;
+  const tasks: Promise<void>[] = [];
+  for (const bridge of registry.values()) {
+    tasks.push(
+      (async () => {
+        try {
+          if (await bridge.cancelByRepo(repo)) cancelled += 1;
+        } catch {
+          /* best-effort: never let one bridge break the fan-out */
+        }
+      })(),
+    );
+  }
+  await Promise.all(tasks);
+  return cancelled;
+}
+
+/**
+ * Kill every warm bridge so the next turn respawns each adapter fresh. Call
+ * after changing a global setting the adapter reads only at boot (reasoning
+ * effort, etc.). Returns how many bridges were town down. Session ids persist
+ * to disk, so conversations carry over the respawn.
+ */
+export function resetAllBridges(): number {
+  const registry = global.__loAcpBridges;
+  if (!registry) return 0;
+  let n = 0;
+  for (const bridge of registry.values()) {
+    try {
+      bridge.kill();
+      n += 1;
+    } catch {
+      /* best-effort */
+    }
+  }
+  registry.clear();
+  return n;
 }

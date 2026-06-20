@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { run } from "@/lib/exec";
-import { cached } from "@/lib/cache";
+import { cached, bust } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import {
   type PrsPayload,
@@ -177,6 +177,10 @@ function envelope(payload: PrsPayload): ApiEnvelope<PrsPayload> {
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const path = url.searchParams.get("path");
+  // A manual refresh (refresh=1) drops the relevant cache entries so the next
+  // read recomputes from gh; interval polls keep the 30s cache.
+  const refresh = url.searchParams.get("refresh");
+  if (refresh) bust("gh-login");
 
   // Scoped: one repo by its local path (the active workspace). The path becomes
   // a shell cwd, so it is canonicalized FIRST (resolve collapses any `..`) and
@@ -191,6 +195,7 @@ export async function GET(req: Request) {
         error: "path out of scope",
       });
     }
+    if (refresh) bust(`prs:scoped:${safePath}`);
     const env = await cached(`prs:scoped:${safePath}`, 30_000, async () => {
       const login = await ghLogin();
       const origin = await originOf(safePath);
@@ -224,6 +229,7 @@ export async function GET(req: Request) {
   }
 
   // Roll-up across every owned github repo under the scan roots.
+  if (refresh) bust("prs:all");
   const env = await cached("prs:all", 30_000, async () => {
     const login = await ghLogin();
     if (!login) {

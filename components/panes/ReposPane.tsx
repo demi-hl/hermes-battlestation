@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, motion, useMotionValue, useTransform } from "framer-motion";
 import { useWorkspace } from "@/components/shell/workspace-context";
+import type { TabId } from "@/components/shell/tabs";
 import { haptic } from "@/components/shell/haptics";
 import { cn } from "@/lib/utils";
 import { Sheet } from "@/components/shell/Sheet";
@@ -13,6 +14,7 @@ import {
   ChevronUpDownIcon,
   AutomationIcon,
   PullRequestIcon,
+  DiffIcon,
 } from "@/components/shell/icons";
 import {
   WorktreeIcon,
@@ -38,7 +40,13 @@ export function ReposPane() {
   const [refreshing, setRefreshing] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [stats, setStats] = useState<Map<string, StatState>>(new Map());
+  // Prune safety per "slug:branch": prunable + reason. Fetched on repo expand.
+  const [pruneStates, setPruneStates] = useState<
+    Map<string, { prunable: boolean; reason: string }>
+  >(new Map());
+  const [pruned, setPruned] = useState<Set<string>>(new Set());
   const [newOpen, setNewOpen] = useState(false);
+  const [newRepo, setNewRepo] = useState<string | null>(null);
   const didAutoExpand = useRef(false);
 
   const load = useCallback(async () => {
@@ -91,11 +99,81 @@ export function ReposPane() {
     [],
   );
 
+  const fetchPruneStates = useCallback(async (slug: string) => {
+    try {
+      const res = await fetch(
+        `/api/workspaces/prune-state?repo=${encodeURIComponent(slug)}`,
+        { cache: "no-store" },
+      );
+      if (!res.ok) return;
+      const body = (await res.json()) as {
+        states?: Record<string, { prunable: boolean; reason: string }>;
+      };
+      if (!body.states) return;
+      setPruneStates((prev) => {
+        const next = new Map(prev);
+        for (const [branch, st] of Object.entries(body.states!)) {
+          next.set(`${slug}:${branch}`, st);
+        }
+        return next;
+      });
+    } catch {
+      /* prune gating just stays unknown → treated as not-prunable */
+    }
+  }, []);
+
   const expandRepo = useCallback(
     (repo: RepoSummary) => {
       for (const ws of repo.workspaces) fetchStat(repo.slug, ws.name);
+      fetchPruneStates(repo.slug);
     },
-    [fetchStat],
+    [fetchStat, fetchPruneStates],
+  );
+
+  // Prune a workspace entry. Safe path first (force=false); on a 409 (refused
+  // because dirty/unmerged) we surface the reason and let the row force-confirm.
+  const prune = useCallback(
+    async (slug: string, branch: string, force: boolean): Promise<{ ok: boolean; reason?: string }> => {
+      try {
+        const res = await fetch("/api/workspaces/prune", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ repo: slug, name: branch, force }),
+        });
+        const body = (await res.json()) as { ok?: boolean; reason?: string; error?: string };
+        if (res.ok && body.ok) {
+          haptic(18);
+          setPruned((prev) => new Set(prev).add(`${slug}:${branch}`));
+          return { ok: true };
+        }
+        return { ok: false, reason: body.reason ?? body.error ?? "prune failed" };
+      } catch (e) {
+        return { ok: false, reason: (e as Error).message };
+      }
+    },
+    [],
+  );
+
+  // Bulk safe-clear: prune every prunable (clean worktree / merged branch)
+  // workspace in a repo at once. Protected rows (base, checked-out, dirty,
+  // unmerged) are skipped — same safety gate as the per-row swipe. Returns the
+  // count cleared so the header can report it.
+  const clearRepo = useCallback(
+    async (repo: RepoSummary): Promise<number> => {
+      const targets = repo.workspaces.filter((ws) => {
+        const ps = pruneStates.get(`${repo.slug}:${ws.name}`);
+        return ps?.prunable && !pruned.has(`${repo.slug}:${ws.name}`);
+      });
+      if (targets.length === 0) return 0;
+      haptic(18);
+      let n = 0;
+      for (const ws of targets) {
+        const r = await prune(repo.slug, ws.name, false);
+        if (r.ok) n++;
+      }
+      return n;
+    },
+    [pruneStates, pruned, prune],
   );
 
   const toggle = useCallback(
@@ -125,12 +203,35 @@ export function ReposPane() {
     expandRepo(target);
   }, [data, active, expandRepo]);
 
+  // Open a repo's session in Chat. localStorage hands off across the pane
+  // remount (mobile unmounts Chat while on Repos); the event covers the
+  // already-mounted case. ChatHub materializes/focuses the repo/branch thread.
+  const openInChat = useCallback(
+    (
+      name: string,
+      path: string | null,
+      branch: string | null,
+      base: string | null,
+    ) => {
+      haptic(12);
+      const payload = { name, path, branch, base };
+      try {
+        localStorage.setItem("lo-pending-repo", JSON.stringify(payload));
+      } catch {
+        /* private mode / quota; the event path still covers mounted Chat */
+      }
+      window.dispatchEvent(new CustomEvent("lo-open-repo", { detail: payload }));
+      window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "chat" } }));
+    },
+    [],
+  );
+
+  // Tap a branch: open that branch's own session (independent of other branches).
   const select = useCallback(
     (repo: RepoSummary, ws: Workspace) => {
-      haptic(12);
-      setActiveWorkspace({ repo: repo.slug, path: ws.path, branch: ws.name });
+      openInChat(repo.slug, ws.path, ws.name, repo.base);
     },
-    [setActiveWorkspace],
+    [openInChat],
   );
 
   return (
@@ -157,8 +258,16 @@ export function ReposPane() {
                 open={expanded.has(repo.slug)}
                 active={active}
                 stats={stats}
+                pruneStates={pruneStates}
+                pruned={pruned}
                 onToggle={() => toggle(repo)}
+                onNewBranch={() => {
+                  setNewRepo(repo.slug);
+                  setNewOpen(true);
+                }}
                 onSelect={(ws) => select(repo, ws)}
+                onPrune={(branch, force) => prune(repo.slug, branch, force)}
+                onClearRepo={() => clearRepo(repo)}
               />
             ))}
           </motion.ul>
@@ -172,13 +281,18 @@ export function ReposPane() {
 
       <NewWorkspaceSheet
         open={newOpen}
-        onClose={() => setNewOpen(false)}
+        onClose={() => {
+          setNewOpen(false);
+          setNewRepo(null);
+        }}
         repos={data?.repos ?? []}
-        defaultRepo={active?.repo ?? data?.repos[0]?.slug ?? null}
+        defaultRepo={newRepo ?? active?.repo ?? data?.repos[0]?.slug ?? null}
         onCreated={async (slug, branch, wtPath) => {
           await load();
           setExpanded((prev) => new Set(prev).add(slug));
+          const base = data?.repos.find((r) => r.slug === slug)?.base ?? null;
           setActiveWorkspace({ repo: slug, path: wtPath, branch });
+          openInChat(slug, wtPath, branch, base);
         }}
       />
     </div>
@@ -204,7 +318,7 @@ function IdentityHeader({
         <img
           src="/nous-logo.svg"
           alt=""
-          className="h-full w-full object-cover opacity-95"
+          className="h-full w-full object-contain p-1 opacity-95"
         />
       </span>
       <div className="flex min-w-0 flex-1 flex-col">
@@ -232,11 +346,25 @@ function IdentityHeader({
 }
 
 function NavRow({ onNewWorkspace }: { onNewWorkspace: () => void }) {
+  // Jump to another primary surface. AppShell listens for `lo-nav` and switches
+  // the active tab — so these rows act as in-page links, not dead labels.
+  const go = (tab: TabId) => {
+    haptic(8);
+    window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab } }));
+  };
   return (
     <div className="border-y border-border px-2 py-1">
       <NavItem icon={<ReposIcon width={16} height={16} />} label="Workspaces" active />
-      <NavItem icon={<AutomationIcon width={16} height={16} />} label="Automations" hint="tab" />
-      <NavItem icon={<PullRequestIcon width={16} height={16} />} label="Tasks & PRs" hint="tab" />
+      <NavItem
+        icon={<PullRequestIcon width={16} height={16} />}
+        label="Tasks & PRs"
+        onClick={() => go("prs")}
+      />
+      <NavItem
+        icon={<DiffIcon width={16} height={16} />}
+        label="Diff"
+        onClick={() => go("diff")}
+      />
       <button
         type="button"
         onClick={() => {
@@ -257,32 +385,43 @@ function NavItem({
   icon,
   label,
   active,
-  hint,
+  onClick,
 }: {
   icon: ReactNode;
   label: string;
   active?: boolean;
-  hint?: string;
+  onClick?: () => void;
 }) {
+  const inner = (
+    <>
+      <span className={active ? "text-midground" : "text-text-tertiary"}>{icon}</span>
+      <span className="text-[0.84rem]">{label}</span>
+      {active ? (
+        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-midground" />
+      ) : (
+        <ChevronRightIcon width={14} height={14} className="ml-auto text-text-tertiary" />
+      )}
+    </>
+  );
+  if (onClick) {
+    return (
+      <button
+        type="button"
+        onClick={onClick}
+        className="flex w-full items-center gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2 text-left text-text-secondary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_6%,transparent)]"
+      >
+        {inner}
+      </button>
+    );
+  }
   return (
     <div
       className={cn(
         "flex items-center gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2",
-        active
-          ? "text-midground"
-          : "text-text-secondary",
+        active ? "text-midground" : "text-text-secondary",
       )}
     >
-      <span className={active ? "text-midground" : "text-text-tertiary"}>{icon}</span>
-      <span className="text-[0.84rem]">{label}</span>
-      {active && (
-        <span className="ml-auto h-1.5 w-1.5 rounded-full bg-midground" />
-      )}
-      {hint && (
-        <span className="ml-auto font-mono-ui text-[0.56rem] uppercase tracking-[0.14em] text-text-disabled">
-          {hint}
-        </span>
-      )}
+      {inner}
     </div>
   );
 }
@@ -316,56 +455,93 @@ function RepoRow({
   open,
   active,
   stats,
+  pruneStates,
+  pruned,
   onToggle,
+  onNewBranch,
   onSelect,
+  onPrune,
+  onClearRepo,
 }: {
   repo: RepoSummary;
   index: number;
   open: boolean;
   active: { repo: string; branch: string } | null;
   stats: Map<string, StatState>;
+  pruneStates: Map<string, { prunable: boolean; reason: string }>;
+  pruned: Set<string>;
   onToggle: () => void;
+  onNewBranch: () => void;
   onSelect: (ws: Workspace) => void;
+  onPrune: (branch: string, force: boolean) => Promise<{ ok: boolean; reason?: string }>;
+  onClearRepo: () => Promise<number>;
 }) {
   const tint = tintFor(repo.slug);
   return (
     <li>
-      <motion.button
-        type="button"
-        onClick={onToggle}
-        aria-expanded={open}
+      <motion.div
         initial={{ opacity: 0, y: 6 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, delay: Math.min(index * 0.025, 0.3), ease: [0.16, 1, 0.3, 1] }}
-        className="flex w-full items-center gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2.5 text-left transition-colors active:bg-[color-mix(in_srgb,var(--midground)_5%,transparent)]"
+        className="flex w-full items-center gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2.5"
       >
-        <span
-          className="grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-sm)] font-mono-ui text-[0.62rem] font-bold tracking-tight"
-          style={{
-            color: tint,
-            background: `color-mix(in srgb, ${tint} 16%, transparent)`,
-            border: `1px solid color-mix(in srgb, ${tint} 30%, transparent)`,
-          }}
+        {/* Name zone: tap to expand/collapse this repo's branch list. To open
+            a session, tap a specific branch row below. */}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-label={open ? `Collapse ${repo.slug}` : `Expand ${repo.slug}`}
+          className="flex min-w-0 flex-1 items-center gap-2.5 rounded-[var(--radius-md)] text-left transition-colors active:bg-[color-mix(in_srgb,var(--midground)_5%,transparent)]"
         >
-          {monogram(repo.slug)}
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[0.92rem] font-medium text-midground">
-            {repo.slug}
+          <span
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-sm)] font-mono-ui text-[0.62rem] font-bold tracking-tight"
+            style={{
+              color: tint,
+              background: `color-mix(in srgb, ${tint} 16%, transparent)`,
+              border: `1px solid color-mix(in srgb, ${tint} 30%, transparent)`,
+            }}
+          >
+            {monogram(repo.slug)}
           </span>
-        </span>
-        <span className="shrink-0 font-mono-ui tabular text-[0.72rem] text-text-tertiary">
-          {repo.workspaces.length}
-        </span>
-        <ChevronRightIcon
-          width={14}
-          height={14}
-          className={cn(
-            "shrink-0 text-text-tertiary transition-transform duration-200",
-            open && "rotate-90",
-          )}
-        />
-      </motion.button>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-[0.92rem] font-medium text-midground">
+              {repo.slug}
+            </span>
+          </span>
+        </button>
+
+        {/* New branch / worktree for this repo. */}
+        <button
+          type="button"
+          onClick={onNewBranch}
+          aria-label={`New branch in ${repo.slug}`}
+          className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] active:text-midground"
+        >
+          <PlusIcon width={14} height={14} />
+        </button>
+
+        {/* Expand / collapse the branch list. */}
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={open}
+          aria-label={open ? "Collapse branches" : "Show branches"}
+          className="flex shrink-0 items-center gap-1.5 rounded-full px-1.5 py-1 transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+        >
+          <span className="font-mono-ui tabular text-[0.72rem] text-text-tertiary">
+            {repo.workspaces.length}
+          </span>
+          <ChevronRightIcon
+            width={14}
+            height={14}
+            className={cn(
+              "text-text-tertiary transition-transform duration-200",
+              open && "rotate-90",
+            )}
+          />
+        </button>
+      </motion.div>
 
       <AnimatePresence initial={false}>
         {open && (
@@ -376,23 +552,105 @@ function RepoRow({
             transition={{ duration: 0.22, ease: [0.16, 1, 0.3, 1] }}
             className="overflow-hidden"
           >
-            {repo.workspaces.map((ws) => {
-              const isActive =
-                active?.repo === repo.slug && active?.branch === ws.name;
-              return (
-                <WorkspaceRow
-                  key={ws.name}
-                  ws={ws}
-                  base={repo.base}
-                  active={isActive}
-                  stat={stats.get(`${repo.slug}:${ws.name}`)}
-                  onSelect={() => onSelect(ws)}
-                />
-              );
-            })}
+            <ClearRow
+              repo={repo}
+              pruneStates={pruneStates}
+              pruned={pruned}
+              onClearRepo={onClearRepo}
+            />
+            {repo.workspaces
+              .filter((ws) => !pruned.has(`${repo.slug}:${ws.name}`))
+              .map((ws) => {
+                const isActive =
+                  active?.repo === repo.slug && active?.branch === ws.name;
+                const pruneState = pruneStates.get(`${repo.slug}:${ws.name}`);
+                return (
+                  <WorkspaceRow
+                    key={ws.name}
+                    ws={ws}
+                    base={repo.base}
+                    active={isActive}
+                    stat={stats.get(`${repo.slug}:${ws.name}`)}
+                    pruneState={pruneState}
+                    onSelect={() => onSelect(ws)}
+                    onPrune={(force) => onPrune(ws.name, force)}
+                  />
+                );
+              })}
           </motion.ul>
         )}
       </AnimatePresence>
+    </li>
+  );
+}
+
+const PRUNE_COMMIT = 78; // px past which a swipe fires the prune
+
+// Bulk-clear header inside an expanded repo. Counts the prunable (clean
+// worktree / merged branch) rows and offers a one-tap safe clear with an inline
+// confirm. Renders nothing when there's nothing safe to clear.
+function ClearRow({
+  repo,
+  pruneStates,
+  pruned,
+  onClearRepo,
+}: {
+  repo: RepoSummary;
+  pruneStates: Map<string, { prunable: boolean; reason: string }>;
+  pruned: Set<string>;
+  onClearRepo: () => Promise<number>;
+}) {
+  const [confirm, setConfirm] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const count = repo.workspaces.filter((ws) => {
+    const ps = pruneStates.get(`${repo.slug}:${ws.name}`);
+    return ps?.prunable && !pruned.has(`${repo.slug}:${ws.name}`);
+  }).length;
+
+  if (count === 0) return null;
+
+  if (confirm) {
+    return (
+      <li className="flex items-center gap-2 px-2.5 py-1.5">
+        <span className="min-w-0 flex-1 truncate text-[0.7rem] text-text-secondary">
+          Clear {count} merged / clean {count === 1 ? "entry" : "entries"}?
+        </span>
+        <button
+          type="button"
+          disabled={busy}
+          onClick={async () => {
+            setBusy(true);
+            await onClearRepo();
+            setBusy(false);
+            setConfirm(false);
+          }}
+          className="shrink-0 rounded-[var(--radius-sm)] bg-[color-mix(in_srgb,var(--color-destructive)_22%,transparent)] px-2 py-1 text-[0.68rem] text-[color:var(--color-destructive)]"
+        >
+          {busy ? "clearing…" : "clear"}
+        </button>
+        <button
+          type="button"
+          onClick={() => setConfirm(false)}
+          className="shrink-0 px-1 text-[0.68rem] text-text-tertiary"
+        >
+          cancel
+        </button>
+      </li>
+    );
+  }
+
+  return (
+    <li className="flex justify-end px-2.5 pb-1 pt-0.5">
+      <button
+        type="button"
+        onClick={() => {
+          haptic(8);
+          setConfirm(true);
+        }}
+        className="rounded-full border border-border px-2 py-0.5 font-mono-ui text-[0.6rem] text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] active:text-midground"
+      >
+        clear {count} merged
+      </button>
     </li>
   );
 }
@@ -402,59 +660,177 @@ function WorkspaceRow({
   base,
   active,
   stat,
+  pruneState,
   onSelect,
+  onPrune,
 }: {
   ws: Workspace;
   base: string | null;
   active: boolean;
   stat: StatState | undefined;
+  pruneState: { prunable: boolean; reason: string } | undefined;
   onSelect: () => void;
+  onPrune: (force: boolean) => Promise<{ ok: boolean; reason?: string }>;
 }) {
   const TypeIcon =
     ws.type === "worktree" ? WorktreeIcon : ws.isCurrent ? BranchIcon : DraftDotIcon;
-  return (
-    <li>
-      <button
-        type="button"
-        onClick={onSelect}
-        aria-current={active}
-        className={cn(
-          "relative flex w-full items-center gap-2.5 rounded-[var(--radius-md)] py-2 pl-4 pr-2.5 text-left transition-colors",
-          active
-            ? "bg-[color-mix(in_srgb,var(--midground)_10%,transparent)]"
-            : "active:bg-[color-mix(in_srgb,var(--midground)_5%,transparent)]",
-        )}
-      >
-        {active && <span className="arc-border" aria-hidden />}
-        {active && (
-          <span
-            aria-hidden
-            className="absolute left-0 top-1/2 h-5 w-[2.5px] -translate-y-1/2 rounded-full bg-midground"
-          />
-        )}
-        <TypeIcon
-          width={14}
-          height={14}
-          className={cn("shrink-0", active ? "text-midground" : "text-text-tertiary")}
-        />
-        <span className="flex min-w-0 flex-1 items-center gap-1.5">
-          <span
-            className={cn(
-              "truncate font-mono-ui text-[0.78rem]",
-              active ? "text-midground" : "text-text-secondary",
-            )}
-          >
-            {ws.name}
+
+  // Swipe-left to prune. Only clean worktrees / merged branches are swipeable
+  // (pruneState.prunable). Protected (base/checked-out/dirty/unmerged) rows are
+  // locked: the swipe is disabled so live work can never be lost. A non-prunable
+  // entry that IS removable with force routes through a confirm.
+  const prunable = pruneState?.prunable ?? false;
+  const locked =
+    pruneState?.reason === "base" ||
+    pruneState?.reason === "checked out" ||
+    active;
+  const x = useMotionValue(0);
+  const draggedRef = useRef(false);
+  const pruneOpacity = useTransform(x, [-PRUNE_COMMIT, -8, 0], [1, 0.4, 0]);
+  const [confirmForce, setConfirmForce] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const fireSafe = async () => {
+    if (busy) return;
+    setBusy(true);
+    const r = await onPrune(false);
+    setBusy(false);
+    if (!r.ok) {
+      // Refused (dirty/unmerged) — offer the force confirm inline.
+      haptic(30);
+      setConfirmForce(true);
+    }
+  };
+
+  if (confirmForce) {
+    return (
+      <li>
+        <div className="flex items-center gap-2 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-destructive)_40%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] py-2 pl-4 pr-2.5">
+          <span className="min-w-0 flex-1 truncate text-[0.72rem] text-text-secondary">
+            Force prune <span className="font-mono-ui text-midground">{ws.name}</span>?{" "}
+            {pruneState?.reason ?? "not safe"}
           </span>
-          {ws.name === base && (
-            <span className="shrink-0 rounded-full border border-border px-1.5 text-[0.5rem] uppercase tracking-[0.12em] text-text-disabled">
-              base
-            </span>
+          <button
+            type="button"
+            onClick={async () => {
+              haptic(20);
+              setBusy(true);
+              await onPrune(true);
+              setBusy(false);
+              setConfirmForce(false);
+            }}
+            disabled={busy}
+            className="shrink-0 rounded-[var(--radius-sm)] bg-[color-mix(in_srgb,var(--color-destructive)_22%,transparent)] px-2 py-1 text-[0.7rem] text-[color:var(--color-destructive)]"
+          >
+            force
+          </button>
+          <button
+            type="button"
+            onClick={() => setConfirmForce(false)}
+            className="shrink-0 px-1 text-[0.7rem] text-text-tertiary"
+          >
+            cancel
+          </button>
+        </div>
+      </li>
+    );
+  }
+
+  const row = (
+    <motion.button
+      type="button"
+      drag={locked ? false : "x"}
+      style={{ x }}
+      dragDirectionLock
+      dragConstraints={{ left: -140, right: 0 }}
+      dragElastic={0.12}
+      onDragStart={() => {
+        draggedRef.current = false;
+      }}
+      onDrag={(_, info) => {
+        if (Math.abs(info.offset.x) > 6) draggedRef.current = true;
+      }}
+      onDragEnd={(_, info) => {
+        if (locked) return;
+        if (info.offset.x <= -PRUNE_COMMIT) {
+          haptic(12);
+          if (prunable) void fireSafe();
+          else setConfirmForce(true); // not safe → straight to force confirm
+        }
+      }}
+      onClick={() => {
+        if (draggedRef.current) return;
+        onSelect();
+      }}
+      aria-current={active}
+      className={cn(
+        "relative flex w-full touch-pan-y items-center gap-2.5 rounded-[var(--radius-md)] py-2 pl-4 pr-2.5 text-left transition-colors",
+        active
+          ? "bg-[color-mix(in_srgb,var(--midground)_10%,transparent)]"
+          : "active:bg-[color-mix(in_srgb,var(--midground)_5%,transparent)]",
+      )}
+    >
+      {active && <span className="arc-border" aria-hidden />}
+      {active && (
+        <span
+          aria-hidden
+          className="absolute left-0 top-1/2 h-5 w-[2.5px] -translate-y-1/2 rounded-full bg-midground"
+        />
+      )}
+      <TypeIcon
+        width={14}
+        height={14}
+        className={cn("shrink-0", active ? "text-midground" : "text-text-tertiary")}
+      />
+      <span className="flex min-w-0 flex-1 items-center gap-1.5">
+        <span
+          className={cn(
+            "truncate font-mono-ui text-[0.78rem]",
+            active ? "text-midground" : "text-text-secondary",
           )}
+        >
+          {ws.name}
         </span>
-        <DiffStatChip stat={stat} />
-      </button>
+        {ws.name === base && (
+          <span className="shrink-0 rounded-full border border-border px-1.5 text-[0.5rem] uppercase tracking-[0.12em] text-text-disabled">
+            base
+          </span>
+        )}
+      </span>
+      <DiffStatChip stat={stat} />
+    </motion.button>
+  );
+
+  // Locked rows render without the prune rail (no swipe affordance at all).
+  if (locked) {
+    return <li>{row}</li>;
+  }
+
+  return (
+    <li className="relative">
+      <div className="pointer-events-none absolute inset-0 flex items-stretch justify-end overflow-hidden rounded-[var(--radius-md)]">
+        <motion.div
+          style={{ opacity: pruneOpacity }}
+          className={cn(
+            "flex w-1/2 items-center justify-end gap-1.5 rounded-[var(--radius-md)] pr-3 font-mono-ui text-[0.6rem] uppercase tracking-wider",
+            prunable
+              ? "bg-[color-mix(in_srgb,var(--color-destructive,#f87171)_20%,transparent)] text-[color:var(--color-destructive,#f87171)]"
+              : "bg-[color-mix(in_srgb,var(--color-warning,#f5b54a)_20%,transparent)] text-[color:var(--color-warning,#f5b54a)]",
+          )}
+        >
+          {prunable ? "prune" : pruneState?.reason ?? "force?"} <TrashGlyph />
+        </motion.div>
+      </div>
+      {row}
     </li>
+  );
+}
+
+function TrashGlyph() {
+  return (
+    <svg width={13} height={13} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+      <path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m2 0v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V6" />
+    </svg>
   );
 }
 

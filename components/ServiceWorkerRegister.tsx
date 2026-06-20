@@ -13,6 +13,12 @@ function urlBase64ToUint8Array(base64: string): Uint8Array {
 // Registers the PWA service worker and subscribes for push notifications.
 export function ServiceWorkerRegister() {
   useEffect(() => {
+    // Native iOS shell: register for APNs instead of web push (web push is
+    // unavailable inside the Capacitor WKWebView). No-ops in the browser/PWA.
+    void import("@/components/shell/nativePush")
+      .then((m) => m.registerNativePush())
+      .catch(() => {});
+
     if (typeof navigator === "undefined" || !("serviceWorker" in navigator)) return;
 
     const onLoad = async () => {

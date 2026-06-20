@@ -212,7 +212,7 @@ export function RefreshButton({
       onClick={onClick}
       className="grid h-8 w-8 place-items-center rounded-full text-text-tertiary transition-colors hover:text-midground active:scale-90"
     >
-      <span className={loading ? "animate-spin-slow" : ""}>
+      <span className={loading ? "animate-spin" : ""}>
         <RefreshIcon width={15} height={15} />
       </span>
     </button>

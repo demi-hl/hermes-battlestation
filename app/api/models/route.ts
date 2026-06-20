@@ -28,9 +28,11 @@ const PROVIDER_LABELS: Record<string, string> = {
   anthropic: "Anthropic",
   openai: "OpenAI",
   "openai-api": "OpenAI",
+  "openai-codex": "OpenAI",
   openrouter: "OpenRouter",
   "x-ai": "xAI",
   xai: "xAI",
+  "xai-oauth": "xAI",
   google: "Google",
   "google-vertex": "Google",
   deepseek: "DeepSeek",
@@ -108,6 +110,82 @@ function labelFor(p: string): string {
   return PROVIDER_LABELS[p] ?? p.charAt(0).toUpperCase() + p.slice(1);
 }
 
+/** Pretty short label for a model id, e.g. "claude-opus-4-8" -> "Opus 4.8",
+ *  "gpt-5.5-pro" -> "GPT 5.5 Pro", "x-ai/grok-4.3" -> "Grok 4.3". Strips the
+ *  provider prefix (anything before a slash) and family noise. */
+function modelLabel(id: string): string {
+  const tail = id.includes("/") ? id.slice(id.lastIndexOf("/") + 1) : id;
+  let s = tail
+    .replace(/^claude-/, "")
+    .replace(/^gpt-/, "GPT ")
+    .replace(/^grok-/, "Grok ")
+    .replace(/^gemini-/, "Gemini ")
+    .replace(/^deepseek-/, "DeepSeek ")
+    .replace(/^o(\d)/, "o$1");
+  // "opus-4-8" -> "Opus 4.8"; collapse hyphen-number runs into dotted versions.
+  s = s.replace(/(\d)-(\d)/g, "$1.$2").replace(/-/g, " ");
+  // Title-case word starts (but keep GPT/o-series casing already applied).
+  s = s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
+  return s.trim();
+}
+
+interface FlatModel {
+  id: string;
+  label: string;
+  provider: string;
+  providerLabel: string;
+}
+
+// Billing-safety ordering: when the SAME model id is offered by multiple
+// providers (e.g. gpt-5.5 via both metered `openai-api` and the flat-rate
+// `openai-codex` subscription), the bottom bar's `modelById` first-match must
+// land on the SUBSCRIPTION provider, never the metered key. Lower rank = earlier
+// in the flattened list = what the picker selects. Subscription/OAuth-backed
+// providers rank above pay-per-token API keys.
+const PROVIDER_RANK: Record<string, number> = {
+  anthropic: 0,
+  "openai-codex": 0,
+  "xai-oauth": 0,
+  copilot: 1,
+  nous: 1,
+  "openai-api": 8,
+  openai: 8,
+  openrouter: 9,
+};
+function providerRank(p: string): number {
+  return PROVIDER_RANK[p] ?? 5;
+}
+
+/** Flatten the per-provider lists into a single ordered model list the bottom
+ *  bar consumes directly (its workspace-context reads `data.models`). Default
+ *  provider's models lead; the rest follow by billing rank (subscription before
+ *  metered), then provider-grouped + de-duped by id. */
+function flatten(providers: ProviderModels[], defaultProvider: string): FlatModel[] {
+  const seen = new Set<string>();
+  const out: FlatModel[] = [];
+  const ordered = [...providers].sort((a, b) => {
+    if (a.provider === defaultProvider) return -1;
+    if (b.provider === defaultProvider) return 1;
+    const r = providerRank(a.provider) - providerRank(b.provider);
+    if (r !== 0) return r;
+    return a.label.localeCompare(b.label);
+  });
+  for (const p of ordered) {
+    for (const m of p.models) {
+      const key = `${p.provider}::${m}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      out.push({
+        id: m,
+        label: modelLabel(m),
+        provider: p.provider,
+        providerLabel: p.label,
+      });
+    }
+  }
+  return out;
+}
+
 export async function GET() {
   // 1. Live provider caches (the real wired providers + models).
   const cache = await readJson<
@@ -152,6 +230,7 @@ export async function GET() {
     source,
     defaultProvider,
     defaultModel,
+    models: flatten(providers, defaultProvider),
     providers: providers.sort((a, b) => a.label.localeCompare(b.label)),
     fetchedAt: new Date().toISOString(),
   });

@@ -16,6 +16,7 @@
 // model + provider (avoiding a mismatch with the app's expectations).
 
 import { spawn } from "node:child_process";
+import { readdirSync, readFileSync, statSync } from "node:fs";
 import { run } from "./exec";
 
 const HOME = process.env.HOME ?? process.cwd();
@@ -44,6 +45,31 @@ export function sessionTitleFor(repo: string | null): string {
   return `lol-${repoSlug(repo)}`;
 }
 
+/** Slugify a branch name for use in a session title / thread id. */
+export function branchSlug(branch: string): string {
+  return branch
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9._-]+/g, "-")
+    .replace(/^-+|-+$/g, "")
+    .slice(0, 60);
+}
+
+/** Session title for a repo + specific branch. A branch that is the repo's
+ *  base/primary checkout collapses to the plain repo title so the default repo
+ *  thread and "open repo" land on the same session; any other branch gets its
+ *  own `lol-<repo>__<branch>` session so branches run independently. */
+export function sessionTitleForBranch(
+  repo: string | null,
+  branch: string | null | undefined,
+  base?: string | null,
+): string {
+  const repoTitle = sessionTitleFor(repo);
+  if (!repo || repo === GENERAL_THREAD_ID) return repoTitle;
+  if (!branch || (base && branch === base)) return repoTitle;
+  return `${repoTitle}__${branchSlug(branch)}`;
+}
+
 export interface SessionRow {
   id: string;
   title: string | null;
@@ -55,6 +81,9 @@ export interface SessionRow {
   outputTokens: number;
   cacheReadTokens: number;
   cacheWriteTokens: number;
+  /** Estimated CURRENT context occupancy (~tokens) from active message content.
+   *  Drops after a /compress, unlike the cumulative cache counters. */
+  liveTokens?: number;
 }
 
 /** Context-window size used for the usage meter, per model. Opus/Sonnet/Haiku
@@ -64,12 +93,11 @@ const CONTEXT_WINDOW = 200_000;
 
 export function usageFromRow(row: SessionRow | null): { used: number; total: number } | null {
   if (!row) return null;
-  // The cached prompt (system + history) re-read each turn plus the last
-  // turn's IO is a reasonable proxy for current context occupancy.
-  const used =
-    (row.cacheReadTokens || 0) +
-    (row.inputTokens || 0) +
-    (row.outputTokens || 0);
+  // Prefer the live estimate (active message content) — it reflects the CURRENT
+  // context and shrinks after compression. The old path summed the session's
+  // cumulative cache_read_tokens, which only ever grows and pinned every long
+  // session to 100% even right after a /compress.
+  const used = row.liveTokens && row.liveTokens > 0 ? row.liveTokens : 0;
   if (used <= 0) return null;
   return { used: Math.min(used, CONTEXT_WINDOW), total: CONTEXT_WINDOW };
 }
@@ -99,6 +127,22 @@ import sqlite3, sys, json, os
 db = os.path.expanduser("~/.hermes/state.db")
 con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
 con.row_factory = sqlite3.Row
+def live_tokens(sid):
+    # Estimate CURRENT context occupancy from the ACTIVE message content
+    # (compression flips old rows to active=0, so this drops after a /compress —
+    # unlike the session's cumulative cache_read_tokens which only ever grows).
+    # ~4 chars/token is the standard rough heuristic; good enough for a meter.
+    try:
+        row = con.execute(
+            "SELECT COALESCE(SUM("
+            "  LENGTH(COALESCE(content,'')) + LENGTH(COALESCE(reasoning_content,'')) "
+            "  + LENGTH(COALESCE(tool_calls,''))"
+            "), 0) AS chars FROM messages WHERE session_id=? AND active=1",
+            (sid,),
+        ).fetchone()
+        return int((row["chars"] or 0) / 4)
+    except Exception:
+        return 0
 def pack(r):
     return {
         "id": r["id"], "title": r["title"], "source": r["source"],
@@ -108,8 +152,89 @@ def pack(r):
         "outputTokens": r["output_tokens"] or 0,
         "cacheReadTokens": r["cache_read_tokens"] or 0,
         "cacheWriteTokens": r["cache_write_tokens"] or 0,
+        "liveTokens": live_tokens(r["id"]),
     }
 `;
+
+/** Look up the live session row by its session id. The ACP bridge does NOT
+ *  rename sessions to `lol-*` (it auto-titles them), so the bridge map's id is
+ *  the source of truth for a thread — resolve the row by id, not by title. */
+export async function querySessionById(id: string): Promise<SessionRow | null> {
+  const script =
+    ROW_SELECT +
+    `
+sid = sys.argv[1]
+row = con.execute(
+    "SELECT * FROM sessions WHERE id=? AND archived IS NOT 1 LIMIT 1",
+    (sid,),
+).fetchone()
+print(json.dumps(pack(row) if row else None))
+`;
+  return queryDb<SessionRow | null>(script, [id], null);
+}
+
+/** Read every ACP bridge session map (`lo-acp-sessions*.json`) and merge into a
+ *  single key->sessionId map. Files are merged oldest-first so the most recently
+ *  written target (the active brain) wins on key collisions. This is the real
+ *  registry of which Hermes session backs each thread — the chat send/resume
+ *  path persists it, and the agent auto-titles the underlying DB row, so the
+ *  `lol-*` DB title the old listing relied on never exists. */
+export function readBridgeSessions(): Map<string, string> {
+  const merged = new Map<string, string>();
+  try {
+    const dir = `${HOME}/.hermes`;
+    const files = readdirSync(dir)
+      .filter((f) => /^lo-acp-sessions.*\.json$/.test(f))
+      .map((f) => {
+        const p = `${dir}/${f}`;
+        let mtime = 0;
+        try {
+          mtime = statSync(p).mtimeMs;
+        } catch {
+          /* race: file vanished */
+        }
+        return { p, mtime };
+      })
+      .sort((a, b) => a.mtime - b.mtime); // oldest first; newest overwrites
+    for (const { p } of files) {
+      try {
+        const obj = JSON.parse(readFileSync(p, "utf8")) as Record<string, string>;
+        for (const [k, v] of Object.entries(obj)) {
+          if (typeof v === "string" && v) merged.set(k, v);
+        }
+      } catch {
+        /* skip malformed map */
+      }
+    }
+  } catch {
+    /* ~/.hermes unreadable — no bridge sessions */
+  }
+  return merged;
+}
+
+/** Resolve a thread's backing session id from the bridge map, trying every key
+ *  shape the map has used across versions: the current `lol-<slug>` title key,
+ *  the slug alone, and the bare repo name (legacy maps keyed by repo name). */
+export function resolveBridgeId(
+  map: Map<string, string>,
+  repo: string | null,
+  branch?: string | null,
+  base?: string | null,
+): string | null {
+  const candidates: string[] = [];
+  if (!repo || repo === GENERAL_THREAD_ID) {
+    candidates.push(GENERAL_SESSION_TITLE, GENERAL_THREAD_ID);
+  } else {
+    candidates.push(sessionTitleForBranch(repo, branch, base));
+    candidates.push(sessionTitleFor(repo));
+    candidates.push(repoSlug(repo), repo);
+  }
+  for (const c of candidates) {
+    const id = map.get(c);
+    if (id) return id;
+  }
+  return null;
+}
 
 /** Look up the live session row for a title (the most recent if duplicates). */
 export async function querySessionByTitle(title: string): Promise<SessionRow | null> {

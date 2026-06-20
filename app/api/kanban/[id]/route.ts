@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { run } from "@/lib/exec";
+import { bust } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import type { KanbanTaskDetail } from "@/lib/kanban/types";
 
@@ -42,4 +43,51 @@ export async function GET(
     };
     return NextResponse.json(env);
   }
+}
+
+// Mutate a single task's lane. Supported actions map to real `hermes kanban`
+// verbs that are reversible (no hard delete from the mobile surface):
+//   archive  → swipe-to-remove (reversible; card leaves every column)
+//   unblock  → push a blocked task back to ready
+//   promote  → force a todo/blocked task to ready even if deps aren't done
+const ACTIONS: Record<string, (id: string) => string> = {
+  archive: (id) => `hermes kanban archive ${id}`,
+  unblock: (id) => `hermes kanban unblock ${id}`,
+  promote: (id) => `hermes kanban promote ${id} --force`,
+};
+
+export async function PATCH(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
+  const { id } = await ctx.params;
+  if (!ID_RE.test(id)) {
+    return NextResponse.json({ error: "invalid task id" }, { status: 400 });
+  }
+
+  let body: { action?: string };
+  try {
+    body = await req.json();
+  } catch {
+    return NextResponse.json({ error: "invalid JSON body" }, { status: 400 });
+  }
+
+  const action = (body.action ?? "").trim();
+  const build = ACTIONS[action];
+  if (!build) {
+    return NextResponse.json(
+      { error: `unsupported action: ${action || "(none)"}` },
+      { status: 400 },
+    );
+  }
+
+  const r = await run(build(id), { timeoutMs: 15000 });
+  if (!r.ok) {
+    return NextResponse.json(
+      { error: r.stderr.trim().split("\n")[0] || `hermes kanban ${action} failed` },
+      { status: 500 },
+    );
+  }
+  bust("kanban");
+  return NextResponse.json({ ok: true, action, id });
 }

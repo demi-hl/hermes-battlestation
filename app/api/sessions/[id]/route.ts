@@ -27,12 +27,31 @@ async function sql(stmt: string): Promise<{ ok: boolean; out: string; err: strin
 export async function PATCH(req: Request, ctx: { params: Promise<{ id: string }> }) {
   const { id } = await ctx.params;
   if (!validId(id)) return NextResponse.json({ error: "bad id" }, { status: 400 });
-  let body: { title?: string };
+  let body: { title?: string; archived?: boolean };
   try {
     body = await req.json();
   } catch {
     return NextResponse.json({ error: "invalid json" }, { status: 400 });
   }
+
+  // Archive toggle: reversible (the fleet/agents + sessions queries filter
+  // `archived = 1`, so the row just leaves the list; nothing is destroyed).
+  if (typeof body.archived === "boolean") {
+    const flag = body.archived ? 1 : 0;
+    const py = [
+      "import sqlite3",
+      `c=sqlite3.connect(${JSON.stringify(DB_PATH)})`,
+      `c.execute("UPDATE sessions SET archived=? WHERE id=?", (${flag}, ${JSON.stringify(id)}))`,
+      "c.commit()",
+      "print('ok', c.total_changes)",
+    ].join("; ");
+    const r = await sql(py);
+    if (!r.ok || !r.out.startsWith("ok")) {
+      return NextResponse.json({ error: r.err || "archive failed" }, { status: 500 });
+    }
+    return NextResponse.json({ ok: true, id, archived: body.archived });
+  }
+
   const title = String(body.title ?? "").slice(0, 200);
   const py = [
     "import sqlite3",

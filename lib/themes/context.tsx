@@ -30,6 +30,11 @@ import { api } from "./api";
  *  a visible flash of the default palette on theme-overridden installs. */
 const STORAGE_KEY = "hermes-dashboard-theme";
 
+/** LocalStorage key for an optional background-color override applied ON TOP
+ *  of the active theme — lets you keep a theme's accents but swap the canvas
+ *  color. Empty/absent = use the theme's own background. */
+const BG_STORAGE_KEY = "hermes-dashboard-bg";
+
 /** Renames of built-in theme keys we've shipped previously. Without this,
  *  users who saved one of the old names in localStorage (or had it
  *  persisted server-side) would silently fall back to `defaultTheme`
@@ -302,7 +307,7 @@ function injectFontStylesheet(url: string | undefined) {
 // Apply a full theme to :root
 // ---------------------------------------------------------------------------
 
-function applyTheme(theme: DashboardTheme) {
+function applyTheme(theme: DashboardTheme, bgOverride?: string | null) {
   if (typeof document === "undefined") return;
   const root = document.documentElement;
 
@@ -341,6 +346,16 @@ function applyTheme(theme: DashboardTheme) {
   };
   for (const [k, v] of Object.entries(vars)) {
     root.style.setProperty(k, v);
+  }
+
+  // Background-color override sits on top of the theme's own background:
+  // repaint the two canvas layer vars the DS derives everything from, keeping
+  // the theme's midground/accents. An empty override is a no-op (theme wins).
+  const bg = (bgOverride ?? "").trim();
+  if (bg) {
+    root.style.setProperty("--background", bg);
+    root.style.setProperty("--background-base", bg);
+    root.style.setProperty("--background-alpha", "1");
   }
 
   injectFontStylesheet(theme.typography.fontUrl);
@@ -389,6 +404,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     Record<string, DashboardTheme>
   >({});
 
+  /** Optional background-color override applied on top of the active theme.
+   *  Empty string = no override (theme's own background wins). */
+  const [bgOverride, setBgOverrideState] = useState<string>(() => {
+    if (typeof window === "undefined") return "";
+    return window.localStorage.getItem(BG_STORAGE_KEY) ?? "";
+  });
+
   // Resolve a theme name to a full DashboardTheme, falling back to default
   // only when neither a built-in nor a user theme is found.
   const resolveTheme = useCallback(
@@ -406,8 +428,8 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   // the API (since the active theme might be a user theme whose definition
   // hadn't loaded yet on first render).
   useEffect(() => {
-    applyTheme(resolveTheme(themeName));
-  }, [themeName, resolveTheme]);
+    applyTheme(resolveTheme(themeName), bgOverride);
+  }, [themeName, resolveTheme, bgOverride]);
 
   // Load server-side themes (built-ins + user YAMLs) once on mount. In this
   // app `api.getThemes()` returns empty, so this effect is a no-op and the
@@ -474,14 +496,28 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     [availableThemes, userThemeDefs],
   );
 
+  const setBgOverride = useCallback((color: string) => {
+    const next = (color ?? "").trim();
+    setBgOverrideState(next);
+    if (typeof window !== "undefined") {
+      if (next) {
+        window.localStorage.setItem(BG_STORAGE_KEY, next);
+      } else {
+        window.localStorage.removeItem(BG_STORAGE_KEY);
+      }
+    }
+  }, []);
+
   const value = useMemo<ThemeContextValue>(
     () => ({
       theme: resolveTheme(themeName),
       themeName,
       availableThemes,
       setTheme,
+      bgOverride,
+      setBgOverride,
     }),
-    [themeName, availableThemes, setTheme, resolveTheme],
+    [themeName, availableThemes, setTheme, resolveTheme, bgOverride, setBgOverride],
   );
 
   return <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>;
@@ -500,6 +536,8 @@ const ThemeContext = createContext<ThemeContextValue>({
     description: t.description,
   })),
   setTheme: () => {},
+  bgOverride: "",
+  setBgOverride: () => {},
 });
 
 interface ThemeContextValue {
@@ -507,4 +545,8 @@ interface ThemeContextValue {
   setTheme: (name: string) => void;
   theme: DashboardTheme;
   themeName: string;
+  /** Active background-color override ("" = none, theme's own bg wins). */
+  bgOverride: string;
+  /** Set ("" clears) the background-color override; persisted to localStorage. */
+  setBgOverride: (color: string) => void;
 }

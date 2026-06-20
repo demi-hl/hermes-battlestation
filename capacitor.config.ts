@@ -1,7 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
+import { KeyboardResize } from '@capacitor/keyboard';
 
 const config: CapacitorConfig = {
-  appId: 'ai.nousresearch.battlestation',
+  appId: 'la.demi.battlestation',
   appName: 'Hermes Battlestation',
   webDir: '.next',
   server: {
@@ -16,7 +17,17 @@ const config: CapacitorConfig = {
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 0,
+      launchShowDuration: 700,
+      backgroundColor: "#041c1c",
+      showSpinner: false,
+    },
+    Keyboard: {
+      // Overlay mode: the keyboard floats over the WKWebView WITHOUT resizing
+      // it, so the visual-viewport / keyboardWillShow JS in Providers.tsx is
+      // the single source of truth for shrinking the shell. `native` here would
+      // double-count against that manual shrink and leave a gap below the
+      // composer. Overlay = composer rides up exactly to the keyboard top.
+      resize: KeyboardResize.None,
     },
   },
 };

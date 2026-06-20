@@ -10,6 +10,7 @@ import path from "node:path";
 import { run } from "./exec";
 import { cached } from "./cache";
 import { REPO_ROOTS, GENERAL_THREAD_ID, GENERAL_CWD } from "./sessions";
+import { resolveRepo, repoSummary } from "./workspace-fs";
 import type { ChatRepo } from "./chat-types";
 
 async function isGitRepo(dir: string): Promise<boolean> {
@@ -69,4 +70,26 @@ export async function resolveRepoCwd(repo: string): Promise<string | null> {
   const repos = await listLocalRepos();
   const hit = repos.find((r) => r.name === repo);
   return hit ? hit.path : null;
+}
+
+/** Resolve (repo, branch) to the safe absolute cwd of that branch's checkout
+ *  (its worktree path, or the repo root for the base/primary branch). The path
+ *  is always derived server-side from the live worktree enumeration — a
+ *  client-supplied path is never trusted. Falls back to the repo root when the
+ *  branch has no dedicated worktree. Returns null for an unknown repo. */
+export async function resolveBranchCwd(
+  repo: string,
+  branch: string | null | undefined,
+): Promise<string | null> {
+  const root = await resolveRepoCwd(repo);
+  if (!root || !branch || repo === GENERAL_THREAD_ID) return root;
+  const ref = await resolveRepo(repo);
+  if (!ref) return root;
+  try {
+    const summary = await repoSummary(ref);
+    const ws = summary.workspaces.find((w) => w.name === branch);
+    return ws?.path ?? root;
+  } catch {
+    return root;
+  }
 }

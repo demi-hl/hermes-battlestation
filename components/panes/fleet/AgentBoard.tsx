@@ -18,6 +18,12 @@ import { Button } from "@/components/ui";
 
 const DESTRUCTIVE = "#fb2c36";
 
+// The "advance" overlay is a fixture-driven demo of the lane transition, NOT a
+// real orchestrator control — it mutates only client display state. Gate it so
+// it never ships as a production button that looks like it does real work.
+// Opt in with NEXT_PUBLIC_DEMO_CONTROLS=1 at build time.
+const DEMO_CONTROLS = process.env.NEXT_PUBLIC_DEMO_CONTROLS === "1";
+
 /** Derive the live count header: working agents per node + the bot state. */
 function CountHeader({ agents }: { agents: FleetAgent[] }) {
   const working = (node: AgentNode) =>
@@ -150,17 +156,18 @@ export function AgentBoard({ agents }: { agents: FleetAgent[] }) {
     <div>
       <div className="mb-2.5 flex items-start justify-between gap-2 px-3">
         <CountHeader agents={topLevel} />
-        <div className="flex shrink-0 items-center gap-1">
-          <Button
-            outlined
-            size="sm"
-            type="button"
-            onClick={advance}
-            aria-label="Demo: advance an agent to the next lane"
-            prefix={<AdvanceIcon width={12} height={12} />}
-          >
-            advance
-          </Button>
+        {DEMO_CONTROLS && (
+          <div className="flex shrink-0 items-center gap-1">
+            <Button
+              outlined
+              size="sm"
+              type="button"
+              onClick={advance}
+              aria-label="Demo: advance an agent to the next lane"
+              prefix={<AdvanceIcon width={12} height={12} />}
+            >
+              advance
+            </Button>
           {Object.keys(advanced).length > 0 && (
             <button
               type="button"
@@ -174,7 +181,8 @@ export function AgentBoard({ agents }: { agents: FleetAgent[] }) {
               <RefreshIcon width={12} height={12} />
             </button>
           )}
-        </div>
+          </div>
+        )}
       </div>
 
       <LayoutGroup>

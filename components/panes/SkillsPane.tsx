@@ -6,6 +6,7 @@ import { usePolling } from "@/components/usePolling";
 import { relativeTime } from "@/lib/format";
 import { haptic } from "@/components/shell/haptics";
 import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/components/useMediaQuery";
 import type { SkillsPayload, SkillEntry } from "@/lib/chat-types";
 import { SearchIcon, RefreshIcon } from "@/components/panes/pane-icons";
 import { ChevronRightIcon } from "@/components/shell/icons";
@@ -240,6 +241,7 @@ export function SkillsPane() {
 
   const [search, setSearch] = useState("");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const isDesktop = useMediaQuery("(min-width: 1024px)");
 
   const groups = useMemo(() => data?.groups ?? [], [data]);
   const total = data?.total ?? 0;
@@ -272,13 +274,18 @@ export function SkillsPane() {
     });
   };
 
-  // Auto-expand all groups on first load.
+  // First-load expand: all groups on desktop, just the first group on mobile
+  // (a wall of expanded skills hurts hierarchy on a phone — audit P2 #15).
   useEffect(() => {
     if (groups.length === 0) return;
     setExpanded((prev) =>
-      prev.size === 0 ? new Set(groups.map((g) => g.category)) : prev,
+      prev.size === 0
+        ? new Set(
+            isDesktop ? groups.map((g) => g.category) : [groups[0].category],
+          )
+        : prev,
     );
-  }, [groups]);
+  }, [groups, isDesktop]);
 
   return (
     <PullToRefresh onRefresh={reload}>
@@ -344,7 +351,7 @@ export function SkillsPane() {
             <button
               type="button"
               onClick={() => setSearch("")}
-              className="grid h-5 w-5 place-items-center rounded-full text-text-tertiary transition-colors hover:text-midground"
+              className="grid h-9 w-9 place-items-center rounded-full text-text-tertiary transition-colors hover:text-midground"
             >
               <svg
                 width={12}

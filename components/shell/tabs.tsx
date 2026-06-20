@@ -41,6 +41,7 @@ import { AnalyticsPane } from "@/components/panes/AnalyticsPane";
 import { RuntimeConfigPane } from "@/components/panes/RuntimeConfigPane";
 import { McpPane } from "@/components/panes/McpPane";
 import { OnboardingPane } from "@/components/panes/OnboardingPane";
+import { UsagePane } from "@/components/panes/UsagePane";
 
 /**
  * Tab registry — the contract between the shell (slice 1) and the feature
@@ -70,6 +71,7 @@ export type TabId =
   | "openrouter"
   | "mcp"
   | "onboarding"
+  | "usage"
   | "automations"
   | "settings";
 
@@ -104,14 +106,16 @@ export const TABS: TabDef[] = [
   { id: "openrouter", label: "OpenRouter", shortLabel: "Router", Icon: RouterIcon, Pane: OpenRouterPane },
   { id: "mcp", label: "MCP", shortLabel: "MCP", Icon: PlugIcon, Pane: McpPane },
   { id: "onboarding", label: "Get Hermes", shortLabel: "Hermes", Icon: DownloadIcon, Pane: OnboardingPane },
+  { id: "usage", label: "Usage & Limits", shortLabel: "Usage", Icon: ChartIcon, Pane: UsagePane },
   { id: "automations", label: "Automations", shortLabel: "Auto", Icon: AutomationIcon, Pane: AutomationsPane },
   { id: "settings", label: "Settings", shortLabel: "Settings", Icon: SettingsIcon, Pane: SettingsPane },
 ];
 
 /** Tabs shown directly in the bottom bar (the rest live behind "More").
- *  Tasks is the home; Chat is the agent spine; Fleet is the command center;
- *  Kanban + PRs are the review surfaces. Reorder freely. */
-export const PRIMARY_TAB_IDS: TabId[] = ["tasks", "chat", "fleet", "kanban", "prs"];
+ *  Tasks is the home; Chat is the agent spine (slot 2 = prime thumb reach);
+ *  Sessions/Repos/Kanban are the daily surfaces. Cron, Config, Fleet, etc. live
+ *  in "More". Fixed set — no user pinning. To reorder the bar, edit this list. */
+export const PRIMARY_TAB_IDS: TabId[] = ["tasks", "chat", "sessions", "repos", "kanban"];
 
 export const TAB_MAP: Record<TabId, TabDef> = Object.fromEntries(
   TABS.map((t) => [t.id, t]),
@@ -127,5 +131,28 @@ export const PRIMARY_TABS: TabDef[] = PRIMARY_TAB_IDS.map(getTab);
 export const SECONDARY_TABS: TabDef[] = TABS.filter(
   (t) => !PRIMARY_TAB_IDS.includes(t.id),
 );
+
+/** Tabs that stay registered + routable (via in-app links such as the Repos
+ *  NavRow or the Settings pane) but are intentionally NOT surfaced in the
+ *  bottom-bar "More" sheet, to keep it uncluttered. Diff + Tasks&PRs are reached
+ *  from Repos; Editor + Terminal are desktop-IDE surfaces; API Keys + MCP live
+ *  under Settings → Integrations. */
+export const HIDDEN_FROM_MORE: TabId[] = [
+  "editor",
+  "diff",
+  "terminal",
+  "prs",
+  "keys",
+  "mcp",
+  "automations",
+];
+
+/**
+ * Every tab (primary first, then secondary) so the bottom bar can resolve any
+ * pinned id regardless of the default split. This is the lookup the
+ * user-customizable bar reads against; PRIMARY_TABS/SECONDARY_TABS stay the
+ * default split for first load.
+ */
+export const ALL_TABS: TabDef[] = [...PRIMARY_TABS, ...SECONDARY_TABS];
 
 export const DEFAULT_TAB_ID: TabId = "tasks";

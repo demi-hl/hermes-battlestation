@@ -1,5 +1,11 @@
 import { NextResponse } from "next/server";
-import { querySessionByTitle, sessionTitleFor } from "@/lib/sessions";
+import {
+  querySessionById,
+  querySessionByTitle,
+  readBridgeSessions,
+  resolveBridgeId,
+  sessionTitleForBranch,
+} from "@/lib/sessions";
 import { readSessionTranscript } from "@/lib/transcript";
 
 export const runtime = "nodejs";
@@ -12,15 +18,23 @@ export const dynamic = "force-dynamic";
  * per-device copy. A fresh device / cleared phone therefore still shows the full
  * conversation, because the durable history lives on the backend.
  *
- * Query: ?repo=<name|general>  (resolves to the lol-<slug> session title)
+ * Resolution order: the ACP bridge map (`lo-acp-sessions*.json`) is the real
+ * registry of which session id backs a thread (the ACP path auto-titles the row
+ * and never writes a `lol-*` DB title), so we resolve the id from the map first
+ * and fall back to the legacy title lookup only if the map has no entry.
+ *
+ * Query: ?repo=<name|general>&branch=<branch?>
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
   const repo = url.searchParams.get("repo") || "general";
-  const title = sessionTitleFor(repo);
+  const branch = url.searchParams.get("branch") || null;
 
   try {
-    const row = await querySessionByTitle(title);
+    const bridgeId = resolveBridgeId(readBridgeSessions(), repo, branch);
+    const row = bridgeId
+      ? await querySessionById(bridgeId)
+      : await querySessionByTitle(sessionTitleForBranch(repo, branch));
     if (!row?.id) {
       return NextResponse.json({ messages: [], sessionId: null });
     }
