@@ -49,7 +49,7 @@ export function ContextBar() {
     notifications, dismissNotification, compress, repoAvatars,
   } = useWorkspace();
 
-  const [sheet, setSheet] = useState<"model" | "profile" | null>(null);
+  const [sheet, setSheet] = useState<"model" | "profile" | "effort" | null>(null);
 
   // Current global reasoning effort — surfaced as a tappable chip in the bar so
   // it's one tap (not buried in the sheet). Re-read when the sheet closes, since
@@ -145,7 +145,7 @@ export function ContextBar() {
           {effort && (
             <button
               type="button"
-              onClick={() => { haptic(8); setSheet("model"); }}
+              onClick={() => { haptic(8); setSheet("effort"); }}
               aria-label={`Reasoning effort: ${effort}. Tap to change.`}
               title={`Reasoning effort: ${effort}`}
               className="flex shrink-0 items-center rounded-full border border-border px-1.5 py-1 font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
@@ -297,7 +297,7 @@ function ProfileSheet({
   onClose,
 }: {
   open: boolean;
-  focus: "model" | "profile";
+  focus: "model" | "profile" | "effort";
   onClose: () => void;
 }) {
   const { models, model, setModel, profiles, activeProfile, setActiveProfile } = useWorkspace();
@@ -352,14 +352,25 @@ function ProfileSheet({
     </div>
   );
 
-  const first = focus === "model" ? ModelsSection : ProfilesSection;
-  const second = focus === "model" ? ProfilesSection : ModelsSection;
+  const EffortSectionBlock = (
+    <EffortSection />
+  );
+
+  // Order the three sections so the tapped chip's target leads. Tapping the
+  // effort chip must surface the effort buttons FIRST — otherwise they sit
+  // below the 80-model list and read as "won't change" on a phone.
+  const sections =
+    focus === "effort"
+      ? [EffortSectionBlock, ProfilesSection, ModelsSection]
+      : focus === "model"
+        ? [ModelsSection, ProfilesSection, EffortSectionBlock]
+        : [ProfilesSection, ModelsSection, EffortSectionBlock];
 
   return (
     <Sheet
       open={open}
       onClose={onClose}
-      title={focus === "model" ? "Model" : "Profile"}
+      title={focus === "model" ? "Model" : focus === "effort" ? "Reasoning effort" : "Profile"}
       className="max-h-[90dvh]"
     >
       {/* Notifications toggle — only when the platform supports web push. */}
@@ -390,14 +401,11 @@ function ProfileSheet({
         </div>
       )}
 
-      {first}
-      <div className="border-t border-border pt-2">{second}</div>
-
-      {/* Reasoning effort — global agent setting; changing it respawns the
-          warm brains so the next turn runs at the new effort. */}
-      <div className="border-t border-border pt-2">
-        <EffortSection />
-      </div>
+      {sections.map((section, i) => (
+        <div key={i} className={i > 0 ? "border-t border-border pt-2" : undefined}>
+          {section}
+        </div>
+      ))}
 
       {/* Usage info */}
       <UsageFooter />
@@ -461,7 +469,7 @@ function EffortSection() {
               onClick={() => select(lvl)}
               aria-pressed={on}
               className={cn(
-                "rounded-[var(--radius-md)] border px-1 py-1.5 text-center font-mono-ui text-[0.6rem] transition-colors",
+                "rounded-[var(--radius-md)] border px-1 py-2.5 text-center font-mono-ui text-[0.66rem] transition-colors",
                 on
                   ? "border-transparent bg-midground text-background-base"
                   : "border-border text-text-secondary active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
