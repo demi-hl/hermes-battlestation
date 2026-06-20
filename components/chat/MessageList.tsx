@@ -31,10 +31,12 @@ export function MessageList({
   messages,
   thread,
   sending,
+  onRetry,
 }: {
   messages: ChatMessage[];
   thread: ChatThread | null;
   sending: boolean;
+  onRetry?: (id: string) => void;
 }) {
   const endRef = useRef<HTMLDivElement>(null);
   const scrollerRef = useRef<HTMLElement | null>(null);
@@ -121,7 +123,7 @@ export function MessageList({
                 )}
               </div>
             ) : (
-              <AssistantBubble m={m} />
+              <AssistantBubble m={m} onRetry={onRetry} />
             )}
           </motion.div>
         ))}
@@ -151,7 +153,7 @@ export function MessageList({
   );
 }
 
-function AssistantBubble({ m }: { m: ChatMessage }) {
+function AssistantBubble({ m, onRetry }: { m: ChatMessage; onRetry?: (id: string) => void }) {
   const hasText = !!m.text;
   const hasTools = !!m.tools?.length;
   // Live timer ticks the whole time the turn is pending — not tied to the
@@ -184,9 +186,26 @@ function AssistantBubble({ m }: { m: ChatMessage }) {
       {hasTools && <ToolTray tools={m.tools!} />}
 
       {m.error ? (
-        <div className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-destructive)_40%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] px-3 py-2 text-[0.85rem] text-text-secondary">
-          {m.text || "the turn failed"}
-        </div>
+        m.retry && onRetry ? (
+          <button
+            type="button"
+            onClick={() => onRetry(m.id)}
+            className="flex w-full items-center justify-between gap-2 rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-destructive)_40%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] px-3 py-2 text-left text-[0.85rem] text-text-secondary transition-colors active:bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)]"
+          >
+            <span>{m.text || "the turn failed"}</span>
+            <span className="flex shrink-0 items-center gap-1 font-mono-ui text-[0.7rem] text-[color:var(--color-destructive)]">
+              <svg width={13} height={13} viewBox="0 0 24 24" fill="none" aria-hidden>
+                <path d="M3 12a9 9 0 1 0 3-6.7L3 8" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+                <path d="M3 3v5h5" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" />
+              </svg>
+              retry
+            </span>
+          </button>
+        ) : (
+          <div className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-destructive)_40%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_8%,transparent)] px-3 py-2 text-[0.85rem] text-text-secondary">
+            {m.text || "the turn failed"}
+          </div>
+        )
       ) : (
         hasText && <Markdown text={m.text} />
       )}

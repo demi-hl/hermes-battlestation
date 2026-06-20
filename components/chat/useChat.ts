@@ -35,6 +35,8 @@ export interface ChatMessage {
   tools?: ToolActivity[];
   /** Image attachments shown as thumbnails on a user bubble (data URLs). */
   images?: string[];
+  /** On a failed assistant bubble: the payload to resend on retry tap. */
+  retry?: { text: string; skills: string[]; images: string[] };
 }
 
 const TRANSCRIPT_PREFIX = "lo-chat:v1:";
@@ -174,6 +176,42 @@ export function useChat() {
     if (messages.length) saveTranscript(activeThreadId, messages);
   }, [messages, activeThreadId]);
 
+  // DURABLE TURNS — foreground re-sync. A turn keeps running on the host when
+  // the app is backgrounded (the send route no longer cancels on disconnect),
+  // so on return we re-pull the active thread's transcript from state.db to show
+  // a turn that completed while away. Guarded: skip if a stream is live locally
+  // (abortRef set) so we never clobber an in-flight turn.
+  useEffect(() => {
+    const onForeground = () => {
+      if (document.visibilityState !== "visible") return;
+      if (abortRef.current) return; // a live stream owns the messages
+      const thread = threads.find((t) => t.id === activeThreadId);
+      const repo = thread?.repo ?? "general";
+      const branch = thread?.branch ?? null;
+      const qs = new URLSearchParams({ repo });
+      if (branch) qs.set("branch", branch);
+      fetch(`/api/chat/history?${qs.toString()}`, { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((data: { messages?: ChatMessage[] } | null) => {
+          if (!data?.messages?.length) return;
+          setMessages((prev) => {
+            if (prev.some((m) => m.pending)) return prev; // never clobber live
+            // Backend has more (the away-turn landed) or we were showing a
+            // dropped-connection error bubble → adopt backend truth.
+            const staleError = prev.some((m) => m.error);
+            if (data.messages!.length >= prev.length || staleError) {
+              return data.messages!;
+            }
+            return prev;
+          });
+        })
+        .catch(() => {});
+      void refreshThreads();
+    };
+    document.addEventListener("visibilitychange", onForeground);
+    return () => document.removeEventListener("visibilitychange", onForeground);
+  }, [activeThreadId, threads, refreshThreads]);
+
   // Drive the bottom ContextBar from the active thread.
   const bindWorkspace = useCallback(
     (thread: ChatThread | null) => {
@@ -302,6 +340,14 @@ export function useChat() {
       const repo = thread?.repo ?? "general";
       const branch = thread?.branch ?? null;
 
+      // Snapshot the exact send payload so a failed turn can be resent verbatim
+      // (the composer has already been cleared by the caller).
+      const retryPayload = {
+        text: trimmed,
+        skills,
+        images: images.map((im) => im.data),
+      };
+
       const userMsg: ChatMessage = {
         id: mkId(),
         role: "user",
@@ -336,7 +382,7 @@ export function useChat() {
         });
         if (!res.ok || !res.body) {
           const errTxt = await res.text().catch(() => "");
-          patchPending({ pending: false, error: true, text: errTxt || "send failed" });
+          patchPending({ pending: false, error: true, text: errTxt || "send failed", retry: retryPayload });
           return;
         }
 
@@ -413,7 +459,7 @@ export function useChat() {
           }
         }
         if (!got) {
-          patchPending({ pending: false, error: true, text: "no response from agent" });
+          patchPending({ pending: false, error: true, text: "no response from agent", retry: retryPayload });
         }
         // Pull fresh thread metadata (message count, new session id, usage).
         void refreshThreads();
@@ -421,10 +467,16 @@ export function useChat() {
         if ((e as Error)?.name === "AbortError") {
           patchPending({ pending: false, error: true, text: "stopped" });
         } else {
+          // A thrown fetch (vs an HTTP error) means the connection dropped —
+          // classically when iOS backgrounds the app mid-turn. WKWebView's raw
+          // string is "Load failed"; show a human message + a retry tap.
+          const raw = e instanceof Error ? e.message : "";
+          const lost = !raw || /load failed|network|fetch|connection/i.test(raw);
           patchPending({
             pending: false,
             error: true,
-            text: e instanceof Error ? e.message : "send failed",
+            text: lost ? "connection lost — tap to retry" : raw,
+            retry: retryPayload,
           });
         }
       } finally {
@@ -473,6 +525,28 @@ export function useChat() {
     void refreshThreads();
   }, [threads, activeThreadId, refreshThreads]);
 
+  // Retry a failed turn: drop the errored assistant bubble + its user message,
+  // then resend the captured payload. Used by the "tap to retry" affordance on a
+  // failed bubble (genuine errors, or a dropped connection where the turn didn't
+  // actually land server-side).
+  const retry = useCallback(
+    (msgId: string) => {
+      const failed = messages.find((m) => m.id === msgId);
+      if (!failed?.retry) return;
+      const payload = failed.retry;
+      const idx = messages.findIndex((m) => m.id === msgId);
+      // Strip the errored assistant bubble and the immediately-preceding user
+      // bubble (the one being resent) so we don't duplicate it.
+      setMessages((m) => {
+        const userIdx = idx > 0 && m[idx - 1]?.role === "user" ? idx - 1 : idx;
+        return m.filter((_, i) => i !== idx && i !== userIdx);
+      });
+      const imgs = payload.images.map((data) => ({ data, mime: "image/png" }));
+      void send(payload.text, payload.skills, imgs);
+    },
+    [messages, send],
+  );
+
   // Create a git branch in the active thread's repo (no-op for general).
   const createBranch = useCallback(
     async (branch: string): Promise<{ ok: boolean; error?: string }> => {
@@ -507,6 +581,7 @@ export function useChat() {
     selectThread,
     startRepoThread,
     send,
+    retry,
     stop,
     newSession,
     createBranch,

@@ -152,7 +152,7 @@ export function ChatHub() {
             {chat.threadsError}
           </p>
         )}
-        <MessageList messages={chat.messages} thread={active} sending={chat.sending} />
+        <MessageList messages={chat.messages} thread={active} sending={chat.sending} onRetry={chat.retry} />
       </motion.div>
 
       {/* Composer pinned above the context bar. */}

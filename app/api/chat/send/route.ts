@@ -182,9 +182,14 @@ export async function POST(req: Request) {
       }
     },
     cancel() {
+      // DURABLE TURNS: a dropped HTTP connection (iOS backgrounding the app,
+      // network blip) must NOT cancel the agent turn — it keeps running on the
+      // host to completion, fires the turn-done push, and the `finally` above
+      // unlocks the session when it truly finishes. The client re-pulls history
+      // on foreground to show the result. Only an explicit Stop
+      // (/api/chat/cancel) cancels the live turn. We just stop our heartbeat;
+      // the bridge prompt keeps streaming into `relay` (emit no-ops once closed).
       if (heartbeat) clearInterval(heartbeat);
-      void acpBridge(target).cancel(sessionKey);
-      unlock(title);
     },
   });
 
