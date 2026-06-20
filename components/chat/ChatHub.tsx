@@ -72,7 +72,8 @@ export function ChatHub() {
 
   const onSend = useCallback(
     (text: string, images: { data: string; mime: string }[] = []) => {
-      void chat.send(text, skills, images);
+      // enqueue sends immediately when idle, or queues (FIFO) while a turn runs.
+      chat.enqueue(text, skills, images);
     },
     [chat, skills],
   );
@@ -174,6 +175,8 @@ export function ChatHub() {
           onNewSession={chat.newSession}
           onTask={onTask}
           sending={chat.sending}
+          queued={chat.queued}
+          onCancelQueued={chat.cancelQueued}
           skills={skills}
           onRemoveSkill={removeSkill}
           onOpenSkills={() => setSkillsOpen(true)}

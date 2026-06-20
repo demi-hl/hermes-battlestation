@@ -72,6 +72,8 @@ export function Composer({
   onNewSession,
   onTask,
   sending,
+  queued,
+  onCancelQueued,
   skills,
   onRemoveSkill,
   onOpenSkills,
@@ -82,6 +84,8 @@ export function Composer({
   onNewSession: () => void;
   onTask: (title: string) => void;
   sending: boolean;
+  queued: { id: string; text: string }[];
+  onCancelQueued: (id: string) => void;
   skills: string[];
   onRemoveSkill: (s: string) => void;
   onOpenSkills: () => void;
@@ -286,7 +290,7 @@ export function Composer({
 
   const submit = () => {
     const t = value.trim();
-    if ((!t && images.length === 0) || sending) return;
+    if (!t && images.length === 0) return;
     // `/task <title>` files a Kanban card instead of sending a turn.
     if (/^\/task\s+/i.test(t)) {
       const title = t.replace(/^\/task\s+/i, "").trim();
@@ -339,6 +343,39 @@ export function Composer({
         paddingBottom: "10px",
       }}
     >
+      {queued.length > 0 && (
+        <div className="mb-2 flex flex-col gap-1">
+          <span className="px-1 font-mono-ui text-[0.56rem] uppercase tracking-wider text-text-tertiary">
+            queued · sends after this turn
+          </span>
+          {queued.map((q) => (
+            <motion.div
+              key={q.id}
+              layout
+              initial={{ opacity: 0, y: 4 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="flex items-center gap-2 rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] py-1 pl-2.5 pr-1"
+            >
+              <span className="grid h-4 w-4 shrink-0 place-items-center rounded-full bg-[color-mix(in_srgb,var(--midground)_14%,transparent)] font-mono-ui text-[0.55rem] text-text-tertiary">
+                ⋯
+              </span>
+              <span className="min-w-0 flex-1 truncate text-[0.74rem] text-text-secondary">{q.text}</span>
+              <button
+                type="button"
+                aria-label="Cancel queued message"
+                onClick={() => {
+                  haptic(6);
+                  onCancelQueued(q.id);
+                }}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-text-tertiary active:scale-90"
+              >
+                <CloseIcon width={11} height={11} />
+              </button>
+            </motion.div>
+          ))}
+        </div>
+      )}
+
       {skills.length > 0 && (
         <div className="mb-2 flex flex-wrap gap-1.5">
           {skills.map((s) => (
@@ -493,17 +530,30 @@ export function Composer({
         />
 
         {sending ? (
-          <button
-            type="button"
-            aria-label="Stop"
-            onClick={() => {
-              haptic(12);
-              onStop();
-            }}
-            className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[color-mix(in_srgb,var(--color-destructive)_85%,transparent)] text-white transition-transform active:scale-90"
-          >
-            <StopIcon width={15} height={15} />
-          </button>
+          <div className="mb-0.5 flex shrink-0 items-center gap-1.5">
+            {(value.trim() || images.length > 0) && (
+              <button
+                type="button"
+                aria-label="Queue message"
+                title="Queue — sends when the current turn finishes"
+                onClick={submit}
+                className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-midground text-background-base transition-all active:scale-90"
+              >
+                <SendIcon width={15} height={15} />
+              </button>
+            )}
+            <button
+              type="button"
+              aria-label="Stop"
+              onClick={() => {
+                haptic(12);
+                onStop();
+              }}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[color-mix(in_srgb,var(--color-destructive)_85%,transparent)] text-white transition-transform active:scale-90"
+            >
+              <StopIcon width={15} height={15} />
+            </button>
+          </div>
         ) : (
           <button
             type="button"

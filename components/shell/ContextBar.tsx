@@ -49,33 +49,43 @@ export function ContextBar() {
     active, model, contextUsage, status,
     profiles, activeProfile, setActiveProfile,
     notifications, dismissNotification, compress, repoAvatars,
-    barCollapsed, setBarCollapsed,
+    turnStartedAt,
   } = useWorkspace();
 
   const [sheet, setSheet] = useState<"model" | "profile" | "effort" | null>(null);
+
+  // Live turn timer — ticks m:ss while a turn is running so you can SEE the
+  // agent is thinking. Cleared (null) when idle. 1s cadence is enough; we round
+  // down so it reads like a stopwatch.
+  const [nowMs, setNowMs] = useState<number>(() => Date.now());
+  useEffect(() => {
+    if (turnStartedAt == null) return;
+    setNowMs(Date.now());
+    const t = setInterval(() => setNowMs(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, [turnStartedAt]);
+  const elapsed =
+    turnStartedAt != null ? Math.max(0, Math.floor((nowMs - turnStartedAt) / 1000)) : null;
+  const elapsedLabel =
+    elapsed != null ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}` : null;
 
   // Live active-agent count — same source + lanes as the desktop status bar
   // (working + spawned). Surfaced as a tappable "# N" badge that jumps to the
   // Tasks board so the active sessions are one tap away.
   const agents = usePolling<FleetAgent[]>("/api/fleet/agents", 10_000);
-  const activeAgents = (agents.data ?? []).filter(
+  const sessionCount = (agents.data ?? []).filter(
     (a) => a.lane === "working" || a.lane === "spawned",
   ).length;
-  const goTasks = useCallback(() => {
+  const goSessions = useCallback(() => {
     haptic(8);
-    window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "tasks" } }));
+    window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "sessions" } }));
   }, []);
 
-  // Reserve only the height the bar actually occupies. Collapsed = the single
-  // top row (40px); expanded = top row + profile row (66px). Panes pad by
-  // --app-context-h, so shrinking it when collapsed hands the freed band back
-  // to the content (the session tree) instead of leaving dead space.
+  // Two fixed rows, always shown (no collapse). Panes pad by --app-context-h;
+  // pin it to the full two-row height.
   useEffect(() => {
-    document.documentElement.style.setProperty(
-      "--app-context-h",
-      barCollapsed ? "40px" : "66px",
-    );
-  }, [barCollapsed]);
+    document.documentElement.style.setProperty("--app-context-h", "66px");
+  }, []);
 
   // Current global reasoning effort — surfaced as a tappable chip in the bar so
   // it's one tap (not buried in the sheet). Re-read when the sheet closes, since
@@ -112,11 +122,12 @@ export function ContextBar() {
           WebkitBackdropFilter: "blur(18px) saturate(150%)",
         }}
       >
-        {/* ---- Always-visible top row: model + meter + compress + collapse toggle ---- */}
+        {/* ---- Top row: full repo/branch tree name + model + effort ---- */}
         <div className="flex h-10 items-center gap-2 px-3">
           <StatusDot status={status} />
 
-          {/* Active workspace / repo */}
+          {/* Active workspace / repo — gets the full row width so the whole
+              tree name is readable (meter moved to the row below). */}
           <div className="flex min-w-0 flex-1 items-center gap-1.5">
             {active ? (
               <>
@@ -139,21 +150,6 @@ export function ContextBar() {
               </span>
             )}
           </div>
-
-          {/* Context meter + compress */}
-          {pct !== null && (
-            <>
-              <button
-                type="button"
-                onClick={compress}
-                title="Compress context (Ctrl+Shift+C)"
-                className="flex shrink-0 items-center gap-1 rounded px-1.5 py-1 text-[0.65rem] text-text-tertiary transition-colors hover:text-midground active:scale-90"
-              >
-                <CompressIcon width={13} height={13} />
-              </button>
-              <ContextMeter pct={pct} />
-            </>
-          )}
 
           {/* Model name — tap to switch the per-turn model */}
           <button
@@ -179,83 +175,81 @@ export function ContextBar() {
               {effort}
             </button>
           )}
+        </div>
 
-          {/* Active agents — tap the "# N" to jump to the Tasks board (the live
-              session list). Mirrors the desktop status bar's agent count. */}
-          {activeAgents > 0 && (
+        {/* ---- Second row: profile · context meter · sessions ---- */}
+        <div className="border-t border-border/50">
+          <div className="flex items-center gap-2 px-3 py-1.5">
+            {/* Profile — tap to switch the brain that runs your turns */}
             <button
               type="button"
-              onClick={goTasks}
-              aria-label={`${activeAgents} active sessions. Tap to view.`}
-              title={`${activeAgents} active sessions`}
-              className="flex shrink-0 items-center gap-0.5 rounded-full bg-midground/20 px-1.5 py-0.5 font-mono-ui text-[0.58rem] text-midground transition-transform active:scale-90"
+              onClick={() => { haptic(8); setSheet("profile"); }}
+              aria-label={`Profile: ${activeProfile?.label ?? "default"}. Tap to switch.`}
+              className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
             >
-              <span className="text-text-tertiary">#</span>
-              <span className="tabular">{activeAgents}</span>
-            </button>
-          )}
-
-          {/* Collapse toggle — drop the profile row out of the way so the tree
-              (Sessions/Tasks) gets the vertical band back. */}
-          <button
-            type="button"
-            onClick={() => { haptic(6); setBarCollapsed(!barCollapsed); }}
-            aria-label={barCollapsed ? "Show profile row" : "Hide profile row"}
-            aria-expanded={!barCollapsed}
-            className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
-          >
-            <ChevronUpDownIcon
-              width={13}
-              height={13}
-              className={cn("transition-transform", barCollapsed ? "" : "rotate-180")}
-            />
-          </button>
-        </div>
-
-        {/* ---- Profile + model row — collapsible (hidden by default) ---- */}
-        {!barCollapsed && (
-        <div className="overflow-hidden border-t border-border/50">
-          <div className="flex items-center gap-3 px-3 py-1.5">
-                {/* Profile — tap to switch the brain that runs your turns */}
-                <button
-                  type="button"
-                  onClick={() => { haptic(8); setSheet("profile"); }}
-                  aria-label={`Profile: ${activeProfile?.label ?? "default"}. Tap to switch.`}
-                  className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full"
+                style={{
+                  background: profileTint(activeProfile?.id ?? "default"),
+                  boxShadow: `0 0 5px ${profileTint(activeProfile?.id ?? "default")}`,
+                }}
+              />
+              <span className="font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
+                profile
+              </span>
+              <span className="font-mono-ui text-[0.66rem] text-midground">
+                {activeProfile?.label ?? "default"}
+              </span>
+              {elapsedLabel && (
+                <span
+                  className="flex items-center gap-1 font-mono-ui tabular text-[0.62rem] text-[color:var(--color-success)]"
+                  title="agent is thinking"
                 >
-                  <span
-                    className="h-1.5 w-1.5 shrink-0 rounded-full"
-                    style={{
-                      background: profileTint(activeProfile?.id ?? "default"),
-                      boxShadow: `0 0 5px ${profileTint(activeProfile?.id ?? "default")}`,
-                    }}
+                  <motion.span
+                    aria-hidden
+                    animate={{ opacity: [1, 0.3, 1] }}
+                    transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
+                    className="h-1 w-1 rounded-full"
+                    style={{ background: "var(--color-success)" }}
                   />
-                  <span className="font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
-                    profile
-                  </span>
-                  <span className="font-mono-ui text-[0.66rem] text-midground">
-                    {activeProfile?.label ?? "default"}
-                  </span>
-                  <ChevronUpDownIcon width={10} height={10} className="text-text-tertiary" />
-                </button>
+                  {elapsedLabel}
+                </span>
+              )}
+              <ChevronUpDownIcon width={10} height={10} className="text-text-tertiary" />
+            </button>
 
-                <div className="min-w-0 flex-1" />
+            <div className="min-w-0 flex-1" />
 
-                {/* Active agents with a "#" — tap to open the Tasks board.
-                    Replaces the redundant model·provider readout. */}
+            {/* Context meter + compress — dropped below so the tree name has the
+                full top row. */}
+            {pct !== null && (
+              <>
                 <button
                   type="button"
-                  onClick={goTasks}
-                  aria-label={`${activeAgents} active sessions. Tap to view.`}
-                  className="flex shrink-0 items-center gap-1 font-mono-ui text-[0.62rem] text-text-disabled transition-colors active:text-midground"
+                  onClick={compress}
+                  title="Compress context (Ctrl+Shift+C)"
+                  className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[0.65rem] text-text-tertiary transition-colors hover:text-midground active:scale-90"
                 >
-                  <span>#</span>
-                  <span className="tabular text-text-tertiary">{activeAgents}</span>
-                  <span>{activeAgents === 1 ? "agent" : "agents"}</span>
+                  <CompressIcon width={13} height={13} />
                 </button>
+                <ContextMeter pct={pct} />
+              </>
+            )}
+
+            {/* Sessions — arrows + live count; tap to open the Sessions list. */}
+            <button
+              type="button"
+              onClick={goSessions}
+              aria-label={`${sessionCount} active sessions. Tap to view.`}
+              title={`${sessionCount} active sessions`}
+              className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 font-mono-ui text-[0.62rem] text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+            >
+              <ChevronUpDownIcon width={11} height={11} className="text-text-tertiary" />
+              <span className="tabular text-midground">{sessionCount}</span>
+              <span>{sessionCount === 1 ? "session" : "sessions"}</span>
+            </button>
           </div>
         </div>
-        )}
       </div>
 
       {/* Model / Profile sheet — left chip focuses profiles, right chip focuses models */}

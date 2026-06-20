@@ -75,7 +75,7 @@ function mkId(): string {
 }
 
 export function useChat() {
-  const { setActiveWorkspace, setStatus, setContextUsage, active, model, activeProfile } = useWorkspace();
+  const { setActiveWorkspace, setStatus, setContextUsage, setTurnStartedAt, active, model, activeProfile } = useWorkspace();
 
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [repos, setRepos] = useState<ChatRepo[]>([]);
@@ -87,6 +87,13 @@ export function useChat() {
   const [sending, setSending] = useState(false);
   const [loadingThreads, setLoadingThreads] = useState(true);
   const [threadsError, setThreadsError] = useState<string | null>(null);
+
+  // Queued messages — typed while a turn is running. Each drains automatically
+  // (FIFO) when the current turn finishes. A queued item can be cancelled before
+  // it sends. Kept in a ref too so the drain effect reads the latest without
+  // re-subscribing.
+  interface QueuedMsg { id: string; text: string; skills: string[]; images: ChatImage[] }
+  const [queued, setQueued] = useState<QueuedMsg[]>([]);
 
   const abortRef = useRef<AbortController | null>(null);
   const syncedRepoRef = useRef<string | null>(null);
@@ -215,6 +222,7 @@ export function useChat() {
           abortRef.current = null;
           setSending(false);
           setStatus("online");
+          setTurnStartedAt(null);
         }
 
         try {
@@ -402,6 +410,7 @@ export function useChat() {
       setMessages((m) => [...m, userMsg, pendingMsg]);
       setSending(true);
       setStatus("connecting");
+      setTurnStartedAt(Date.now());
 
       const patchPending = (patch: Partial<ChatMessage>) =>
         setMessages((m) => m.map((x) => (x.id === pendingMsg.id ? { ...x, ...patch } : x)));
@@ -518,10 +527,11 @@ export function useChat() {
       } finally {
         setSending(false);
         setStatus("online");
+        setTurnStartedAt(null);
         abortRef.current = null;
       }
     },
-    [sending, threads, activeThreadId, setStatus, setContextUsage, refreshThreads, model, activeProfile],
+    [sending, threads, activeThreadId, setStatus, setContextUsage, setTurnStartedAt, refreshThreads, model, activeProfile],
   );
 
   const stop = useCallback(() => {
@@ -538,6 +548,36 @@ export function useChat() {
       /* best-effort: local abort already happened */
     });
   }, [threads, activeThreadId]);
+
+  // Queue a message to send when the current turn finishes. If nothing is
+  // running, it sends immediately. Returns nothing; the draft is owned by the
+  // composer which clears on enqueue.
+  const enqueue = useCallback(
+    (text: string, skills: string[] = [], images: ChatImage[] = []) => {
+      const trimmed = text.trim();
+      if (!trimmed && images.length === 0) return;
+      if (!sending) {
+        void send(text, skills, images);
+        return;
+      }
+      setQueued((q) => [...q, { id: mkId(), text: trimmed, skills, images }]);
+    },
+    [sending, send],
+  );
+
+  const cancelQueued = useCallback((id: string) => {
+    setQueued((q) => q.filter((m) => m.id !== id));
+  }, []);
+
+  // Drain the queue: when a turn finishes (sending → false) and items are
+  // waiting, fire the next one. One at a time — the send sets sending=true again,
+  // which gates the next drain until it completes.
+  useEffect(() => {
+    if (sending || queued.length === 0) return;
+    const [next, ...rest] = queued;
+    setQueued(rest);
+    void send(next.text, next.skills, next.images);
+  }, [sending, queued, send]);
 
   // Start a brand new session for the active thread's repo, discarding the
   // current transcript binding so the next turn opens a fresh agent session.
@@ -647,6 +687,9 @@ export function useChat() {
     activeThreadId,
     messages,
     sending,
+    queued,
+    enqueue,
+    cancelQueued,
     loadingThreads,
     threadsError,
     selectThread,

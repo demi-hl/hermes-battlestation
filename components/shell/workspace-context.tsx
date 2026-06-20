@@ -91,6 +91,11 @@ interface WorkspaceContextValue {
   status: AgentStatus;
   setStatus: (next: AgentStatus) => void;
 
+  // Active turn — when a turn is running, the ms-epoch it started (else null).
+  // Drives the live m:ss timer in the ContextBar so you can see it's thinking.
+  turnStartedAt: number | null;
+  setTurnStartedAt: (v: number | null) => void;
+
   // Profiles
   profiles: AgentProfile[];
   activeProfile: AgentProfile | null;
@@ -159,6 +164,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   const [active, setActiveWorkspace] = useState<ActiveWorkspace | null>(null);
   const [contextUsage, setContextUsage] = useState<ContextUsage | null>(null);
   const [status, setStatus] = useState<AgentStatus>("online");
+  const [turnStartedAt, setTurnStartedAt] = useState<number | null>(null);
 
   // Models loaded from /api/models at boot
   const [models, setModels] = useState<ModelOption[]>(DEFAULT_MODELS);
@@ -336,6 +342,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       models, model, setModel,
       contextUsage, setContextUsage,
       status, setStatus,
+      turnStartedAt, setTurnStartedAt,
       profiles, activeProfile, setActiveProfile,
       repoAvatars, setRepoAvatar,
       activeSessions, addSession, updateSession, removeSession,
@@ -343,7 +350,7 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
       barCollapsed, setBarCollapsed,
       compress,
     }),
-    [active, models, model, setModel, contextUsage, status, profiles, activeProfile,
+    [active, models, model, setModel, contextUsage, status, turnStartedAt, profiles, activeProfile,
      setActiveProfile, repoAvatars, activeSessions, notifications, barCollapsed, compress,
      setRepoAvatar, addSession, updateSession, removeSession, dismissNotification],
   );
@@ -369,6 +376,8 @@ const WorkspaceContext = createContext<WorkspaceContextValue>({
   setContextUsage: () => {},
   status: "online",
   setStatus: () => {},
+  turnStartedAt: null,
+  setTurnStartedAt: () => {},
   profiles: DEFAULT_PROFILES,
   activeProfile: DEFAULT_PROFILES[0],
   setActiveProfile: () => {},
