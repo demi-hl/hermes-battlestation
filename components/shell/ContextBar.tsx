@@ -497,10 +497,10 @@ function ProfileEffort({ profile }: { profile: AgentProfile }) {
   const [effort, setEffort] = useState<string>(profile.effort ?? "");
   const [saving, setSaving] = useState<string | null>(null);
 
-  const select = async (next: EffortLevel) => {
+  const select = async (next: string) => {
     if (next === effort || saving) return;
     haptic(10);
-    setSaving(next);
+    setSaving(next || "auto");
     try {
       const res = await fetch("/api/profiles", {
         method: "POST",
@@ -515,30 +515,36 @@ function ProfileEffort({ profile }: { profile: AgentProfile }) {
     }
   };
 
+  // "auto" = clear the override (config default). The 5 explicit levels follow.
+  const CHIPS: { value: string; label: string }[] = [
+    { value: "", label: "auto" },
+    ...EFFORT_LEVELS.map((lvl) => ({ value: lvl, label: lvl })),
+  ];
+
   return (
     <div className="mx-auto mb-1 w-full max-w-sm px-3 pb-1">
       <span className="mb-1 block text-center font-mono-ui text-[0.5rem] uppercase tracking-wider text-text-tertiary">
         effort · {profile.label}
       </span>
-      <div className="grid grid-cols-5 gap-1">
-        {EFFORT_LEVELS.map((lvl) => {
-          const on = lvl === effort;
-          const busy = saving === lvl;
+      <div className="grid grid-cols-6 gap-1">
+        {CHIPS.map((chip) => {
+          const on = chip.value === effort;
+          const busy = saving === (chip.value || "auto");
           return (
             <button
-              key={lvl}
+              key={chip.value || "auto"}
               type="button"
-              onClick={() => select(lvl)}
+              onClick={() => select(chip.value)}
               aria-pressed={on}
               className={cn(
-                "rounded-[var(--radius-md)] border px-1 py-2 text-center font-mono-ui text-[0.6rem] transition-colors",
+                "rounded-[var(--radius-md)] border px-1 py-2 text-center font-mono-ui text-[0.58rem] transition-colors",
                 on
                   ? "border-transparent bg-midground text-background-base"
                   : "border-border text-text-secondary active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
                 busy && "opacity-60",
               )}
             >
-              {lvl}
+              {chip.label}
             </button>
           );
         })}
