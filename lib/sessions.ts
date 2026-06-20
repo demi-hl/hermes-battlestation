@@ -158,14 +158,17 @@ def pack(r):
 
 /** Look up the live session row by its session id. The ACP bridge does NOT
  *  rename sessions to `lol-*` (it auto-titles them), so the bridge map's id is
- *  the source of truth for a thread — resolve the row by id, not by title. */
+ *  the source of truth for a thread — resolve the row by id, not by title.
+ *  No `archived` filter here: the caller already holds an explicit id the
+ *  bridge maps to a live thread, so an archived DB row (the agent auto-archives
+ *  resumed sessions) must still surface its real message count + usage. */
 export async function querySessionById(id: string): Promise<SessionRow | null> {
   const script =
     ROW_SELECT +
     `
 sid = sys.argv[1]
 row = con.execute(
-    "SELECT * FROM sessions WHERE id=? AND archived IS NOT 1 LIMIT 1",
+    "SELECT * FROM sessions WHERE id=? LIMIT 1",
     (sid,),
 ).fetchone()
 print(json.dumps(pack(row) if row else None))
