@@ -336,8 +336,7 @@ export function Composer({
         // indicator safe area is covered by the keyboard, so collapse it via
         // --kb-open and keep only a small base pad. Falls back to the full safe
         // area when the keyboard is closed.
-        paddingBottom:
-          "calc(10px + env(safe-area-inset-bottom) * (1 - var(--kb-open, 0)))",
+        paddingBottom: "10px",
       }}
     >
       {skills.length > 0 && (
@@ -420,7 +419,7 @@ export function Composer({
             haptic(8);
             fileRef.current?.click();
           }}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] active:text-midground"
+          className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] active:text-midground"
         >
           <ImageIcon width={18} height={18} />
         </button>
@@ -443,7 +442,7 @@ export function Composer({
             haptic(8);
             onOpenSkills();
           }}
-          className="grid h-11 w-11 shrink-0 place-items-center rounded-full text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] active:text-midground"
+          className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] active:text-midground"
         >
           <SparkIcon width={18} height={18} />
         </button>
@@ -454,7 +453,7 @@ export function Composer({
           aria-pressed={recording}
           onClick={toggleDictation}
           className={cn(
-            "grid h-11 w-11 shrink-0 place-items-center rounded-full transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
+            "mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
             recording
               ? "text-[color-mix(in_srgb,var(--color-destructive)_90%,transparent)]"
               : "text-text-tertiary active:text-midground",
@@ -490,7 +489,7 @@ export function Composer({
           rows={1}
           inputMode="text"
           placeholder={`Message ${contextLabel}`}
-          className="scrollbar-none max-h-[140px] min-h-[28px] flex-1 resize-none bg-transparent py-1 text-[0.8rem] leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
+          className="scrollbar-none max-h-[140px] min-h-[28px] flex-1 resize-none bg-transparent py-1 text-base leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
         />
 
         {sending ? (
@@ -501,7 +500,7 @@ export function Composer({
               haptic(12);
               onStop();
             }}
-            className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[color-mix(in_srgb,var(--color-destructive)_85%,transparent)] text-white transition-transform active:scale-90"
+            className="mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full bg-[color-mix(in_srgb,var(--color-destructive)_85%,transparent)] text-white transition-transform active:scale-90"
           >
             <StopIcon width={15} height={15} />
           </button>
@@ -512,7 +511,7 @@ export function Composer({
             disabled={!value.trim() && images.length === 0}
             onClick={submit}
             className={cn(
-              "grid h-11 w-11 shrink-0 place-items-center rounded-full transition-all active:scale-90",
+              "mb-0.5 grid h-9 w-9 shrink-0 place-items-center rounded-full transition-all active:scale-90",
               value.trim() || images.length > 0
                 ? "bg-midground text-background-base"
                 : "bg-[color-mix(in_srgb,var(--midground)_12%,transparent)] text-text-tertiary",
