@@ -71,11 +71,14 @@ class AcpBridge {
   // sessions we've created/loaded in THIS process (no reload needed).
   private liveSessions = new Set<string>();
 
-  // The single in-flight turn's event sink. ACP gives no per-request session
-  // tagging on notifications, and we serialize turns per adapter, so one active
-  // sink at a time is correct.
-  private sink: ((ev: AcpTurnEvent) => void) | null = null;
-  private sinkSession: string | null = null;
+  // Per-session event sinks, keyed by ACP sessionId. Verified empirically: the
+  // agent tags EVERY session/update with its sessionId and runs prompts for
+  // different sessions CONCURRENTLY. So we route each update to the sink for its
+  // session — N turns stream in parallel on one warm adapter, with no
+  // cross-wiring. (The old single-sink design dumped a still-running turn's
+  // tokens into whatever turn started last.) toolCallIds are globally unique, so
+  // one shared kind map is safe across concurrent sessions.
+  private sinks = new Map<string, (ev: AcpTurnEvent) => void>();
   private toolKinds = new Map<string, ToolKind>();
 
   constructor(target: BridgeTarget) {
@@ -146,10 +149,10 @@ class AcpBridge {
         // Reject any in-flight waiters.
         for (const [, p] of this.pending) p.reject(new Error("acp adapter exited"));
         this.pending.clear();
-        if (this.sink) {
-          this.sink({ kind: "error", error: "agent process exited" });
-          this.sink = null;
+        for (const sink of this.sinks.values()) {
+          sink({ kind: "error", error: "agent process exited" });
         }
+        this.sinks.clear();
       });
       child.on("error", (e) => reject(e));
 
@@ -189,25 +192,31 @@ class AcpBridge {
           }
         }
       } else if (msg.method === "session/update") {
-        this.onUpdate((msg.params as Record<string, unknown>)?.update as Record<string, unknown>);
+        const params = msg.params as Record<string, unknown> | undefined;
+        this.onUpdate(
+          params?.sessionId as string | undefined,
+          params?.update as Record<string, unknown> | undefined,
+        );
       }
       // server->client requests (fs/permission) are not expected: we declared
       // no fs capability and run --accept-hooks, so nothing to answer.
     }
   }
 
-  private onUpdate(u: Record<string, unknown> | undefined) {
-    if (!u || !this.sink) return;
+  private onUpdate(sessionId: string | undefined, u: Record<string, unknown> | undefined) {
+    if (!u) return;
+    const sink = sessionId ? this.sinks.get(sessionId) : undefined;
+    if (!sink) return;
     const kind = u.sessionUpdate as string;
     switch (kind) {
       case "agent_message_chunk": {
         const text = ((u.content as Record<string, unknown>)?.text as string) ?? "";
-        if (text) this.sink({ kind: "delta", text });
+        if (text) sink({ kind: "delta", text });
         break;
       }
       case "agent_thought_chunk": {
         const text = ((u.content as Record<string, unknown>)?.text as string) ?? "";
-        if (text) this.sink({ kind: "thought", text });
+        if (text) sink({ kind: "thought", text });
         break;
       }
       case "tool_call": {
@@ -215,7 +224,7 @@ class AcpBridge {
         const name = (u.kind as string) ?? (u.title as string) ?? "tool";
         const title = (u.title as string) ?? name;
         this.toolKinds.set(id, { name, title });
-        this.sink({ kind: "tool-start", id, name, title });
+        sink({ kind: "tool-start", id, name, title });
         break;
       }
       case "tool_call_update": {
@@ -224,7 +233,7 @@ class AcpBridge {
         if (status === "completed" || status === "failed") {
           const meta = this.toolKinds.get(id) ?? { name: "tool", title: "tool" };
           this.toolKinds.delete(id);
-          this.sink({
+          sink({
             kind: "tool-end",
             id,
             name: meta.name,
@@ -235,7 +244,7 @@ class AcpBridge {
         break;
       }
       case "usage_update": {
-        this.sink({
+        sink({
           kind: "usage",
           used: (u.used as number) ?? 0,
           total: (u.size as number) ?? 0,
@@ -316,8 +325,6 @@ class AcpBridge {
     }
 
     for (let attempt = 0; attempt < 2; attempt++) {
-      this.sink = onEvent;
-      this.sinkSession = id;
       this.toolKinds.clear();
       let gotContent = false;
       const wrapped = (ev: AcpTurnEvent) => {
@@ -329,7 +336,9 @@ class AcpBridge {
         onEvent(ev);
       };
 
-      this.sink = wrapped;
+      // Register this turn's sink under its sessionId so concurrent turns on
+      // OTHER sessions keep streaming to their own sinks (no cross-wiring).
+      this.sinks.set(id, wrapped);
       onEvent({ kind: "session", sessionId: id, isNew });
 
       let stopReason = "end_turn";
@@ -344,6 +353,7 @@ class AcpBridge {
         failed = true;
         // A loaded session may reject on prompt if its backing row was pruned.
         if (attempt === 0 && !isNew) {
+          this.sinks.delete(id);
           this.invalidate(repo, id);
           const fresh = await this.resolveSession(repo, cwd);
           id = fresh.id;
@@ -352,10 +362,7 @@ class AcpBridge {
         }
         onEvent({ kind: "error", error: e instanceof Error ? e.message : "prompt failed" });
       } finally {
-        if (this.sinkSession === id) {
-          this.sink = null;
-          this.sinkSession = null;
-        }
+        this.sinks.delete(id);
       }
 
       // Dead loaded session: resolved with no content. Retry once fresh.
