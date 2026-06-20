@@ -177,40 +177,76 @@ export function useChat() {
   }, [messages, activeThreadId]);
 
   // DURABLE TURNS — foreground re-sync. A turn keeps running on the host when
-  // the app is backgrounded (the send route no longer cancels on disconnect),
-  // so on return we re-pull the active thread's transcript from state.db to show
-  // a turn that completed while away. Guarded: skip if a stream is live locally
-  // (abortRef set) so we never clobber an in-flight turn.
+  // the app is backgrounded (the send route no longer cancels on disconnect).
+  // iOS freezes the in-flight fetch when backgrounded, so the stream's `finally`
+  // (which clears abortRef + sending) may never run — leaving an orphaned
+  // in-flight guard and a stuck `pending` bubble. On foreground we ask the host
+  // whether the turn is STILL running:
+  //   - still running  → leave the pending bubble; a later foreground re-pull
+  //     (or the turn-done push) resolves it. Don't clobber a live turn.
+  //   - not running     → the turn finished (or died) while away. Clear the
+  //     orphaned abortRef/sending and adopt backend truth, replacing the stuck
+  //     pending/error bubble with the real persisted reply.
   useEffect(() => {
     const onForeground = () => {
       if (document.visibilityState !== "visible") return;
-      if (abortRef.current) return; // a live stream owns the messages
       const thread = threads.find((t) => t.id === activeThreadId);
       const repo = thread?.repo ?? "general";
       const branch = thread?.branch ?? null;
       const qs = new URLSearchParams({ repo });
       if (branch) qs.set("branch", branch);
-      fetch(`/api/chat/history?${qs.toString()}`, { cache: "no-store" })
-        .then((r) => (r.ok ? r.json() : null))
-        .then((data: { messages?: ChatMessage[] } | null) => {
+
+      (async () => {
+        // Is a durable turn still running for this thread on the host?
+        let running = false;
+        try {
+          const r = await fetch(`/api/chat/turn-status?${qs.toString()}`, { cache: "no-store" });
+          if (r.ok) running = !!((await r.json()) as { running?: boolean }).running;
+        } catch {
+          /* status unreachable — fall through and try the history re-pull */
+        }
+
+        // A live LOCAL stream still owns the messages only if the turn is also
+        // still running on the host. If the host says it's done but abortRef is
+        // still set, the stream froze on background and never cleaned up — clear
+        // the orphan so the UI unsticks.
+        if (running && abortRef.current) return;
+        if (!running && abortRef.current) {
+          abortRef.current = null;
+          setSending(false);
+          setStatus("online");
+        }
+
+        try {
+          const res = await fetch(`/api/chat/history?${qs.toString()}`, { cache: "no-store" });
+          if (!res.ok) return;
+          const data = (await res.json()) as { messages?: ChatMessage[] } | null;
           if (!data?.messages?.length) return;
           setMessages((prev) => {
-            if (prev.some((m) => m.pending)) return prev; // never clobber live
-            // Backend has more (the away-turn landed) or we were showing a
-            // dropped-connection error bubble → adopt backend truth.
-            const staleError = prev.some((m) => m.error);
-            if (data.messages!.length >= prev.length || staleError) {
-              return data.messages!;
-            }
+            // The turn is still running — keep our live/pending bubble, don't
+            // overwrite with a transcript that doesn't have the reply yet.
+            if (running && prev.some((m) => m.pending)) return prev;
+            // Turn finished/died while away, or we were showing a stuck
+            // pending / dropped-connection error bubble → adopt backend truth.
+            const stuck = prev.some((m) => m.pending || m.error);
+            if (data.messages!.length >= prev.length || stuck) return data.messages!;
             return prev;
           });
-        })
-        .catch(() => {});
-      void refreshThreads();
+        } catch {
+          /* offline — keep the localStorage paint */
+        }
+        void refreshThreads();
+      })();
     };
     document.addEventListener("visibilitychange", onForeground);
-    return () => document.removeEventListener("visibilitychange", onForeground);
-  }, [activeThreadId, threads, refreshThreads]);
+    // iOS can restore the PWA from the page cache (bfcache) without firing
+    // visibilitychange — pageshow covers that return path.
+    window.addEventListener("pageshow", onForeground);
+    return () => {
+      document.removeEventListener("visibilitychange", onForeground);
+      window.removeEventListener("pageshow", onForeground);
+    };
+  }, [activeThreadId, threads, refreshThreads, setStatus]);
 
   // Drive the bottom ContextBar from the active thread.
   const bindWorkspace = useCallback(
@@ -528,23 +564,58 @@ export function useChat() {
   // Retry a failed turn: drop the errored assistant bubble + its user message,
   // then resend the captured payload. Used by the "tap to retry" affordance on a
   // failed bubble (genuine errors, or a dropped connection where the turn didn't
-  // actually land server-side).
+  // actually land server-side). If the durable turn is STILL running on the host
+  // (the app backgrounded mid-turn and it kept going), a resend would collide
+  // with the per-thread lock ("a turn is already running") — so we reconnect by
+  // re-pulling history instead, and let the running turn land on its own.
   const retry = useCallback(
     (msgId: string) => {
       const failed = messages.find((m) => m.id === msgId);
       if (!failed?.retry) return;
       const payload = failed.retry;
-      const idx = messages.findIndex((m) => m.id === msgId);
-      // Strip the errored assistant bubble and the immediately-preceding user
-      // bubble (the one being resent) so we don't duplicate it.
-      setMessages((m) => {
-        const userIdx = idx > 0 && m[idx - 1]?.role === "user" ? idx - 1 : idx;
-        return m.filter((_, i) => i !== idx && i !== userIdx);
-      });
-      const imgs = payload.images.map((data) => ({ data, mime: "image/png" }));
-      void send(payload.text, payload.skills, imgs);
+      const thread = threads.find((t) => t.id === activeThreadId);
+      const repo = thread?.repo ?? "general";
+      const branch = thread?.branch ?? null;
+      const qs = new URLSearchParams({ repo });
+      if (branch) qs.set("branch", branch);
+
+      void (async () => {
+        // Is the turn this bubble belongs to still running on the host?
+        let running = false;
+        try {
+          const r = await fetch(`/api/chat/turn-status?${qs.toString()}`, { cache: "no-store" });
+          if (r.ok) running = !!((await r.json()) as { running?: boolean }).running;
+        } catch {
+          /* status unreachable — fall back to a resend */
+        }
+
+        if (running) {
+          // Reconnect: pull backend truth so the (eventually) completed reply
+          // replaces this error bubble. No colliding send.
+          try {
+            const res = await fetch(`/api/chat/history?${qs.toString()}`, { cache: "no-store" });
+            if (res.ok) {
+              const data = (await res.json()) as { messages?: ChatMessage[] } | null;
+              if (data?.messages?.length) setMessages(data.messages);
+            }
+          } catch {
+            /* leave the error bubble; foreground re-sync will catch it */
+          }
+          return;
+        }
+
+        // Turn is not running → a real resend. Strip the errored assistant
+        // bubble + the user message being resent so we don't duplicate it.
+        const idx = messages.findIndex((m) => m.id === msgId);
+        setMessages((m) => {
+          const userIdx = idx > 0 && m[idx - 1]?.role === "user" ? idx - 1 : idx;
+          return m.filter((_, i) => i !== idx && i !== userIdx);
+        });
+        const imgs = payload.images.map((data) => ({ data, mime: "image/png" }));
+        void send(payload.text, payload.skills, imgs);
+      })();
     },
-    [messages, send],
+    [messages, threads, activeThreadId, send],
   );
 
   // Create a git branch in the active thread's repo (no-op for general).

@@ -301,6 +301,12 @@ export function tryLock(title: string): boolean {
 export function unlock(title: string): void {
   activeTitles.delete(title);
 }
+/** True while a durable turn for this title is still running on the host. The
+ *  client polls this on foreground to reconnect to (not collide with) a turn
+ *  that kept running while the app was backgrounded. */
+export function isLocked(title: string): boolean {
+  return activeTitles.has(title);
+}
 
 /** Build the argv for a chat turn. `resume` true => continue the named session;
  *  false => fresh session (first turn, renamed afterward). */
