@@ -313,7 +313,13 @@ function ProfileChips({
   onSelect: (p: string) => void;
 }) {
   return (
-    <div className="flex gap-1.5 overflow-x-auto border-b border-border px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+    <div
+      className="flex gap-1.5 overflow-x-auto border-b border-border px-2 py-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      // iOS WKWebView smears composited text over the difference-blend Backdrop
+      // during momentum scroll — isolating the row into its own stacking context
+      // + GPU layer kills the smear (same fix as the pane scroller).
+      style={{ isolation: "isolate", transform: "translateZ(0)" }}
+    >
       {profiles.map((p) => {
         const on = p.name === active;
         const tint = profileTint(p.name);
@@ -333,11 +339,11 @@ function ProfileChips({
               className="h-1.5 w-1.5 shrink-0 rounded-full"
               style={{ background: tint, boxShadow: on ? "none" : `0 0 4px ${tint}` }}
             />
-            <span className="font-mono-ui">{p.name}</span>
+            <span className="shrink-0 whitespace-nowrap font-mono-ui">{p.name}</span>
             <span
               className={cn(
-                "rounded-full px-1 font-mono-ui tabular text-[0.58rem]",
-                on ? "bg-background-base/20" : "text-text-tertiary",
+                "ml-0.5 grid h-4 min-w-[1.1rem] shrink-0 place-items-center rounded-full px-1 font-mono-ui tabular text-[0.58rem] leading-none",
+                on ? "bg-background-base/20" : "bg-[color-mix(in_srgb,var(--midground)_10%,transparent)] text-text-tertiary",
               )}
             >
               {p.count}

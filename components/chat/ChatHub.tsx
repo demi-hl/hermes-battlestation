@@ -25,13 +25,24 @@ export function ChatHub() {
   const [themeOpen, setThemeOpen] = useState(false);
   const [skills, setSkills] = useState<string[]>([]);
 
-  // Open a specific session from another tab (Sessions pane → "open in chat").
-  // The Sessions pane fires `lo-nav` to switch to this tab AND `lo-open-session`
-  // with the thread id; we select it here. Same window-event bus as lo-prefill.
+  // Open a specific session from another tab (Sessions pane → "open in chat",
+  // Tasks card → tap). The source fires `lo-nav` to switch to this tab AND
+  // `lo-open-session` with either a thread id (threadId) or a raw Hermes session
+  // id (sessionId). A threadId selects directly; a sessionId is resolved to the
+  // thread whose backing session matches (else ignored — fleet/cron/telegram
+  // sessions have no chat thread to open into). Same window-event bus as
+  // lo-prefill.
   useEffect(() => {
     const onOpen = (e: Event) => {
-      const id = (e as CustomEvent<{ threadId?: string }>).detail?.threadId;
-      if (id) chat.selectThread(id);
+      const detail = (e as CustomEvent<{ threadId?: string; sessionId?: string }>).detail;
+      if (detail?.threadId) {
+        chat.selectThread(detail.threadId);
+        return;
+      }
+      if (detail?.sessionId) {
+        const match = chat.threads.find((t) => t.sessionId === detail.sessionId);
+        if (match) chat.selectThread(match.id);
+      }
     };
     window.addEventListener("lo-open-session", onOpen as EventListener);
     return () =>

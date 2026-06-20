@@ -15,6 +15,8 @@ import { haptic } from "./haptics";
 import { usePush } from "./usePush";
 import { cn } from "@/lib/utils";
 import { profileTint } from "@/lib/profile-color";
+import { usePolling } from "@/components/usePolling";
+import type { FleetAgent } from "@/lib/fleet/types";
 import { AnimatePresence, motion } from "framer-motion";
 
 /** How long to show a notification before auto-dismiss. */
@@ -45,11 +47,35 @@ function groupModels(models: ModelOption[]): [string, ModelOption[]][] {
 export function ContextBar() {
   const {
     active, model, contextUsage, status,
-    activeSessions, profiles, activeProfile, setActiveProfile,
+    profiles, activeProfile, setActiveProfile,
     notifications, dismissNotification, compress, repoAvatars,
+    barCollapsed, setBarCollapsed,
   } = useWorkspace();
 
   const [sheet, setSheet] = useState<"model" | "profile" | "effort" | null>(null);
+
+  // Live active-agent count — same source + lanes as the desktop status bar
+  // (working + spawned). Surfaced as a tappable "# N" badge that jumps to the
+  // Tasks board so the active sessions are one tap away.
+  const agents = usePolling<FleetAgent[]>("/api/fleet/agents", 10_000);
+  const activeAgents = (agents.data ?? []).filter(
+    (a) => a.lane === "working" || a.lane === "spawned",
+  ).length;
+  const goTasks = useCallback(() => {
+    haptic(8);
+    window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "tasks" } }));
+  }, []);
+
+  // Reserve only the height the bar actually occupies. Collapsed = the single
+  // top row (40px); expanded = top row + profile row (66px). Panes pad by
+  // --app-context-h, so shrinking it when collapsed hands the freed band back
+  // to the content (the session tree) instead of leaving dead space.
+  useEffect(() => {
+    document.documentElement.style.setProperty(
+      "--app-context-h",
+      barCollapsed ? "40px" : "66px",
+    );
+  }, [barCollapsed]);
 
   // Current global reasoning effort — surfaced as a tappable chip in the bar so
   // it's one tap (not buried in the sheet). Re-read when the sheet closes, since
@@ -154,15 +180,40 @@ export function ContextBar() {
             </button>
           )}
 
-          {/* Active sessions dot badge */}
-          {activeSessions.length > 0 && (
-            <span className="flex shrink-0 items-center justify-center h-4 min-w-[16px] rounded-full bg-midground/20 px-1 font-mono-ui text-[0.55rem] text-midground">
-              {activeSessions.length}
-            </span>
+          {/* Active agents — tap the "# N" to jump to the Tasks board (the live
+              session list). Mirrors the desktop status bar's agent count. */}
+          {activeAgents > 0 && (
+            <button
+              type="button"
+              onClick={goTasks}
+              aria-label={`${activeAgents} active sessions. Tap to view.`}
+              title={`${activeAgents} active sessions`}
+              className="flex shrink-0 items-center gap-0.5 rounded-full bg-midground/20 px-1.5 py-0.5 font-mono-ui text-[0.58rem] text-midground transition-transform active:scale-90"
+            >
+              <span className="text-text-tertiary">#</span>
+              <span className="tabular">{activeAgents}</span>
+            </button>
           )}
+
+          {/* Collapse toggle — drop the profile row out of the way so the tree
+              (Sessions/Tasks) gets the vertical band back. */}
+          <button
+            type="button"
+            onClick={() => { haptic(6); setBarCollapsed(!barCollapsed); }}
+            aria-label={barCollapsed ? "Show profile row" : "Hide profile row"}
+            aria-expanded={!barCollapsed}
+            className="grid h-6 w-6 shrink-0 place-items-center rounded-full text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+          >
+            <ChevronUpDownIcon
+              width={13}
+              height={13}
+              className={cn("transition-transform", barCollapsed ? "" : "rotate-180")}
+            />
+          </button>
         </div>
 
-        {/* ---- Profile + active-sessions row (always shown) ---- */}
+        {/* ---- Profile + model row — collapsible (hidden by default) ---- */}
+        {!barCollapsed && (
         <div className="overflow-hidden border-t border-border/50">
           <div className="flex items-center gap-3 px-3 py-1.5">
                 {/* Profile — tap to switch the brain that runs your turns */}
@@ -190,12 +241,21 @@ export function ContextBar() {
 
                 <div className="min-w-0 flex-1" />
 
-                {/* Last-used model info */}
-                <span className="shrink-0 font-mono-ui tabular text-[0.62rem] text-text-disabled">
-                  {model.id} · {model.provider}
-                </span>
+                {/* Active agents with a "#" — tap to open the Tasks board.
+                    Replaces the redundant model·provider readout. */}
+                <button
+                  type="button"
+                  onClick={goTasks}
+                  aria-label={`${activeAgents} active sessions. Tap to view.`}
+                  className="flex shrink-0 items-center gap-1 font-mono-ui text-[0.62rem] text-text-disabled transition-colors active:text-midground"
+                >
+                  <span>#</span>
+                  <span className="tabular text-text-tertiary">{activeAgents}</span>
+                  <span>{activeAgents === 1 ? "agent" : "agents"}</span>
+                </button>
           </div>
         </div>
+        )}
       </div>
 
       {/* Model / Profile sheet — left chip focuses profiles, right chip focuses models */}
