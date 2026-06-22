@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { haptic } from "@/components/shell/haptics";
 import { cn } from "@/lib/utils";
+import { Composer } from "@/components/chat/Composer";
 
 interface Msg {
   id: string;
@@ -38,7 +39,6 @@ export function SessionReader() {
   const [meta, setMeta] = useState<{ profile: string; id: string } | null>(null);
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
   const [loading, setLoading] = useState(false);
-  const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
   const fallbackAttemptedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -53,7 +53,6 @@ export function SessionReader() {
       setTitle(d.title || "session");
       setMeta({ profile: d.profile || "default", id: d.id });
       setMsgs(null);
-      setInput("");
       setSending(false);
       fallbackAttemptedRef.current = false;
       setOpen(true);
@@ -144,15 +143,14 @@ export function SessionReader() {
     setOpen(false);
   };
 
-  const send = async () => {
-    const text = input.trim();
-    if (!text || sending || !meta) return;
+  const send = async (text: string, images?: { data: string; mime: string }[]) => {
+    const trimmed = text.trim();
+    if ((!trimmed && !(images && images.length)) || sending || !meta) return;
     haptic(8);
-    const userMsg: Msg = { id: mkId(), role: "user", text, ts: Date.now() };
+    const userMsg: Msg = { id: mkId(), role: "user", text: trimmed, ts: Date.now() };
     const pendingId = mkId();
     const pendingMsg: Msg = { id: pendingId, role: "assistant", text: "", ts: Date.now(), pending: true };
     setMsgs((m) => [...(m ?? []), userMsg, pendingMsg]);
-    setInput("");
     setSending(true);
 
     const patch = (p: Partial<Msg>) =>
@@ -164,7 +162,7 @@ export function SessionReader() {
       const res = await fetch("/api/sessions/continue", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId: meta.id, profile: meta.profile, message: text }),
+        body: JSON.stringify({ sessionId: meta.id, profile: meta.profile, message: trimmed, images }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {
@@ -293,40 +291,20 @@ export function SessionReader() {
             )}
           </div>
 
-          {/* continue composer */}
-          <div className="shrink-0 border-t border-border px-3 py-2.5">
-            <div className="flex items-end gap-2">
-              <textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void send();
-                  }
-                }}
-                rows={1}
-                placeholder="Continue this session…"
-                disabled={sending}
-                className="max-h-32 min-h-[2.5rem] flex-1 resize-none rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] px-3 py-2 text-[0.85rem] text-midground outline-none placeholder:text-text-disabled focus:border-[color-mix(in_srgb,var(--midground)_30%,transparent)]"
-              />
-              <button
-                type="button"
-                onClick={() => void send()}
-                disabled={sending || !input.trim()}
-                aria-label="Send"
-                className="grid h-10 w-10 shrink-0 place-items-center rounded-[var(--radius-md)] bg-midground text-background-base transition-opacity disabled:opacity-40 active:scale-95"
-              >
-                {sending ? (
-                  <span className="h-2.5 w-2.5 animate-pulse rounded-full bg-background-base" />
-                ) : (
-                  <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M5 12h14M13 6l6 6-6 6" />
-                  </svg>
-                )}
-              </button>
-            </div>
-          </div>
+          {/* continue composer — the SAME Composer as the Chat tab */}
+          <Composer
+            onSend={(text, images) => void send(text, images)}
+            onStop={() => abortRef.current?.abort()}
+            onNewSession={close}
+            onTask={() => {}}
+            sending={sending}
+            queued={[]}
+            onCancelQueued={() => {}}
+            skills={[]}
+            onRemoveSkill={() => {}}
+            onOpenSkills={() => {}}
+            contextLabel={title}
+          />
         </motion.div>
       )}
     </AnimatePresence>
