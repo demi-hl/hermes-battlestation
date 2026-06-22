@@ -254,8 +254,9 @@ export function SessionReader() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-x-0 top-0 z-[40] mx-auto flex max-w-[560px] flex-col overflow-hidden bg-[color-mix(in_srgb,var(--background-base)_94%,transparent)] backdrop-blur-xl"
+          className="fixed inset-x-0 top-0 z-[40] mx-auto flex max-w-[560px] flex-col overflow-hidden backdrop-blur-xl"
           style={{
+            background: "var(--background-base)",
             // Stop ABOVE the bottom chrome (context bar + tab bar) so it stays
             // visible — the reader should feel like the Chat tab, not a full
             // takeover. When the keyboard opens the chrome translates away
