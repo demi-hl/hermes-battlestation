@@ -528,10 +528,6 @@ export function Composer({
           rows={1}
           inputMode="text"
           placeholder={placeholder ?? `Message ${contextLabel}`}
-          style={{
-            fontFamily:
-              'system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif',
-          }}
           className="scrollbar-none max-h-[140px] min-h-[28px] flex-1 resize-none bg-transparent py-1 text-base leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
         />
 
