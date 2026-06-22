@@ -78,6 +78,7 @@ export function Composer({
   onRemoveSkill,
   onOpenSkills,
   contextLabel,
+  placeholder,
 }: {
   onSend: (text: string, images?: { data: string; mime: string }[]) => void;
   onStop: () => void;
@@ -90,6 +91,7 @@ export function Composer({
   onRemoveSkill: (s: string) => void;
   onOpenSkills: () => void;
   contextLabel: string;
+  placeholder?: string;
 }) {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<{ id: string; data: string; mime: string }[]>([]);
@@ -525,7 +527,7 @@ export function Composer({
           }}
           rows={1}
           inputMode="text"
-          placeholder={`Message ${contextLabel}`}
+          placeholder={placeholder ?? `Message ${contextLabel}`}
           className="scrollbar-none max-h-[140px] min-h-[28px] flex-1 resize-none bg-transparent py-1 text-base leading-relaxed text-text-primary outline-none placeholder:text-text-tertiary"
         />
 

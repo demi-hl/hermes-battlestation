@@ -257,6 +257,11 @@ export function SessionsPane() {
         <SearchBar value={search} onChange={setSearch} />
       </div>
 
+      {/* Active now — the SAME source the ContextBar badge counts
+          (/api/fleet/agents working+spawned), so the badge's "N sessions"
+          always equals what's listed here. Tap to continue the live session. */}
+      <ActiveNowSection />
+
       {/* Profile filter chips — default (resumable) + every other profile's
           store (read-only history). Only shown when >1 profile exists. */}
       {profiles.length > 1 && (
@@ -279,11 +284,102 @@ export function SessionsPane() {
           from /api/sessions/all so the chip BADGE always equals the LIST.
           Default rows stay resumable (Open-in-chat); other profiles are
           read-only history. */}
+      <p className="px-3 pb-1 pt-3 font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
+        History
+      </p>
       <ProfileSessions
         profile={activeProfile}
         search={search}
         resumable={activeProfile === "default"}
       />
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Active now — live sessions from /api/fleet/agents (the badge's source)
+// ---------------------------------------------------------------------------
+
+interface ActiveAgent {
+  id: string;
+  objective: string;
+  lane: string;
+  signal: string;
+  lastSignal: number;
+}
+
+function ActiveNowSection() {
+  const [agents, setAgents] = useState<ActiveAgent[]>([]);
+
+  const load = useCallback(async () => {
+    try {
+      const res = await fetch("/api/fleet/agents", { cache: "no-store" });
+      if (!res.ok) return;
+      const body = (await res.json()) as { data?: ActiveAgent[] };
+      const live = (body.data ?? []).filter(
+        (a) => a.lane === "working" || a.lane === "spawned",
+      );
+      setAgents(live);
+    } catch {
+      /* offline — keep last */
+    }
+  }, []);
+
+  // Same 10s cadence as the ContextBar badge so the two never drift.
+  useEffect(() => {
+    load();
+    const id = setInterval(load, 10_000);
+    return () => clearInterval(id);
+  }, [load]);
+
+  if (agents.length === 0) return null;
+
+  const open = (a: ActiveAgent) => {
+    haptic([6, 4, 8]);
+    // Continue the live session in the full-screen reader (same path the
+    // Sessions rows use). The agent id IS the Hermes session id.
+    window.dispatchEvent(
+      new CustomEvent("lo-read-session", {
+        detail: { profile: "default", id: a.id, title: a.objective || "session" },
+      }),
+    );
+  };
+
+  return (
+    <div className="border-b border-border px-2 py-2">
+      <p className="flex items-center gap-1.5 px-1 pb-1.5 font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
+        <span className="h-1.5 w-1.5 rounded-full bg-[color:var(--color-positive,#34d399)] shadow-[0_0_5px_var(--color-positive,#34d399)]" />
+        Active now · {agents.length}
+      </p>
+      <ul className="flex flex-col gap-1">
+        {agents.map((a) => (
+          <li key={a.id}>
+            <button
+              type="button"
+              onClick={() => open(a)}
+              className="flex w-full items-center gap-2 rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] px-2.5 py-2 text-left transition-colors active:bg-[color-mix(in_srgb,var(--midground)_10%,transparent)]"
+            >
+              <span
+                className={cn(
+                  "h-1.5 w-1.5 shrink-0 rounded-full",
+                  a.lane === "working"
+                    ? "animate-pulse bg-[color:var(--color-positive,#34d399)]"
+                    : "bg-text-tertiary",
+                )}
+              />
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[0.8rem] text-midground">
+                  {a.objective || "session"}
+                </span>
+                <span className="block truncate font-mono-ui text-[0.6rem] text-text-tertiary">
+                  {a.signal}
+                </span>
+              </span>
+              <ChevronRightIcon width={14} height={14} className="shrink-0 text-text-tertiary" />
+            </button>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
