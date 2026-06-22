@@ -545,6 +545,22 @@ class AcpBridge {
     await this.cancel(repo);
     return true;
   }
+
+  /**
+   * Cancel a turn by RAW session id (the continue-session path uses
+   * promptSession(sessionId, …) directly, so it isn't in the repoSession map).
+   * Fires session/cancel for the given id; best-effort, returns true if the
+   * RPC was attempted on a live child.
+   */
+  async cancelBySessionId(sessionId: string): Promise<boolean> {
+    if (!sessionId || !this.child) return false;
+    try {
+      await this.rpc("session/cancel", { sessionId });
+      return true;
+    } catch {
+      return false;
+    }
+  }
 }
 
 // Module singleton registry — one warm bridge per (profile, model, provider),
