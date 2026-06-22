@@ -3,8 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { haptic } from "@/components/shell/haptics";
-import { cn } from "@/lib/utils";
 import { Composer } from "@/components/chat/Composer";
+import { MessageList } from "@/components/chat/MessageList";
+import type { ChatMessage } from "@/components/chat/useChat";
 
 interface Msg {
   id: string;
@@ -278,50 +279,31 @@ export function SessionReader() {
               </svg>
             </button>
             <div className="flex min-w-0 flex-1 flex-col">
-              <span className="truncate text-[0.95rem] font-medium text-midground">{title}</span>
+              <span className="truncate font-mondwest text-display text-[0.9rem] tracking-wide text-midground">{title}</span>
               <span className="font-mono-ui text-[0.62rem] uppercase tracking-wider text-text-tertiary">
                 {meta?.profile} · {msgs ? `${msgs.length} messages` : "loading"}
               </span>
             </div>
           </div>
 
-          {/* transcript */}
-          <div ref={scrollRef} className="flex-1 overflow-y-auto overscroll-contain px-3 py-3">
+          {/* transcript — the SAME MessageList as the Chat tab (bubbles,
+              markdown, hermes label, tool tray) so the theme matches exactly. */}
+          <div
+            ref={scrollRef}
+            data-msg-scroll
+            className="flex-1 overflow-y-auto overscroll-contain"
+          >
             {loading ? (
-              <div className="flex items-center gap-2 py-6">
+              <div className="flex items-center gap-2 px-3 py-6">
                 <span className="h-2 w-2 animate-pulse rounded-full bg-text-tertiary" />
                 <span className="text-[0.8rem] text-text-tertiary">Loading transcript…</span>
               </div>
             ) : msgs && msgs.length > 0 ? (
-              <div className="flex flex-col gap-2.5 pb-4">
-                {msgs.map((m) => (
-                  <div
-                    key={m.id}
-                    className={cn(
-                      "rounded-[var(--radius-md)] px-3 py-2.5",
-                      m.error
-                        ? "bg-[color-mix(in_srgb,var(--color-destructive,#f87171)_12%,transparent)] text-[color:var(--color-destructive,#f87171)]"
-                        : m.role === "user"
-                          ? "bg-[color-mix(in_srgb,var(--midground)_10%,transparent)] text-text-secondary"
-                          : "bg-[color-mix(in_srgb,var(--midground)_4%,transparent)] text-text-tertiary",
-                    )}
-                  >
-                    <span className="font-mono-ui text-[0.56rem] uppercase tracking-wider text-text-disabled">
-                      {m.role}
-                    </span>
-                    {m.pending && !m.text ? (
-                      <div className="mt-1 flex items-center gap-2">
-                        <span className="h-2 w-2 animate-pulse rounded-full bg-text-tertiary" />
-                        <span className="text-[0.8rem] text-text-tertiary">Working…</span>
-                      </div>
-                    ) : (
-                      <p className="mt-1 whitespace-pre-wrap break-words text-[0.84rem] leading-relaxed">
-                        {m.text}
-                      </p>
-                    )}
-                  </div>
-                ))}
-              </div>
+              <MessageList
+                messages={msgs as ChatMessage[]}
+                thread={null}
+                sending={sending}
+              />
             ) : (
               <p className="py-8 text-center text-[0.82rem] text-text-tertiary">No messages in this session.</p>
             )}
