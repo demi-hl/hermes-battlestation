@@ -379,6 +379,121 @@ class AcpBridge {
     }
   }
 
+  /**
+   * Continue an EXACT Hermes session by its store id (not a repo binding).
+   * Loads the session into this warm adapter if needed (cold `session/load`
+   * pulls it from the shared state.db — works for telegram/cron/CLI sessions
+   * that were never opened as a repo thread), then runs one streamed turn.
+   * This is what powers "Continue" in the SessionReader: resume any session,
+   * not just the 1-2 live bridge threads.
+   */
+  async promptSession(
+    sessionId: string,
+    cwd: string,
+    text: string,
+    onEvent: (ev: AcpTurnEvent) => void,
+    images: { data: string; mime: string }[] = [],
+  ): Promise<void> {
+    await this.ensureProc();
+    if (!this.liveSessions.has(sessionId)) {
+      try {
+        await this.rpc("session/load", { sessionId, cwd, mcpServers: [] });
+        this.liveSessions.add(sessionId);
+      } catch (e) {
+        onEvent({
+          kind: "error",
+          error: e instanceof Error ? e.message : "could not load session",
+        });
+        onEvent({ kind: "done", stopReason: "error" });
+        return;
+      }
+    }
+
+    const promptBlocks: Record<string, unknown>[] = [{ type: "text", text }];
+    for (const img of images) {
+      const raw = img.data.startsWith("data:")
+        ? img.data.slice(img.data.indexOf(",") + 1)
+        : img.data;
+      if (!raw) continue;
+      promptBlocks.push({ type: "image", data: raw, mimeType: img.mime || "image/png" });
+    }
+
+    this.toolKinds.clear();
+    this.sinks.set(sessionId, onEvent);
+    onEvent({ kind: "session", sessionId, isNew: false });
+    try {
+      const res = (await this.rpc("session/prompt", {
+        sessionId,
+        prompt: promptBlocks,
+      })) as { stopReason?: string };
+      onEvent({ kind: "done", stopReason: res?.stopReason ?? "end_turn" });
+    } catch (e) {
+      onEvent({ kind: "error", error: e instanceof Error ? e.message : "prompt failed" });
+      onEvent({ kind: "done", stopReason: "error" });
+    } finally {
+      this.sinks.delete(sessionId);
+    }
+  }
+
+  /**
+   * Continue a conversation that can't be resumed in-place (a telegram/cron/CLI
+   * session — the ACP adapter only restores its OWN source="acp" sessions, so
+   * a gateway session's row exists in state.db but `session/load` refuses it).
+   * We create a FRESH acp session and prime it with the prior transcript as
+   * context, then run the user's turn. The agent answers with full awareness of
+   * the prior thread, and the new session IS acp-native so it's resumable in
+   * place from here on. Emits the NEW session id via the session event.
+   */
+  async promptSeeded(
+    cwd: string,
+    seedContext: string,
+    text: string,
+    onEvent: (ev: AcpTurnEvent) => void,
+    images: { data: string; mime: string }[] = [],
+  ): Promise<void> {
+    await this.ensureProc();
+    let id: string;
+    try {
+      const res = (await this.rpc("session/new", { cwd, mcpServers: [] })) as {
+        sessionId: string;
+      };
+      id = res.sessionId;
+      this.liveSessions.add(id);
+    } catch (e) {
+      onEvent({ kind: "error", error: e instanceof Error ? e.message : "could not start session" });
+      onEvent({ kind: "done", stopReason: "error" });
+      return;
+    }
+
+    const combined = seedContext
+      ? `${seedContext}\n\n---\n\nThe user is continuing the conversation above from a new surface. Their next message:\n\n${text}`
+      : text;
+    const promptBlocks: Record<string, unknown>[] = [{ type: "text", text: combined }];
+    for (const img of images) {
+      const raw = img.data.startsWith("data:")
+        ? img.data.slice(img.data.indexOf(",") + 1)
+        : img.data;
+      if (!raw) continue;
+      promptBlocks.push({ type: "image", data: raw, mimeType: img.mime || "image/png" });
+    }
+
+    this.toolKinds.clear();
+    this.sinks.set(id, onEvent);
+    onEvent({ kind: "session", sessionId: id, isNew: true });
+    try {
+      const res = (await this.rpc("session/prompt", {
+        sessionId: id,
+        prompt: promptBlocks,
+      })) as { stopReason?: string };
+      onEvent({ kind: "done", stopReason: res?.stopReason ?? "end_turn" });
+    } catch (e) {
+      onEvent({ kind: "error", error: e instanceof Error ? e.message : "prompt failed" });
+      onEvent({ kind: "done", stopReason: "error" });
+    } finally {
+      this.sinks.delete(id);
+    }
+  }
+
   /** Forget a session that proved dead (stale id / pruned row). */
   private invalidate(repo: string, id: string) {
     if (this.repoSession.get(repo) === id) {

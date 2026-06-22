@@ -102,14 +102,81 @@ except Exception:
 /** All non-archived sessions for a profile, newest first. Read-only. */
 export async function listSessionsForProfile(
   profile: string,
-  limit = 120,
+  limit = 1000,
 ): Promise<ProfileSession[]> {
   const db = dbPathForProfile(profile);
   if (!db) return [];
   const rows = await runPy<ProfileSession[]>(
     `
-import sqlite3, sys, json
+import sqlite3, sys, json, re
 db, limit = sys.argv[1], int(sys.argv[2])
+def flatten(content):
+    if content is None: return ""
+    s = content
+    if isinstance(s, str):
+        t = s.strip()
+        if t.startswith("[") or t.startswith("{"):
+            try:
+                data = json.loads(t)
+            except Exception:
+                return s
+            if isinstance(data, list):
+                parts = []
+                for it in data:
+                    if isinstance(it, dict):
+                        if isinstance(it.get("text"), str): parts.append(it["text"])
+                        elif it.get("type") == "text" and isinstance(it.get("content"), str): parts.append(it["content"])
+                    elif isinstance(it, str): parts.append(it)
+                return " ".join(p for p in parts if p).strip()
+            if isinstance(data, dict) and isinstance(data.get("text"), str):
+                return data["text"]
+            return s
+        return s
+    return str(s)
+def derive_title(con, sid):
+    # First real user message → short title. Skips compaction/system noise.
+    try:
+        rows = con.execute(
+            "SELECT content FROM messages WHERE session_id=? AND role='user' "
+            "AND (active IS NULL OR active=1) ORDER BY id ASC LIMIT 5", (sid,)
+        ).fetchall()
+    except Exception:
+        return None
+    for r in rows:
+        text = flatten(r[0]).strip()
+        if not text: continue
+        st = text.lstrip()
+        # skip pure system-noise turns (no human content to title from)
+        if st.startswith("[CONTEXT COMPACTION") or st.startswith("[System note:") or st.startswith("[IMPORTANT:") or st.startswith("[voice mode"): continue
+        # image-only opener: a vision description is injected as
+        # "[The user sent an image~ ... # Image Description <desc>". This script
+        # rides inside a JS template literal, so backslash escapes get mangled
+        # by the bundler. Use plain string ops only here, no regex, no escapes.
+        if st.lower().startswith("[the user sent an image"):
+            idx = text.lower().find("image description")
+            if idx >= 0:
+                body = text[idx + 17:]
+            else:
+                nl = text.find(chr(10))
+                body = text[nl + 1:] if nl >= 0 else ""
+            body = body.strip().lstrip("~:>#*- ").strip()
+            cut = len(body)
+            for i, ch in enumerate(body):
+                if ch in ".!?" and (i + 1 >= len(body) or body[i + 1] <= " "):
+                    cut = i + 1
+                    break
+            body = " ".join(body[:cut].split())
+            return ("Image " + chr(183) + " " + (body[:38] + chr(8230) if len(body) > 38 else body)) if body else "Image"
+        # unwrap a leading [DEMI] / [Replying to: "..."] / attachment marker; keep the text AFTER it
+        text = re.sub(r'^\[DEMI\]\s*', "", text)
+        text = re.sub(r'^\[Replying to:.*?\]\s*', "", text, flags=re.S)
+        text = re.sub(r'^\[The user sent[^\]]*\]\s*', "", text, flags=re.I)
+        text = re.sub(r'^\[Image attached[^\]]*\]\s*', "", text, flags=re.I)
+        text = text.strip()
+        if not text or text.startswith("["): continue
+        text = " ".join(text.split())
+        return (text[:48] + "\u2026") if len(text) > 48 else text
+    return None
 try:
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
     con.row_factory = sqlite3.Row
@@ -123,9 +190,12 @@ try:
     out = []
     for r in rows:
         used = (r["cache_read_tokens"] or 0) + (r["input_tokens"] or 0) + (r["output_tokens"] or 0)
+        title = r["title"]
+        if not title or not str(title).strip():
+            title = derive_title(con, r["id"])
         out.append({
             "id": r["id"],
-            "title": r["title"],
+            "title": title,
             "source": r["source"],
             "model": r["model"],
             "messageCount": r["message_count"] or 0,
@@ -143,6 +213,34 @@ except Exception:
     ...r,
     used: r.used != null ? Math.min(r.used, CONTEXT_WINDOW) : null,
   }));
+}
+
+/** Resolve a session's working directory + source from the store. cwd null →
+ *  caller uses home; source distinguishes acp (resumable in-place) from
+ *  telegram/cron/cli (must be seeded into a fresh session). */
+export async function sessionMeta(
+  profile: string,
+  sessionId: string,
+): Promise<{ cwd: string | null; source: string | null }> {
+  const db = dbPathForProfile(profile);
+  if (!db) return { cwd: null, source: null };
+  return runPy<{ cwd: string | null; source: string | null }>(
+    `
+import sqlite3, sys, json
+db, sid = sys.argv[1], sys.argv[2]
+try:
+    con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
+    row = con.execute("SELECT cwd, source FROM sessions WHERE id=?", (sid,)).fetchone()
+    if row:
+        print(json.dumps({"cwd": row[0] or None, "source": row[1] or None}))
+    else:
+        print(json.dumps({"cwd": None, "source": None}))
+except Exception:
+    print(json.dumps({"cwd": None, "source": None}))
+`,
+    [db, sessionId],
+    { cwd: null, source: null },
+  );
 }
 
 /** Read a session's transcript from a specific profile's store. Read-only. */

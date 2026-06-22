@@ -275,26 +275,15 @@ export function SessionsPane() {
         />
       )}
 
-      {/* Body: default profile = rich threads; others = read-only history. */}
-      {activeProfile === "default" ? (
-        <DefaultSessions
-          payload={payload}
-          error={error}
-          filtered={filtered}
-          search={search}
-          expanded={expanded}
-          histories={histories}
-          historyLoading={historyLoading}
-          toggle={toggle}
-          openInChat={openInChat}
-          handleRename={handleRename}
-          handleDelete={handleDelete}
-          handleArchive={handleArchive}
-          load={load}
-        />
-      ) : (
-        <ProfileSessions profile={activeProfile} search={search} />
-      )}
+      {/* Body: every profile (default included) shows its full session list
+          from /api/sessions/all so the chip BADGE always equals the LIST.
+          Default rows stay resumable (Open-in-chat); other profiles are
+          read-only history. */}
+      <ProfileSessions
+        profile={activeProfile}
+        search={search}
+        resumable={activeProfile === "default"}
+      />
     </div>
   );
 }
@@ -602,10 +591,16 @@ function AllSessionsList({ search }: { search: string }) {
 // Read-only cross-profile session list
 // ---------------------------------------------------------------------------
 
-function ProfileSessions({ profile, search }: { profile: string; search: string }) {
+function ProfileSessions({ profile, search, resumable = false }: { profile: string; search: string; resumable?: boolean }) {
   const [sessions, setSessions] = useState<ProfileSession[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [openId, setOpenId] = useState<string | null>(null);
+  // Only sessions that back a LIVE ACP bridge thread can resume in chat. The
+  // store holds 198 sessions (cron/telegram/CLI/bg runs included) but only the
+  // 1-2 repo-bound bridge sessions are resumable; the rest are read-only
+  // history. Without this the pane offered "Open in chat" on every row and the
+  // tap no-op'd onto the general thread (the "sessions don't open" bug).
+  const [liveIds, setLiveIds] = useState<Set<string>>(new Set());
 
   useEffect(() => {
     let live = true;
@@ -624,6 +619,28 @@ function ProfileSessions({ profile, search }: { profile: string; search: string 
       live = false;
     };
   }, [profile]);
+
+  // Resolve which session ids are live (resumable) bridge threads. Only the
+  // default profile resumes in chat, so skip the fetch entirely otherwise.
+  useEffect(() => {
+    if (!resumable) {
+      setLiveIds(new Set());
+      return;
+    }
+    let live = true;
+    fetch("/api/chat/threads", { cache: "no-store" })
+      .then((r) => r.json() as Promise<{ threads?: { sessionId?: string | null }[] }>)
+      .then((j) => {
+        if (!live) return;
+        setLiveIds(new Set((j.threads ?? []).map((t) => t.sessionId).filter((x): x is string => !!x)));
+      })
+      .catch(() => {
+        /* threads unreachable — fall back to no resumable rows (read-only) */
+      });
+    return () => {
+      live = false;
+    };
+  }, [profile, resumable]);
 
   const filtered = useMemo(() => {
     if (!sessions) return [];
@@ -646,7 +663,7 @@ function ProfileSessions({ profile, search }: { profile: string; search: string 
   return (
     <div className="px-2 pt-1">
       <p className="px-1 pb-2 font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
-        read-only · {profile} profile history
+        {resumable ? `${profile} profile · tap to view · live threads resume` : `read-only · ${profile} profile history`}
       </p>
       {filtered.length === 0 ? (
         <p className="px-3 py-10 text-center text-sm text-text-tertiary">
@@ -659,6 +676,7 @@ function ProfileSessions({ profile, search }: { profile: string; search: string 
               key={s.id}
               profile={profile}
               session={s}
+              resumable={resumable && liveIds.has(s.id)}
               open={openId === s.id}
               onToggle={() => {
                 haptic(6);
@@ -680,11 +698,13 @@ function ProfileSessionRow({
   session,
   open,
   onToggle,
+  resumable = false,
 }: {
   profile: string;
   session: ProfileSession;
   open: boolean;
   onToggle: () => void;
+  resumable?: boolean;
 }) {
   const [history, setHistory] = useState<ChatMessage[] | null>(null);
   const [loading, setLoading] = useState(false);
@@ -711,8 +731,15 @@ function ProfileSessionRow({
     <li>
       <button
         type="button"
-        onClick={onToggle}
-        aria-expanded={open}
+        onClick={() => {
+          haptic(6);
+          window.dispatchEvent(
+            new CustomEvent("lo-read-session", {
+              detail: { profile, id: session.id, title },
+            }),
+          );
+        }}
+        aria-expanded={false}
         className="flex w-full items-center gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2.5 text-left transition-colors active:bg-[color-mix(in_srgb,var(--midground)_5%,transparent)]"
       >
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-sm)] border border-border text-text-tertiary">
@@ -755,6 +782,25 @@ function ProfileSessionRow({
             className="overflow-hidden"
           >
             <div className="ml-9 border-l border-border pl-3 pb-2">
+              {resumable && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    haptic([6, 4, 8]);
+                    window.dispatchEvent(
+                      new CustomEvent("lo-set-profile", { detail: { profile: "default" } }),
+                    );
+                    window.dispatchEvent(
+                      new CustomEvent("lo-open-session", { detail: { sessionId: session.id } }),
+                    );
+                    window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "chat" } }));
+                  }}
+                  className="mb-2 flex w-full items-center justify-center gap-1.5 rounded-[var(--radius-md)] bg-midground py-2 text-[0.8rem] font-medium text-background-base active:scale-[0.98]"
+                >
+                  Open in chat
+                  <ChevronRightIcon width={13} height={13} />
+                </button>
+              )}
               {loading ? (
                 <div className="flex items-center gap-2 py-2">
                   <span className="h-2 w-2 animate-pulse rounded-full bg-text-tertiary" />

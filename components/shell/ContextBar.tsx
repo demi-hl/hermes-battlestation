@@ -73,9 +73,14 @@ export function ContextBar() {
   // (working + spawned). Surfaced as a tappable "# N" badge that jumps to the
   // Tasks board so the active sessions are one tap away.
   const agents = usePolling<FleetAgent[]>("/api/fleet/agents", 10_000);
-  const sessionCount = (agents.data ?? []).filter(
+  const fleetSessions = (agents.data ?? []).filter(
     (a) => a.lane === "working" || a.lane === "spawned",
   ).length;
+  // A live local turn IS an active session. The fleet poll (python+sqlite, 10s
+  // cadence) returns data:[] on its own timeout and drops long turns past the
+  // 120s message-freshness window — both read "0 sessions" while this turn's
+  // timer is visibly running. Floor at 1 whenever a turn is in flight.
+  const sessionCount = Math.max(fleetSessions, turnStartedAt != null ? 1 : 0);
   const goSessions = useCallback(() => {
     haptic(8);
     window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "sessions" } }));
@@ -408,25 +413,21 @@ function ProfileSheet({
     </div>
   );
 
-  const EffortSectionBlock = (
-    <EffortSection />
-  );
-
-  // Order the three sections so the tapped chip's target leads. Tapping the
-  // effort chip must surface the effort buttons FIRST — otherwise they sit
-  // below the 80-model list and read as "won't change" on a phone.
+  // Effort lives PER-PROFILE (inline under the active profile row), not as a
+  // separate global block — the old global EffortSection wrote the same
+  // config.yaml agent.reasoning_effort key as the default profile's chips, so
+  // it was a duplicate control. Tapping the effort OR profile chip now leads
+  // with the profiles section (active profile's effort chips show inline).
   const sections =
-    focus === "effort"
-      ? [EffortSectionBlock, ProfilesSection, ModelsSection]
-      : focus === "model"
-        ? [ModelsSection, ProfilesSection, EffortSectionBlock]
-        : [ProfilesSection, ModelsSection, EffortSectionBlock];
+    focus === "model"
+      ? [ModelsSection, ProfilesSection]
+      : [ProfilesSection];
 
   return (
     <Sheet
       open={open}
       onClose={onClose}
-      title={focus === "model" ? "Model" : focus === "effort" ? "Reasoning effort" : "Profile"}
+      title={focus === "model" ? "Model" : focus === "effort" ? "Effort" : "Profile"}
       className="max-h-[90dvh]"
     >
       {/* Notifications toggle — only when the platform supports web push. */}

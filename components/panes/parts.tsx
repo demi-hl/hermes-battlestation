@@ -3,7 +3,6 @@
 import {
   useEffect,
   useRef,
-  useState,
   type ReactNode,
   type SVGProps,
 } from "react";
@@ -337,11 +336,13 @@ export function PullToRefresh({
 }) {
   const wrap = useRef<HTMLDivElement>(null);
   const scroller = useRef<HTMLElement | null>(null);
+  const content = useRef<HTMLDivElement>(null);
+  const indicator = useRef<HTMLDivElement>(null);
+  const spinner = useRef<HTMLDivElement>(null);
   const startY = useRef(0);
   const pulling = useRef(false);
-  const [isPulling, setIsPulling] = useState(false);
-  const [pull, setPull] = useState(0);
-  const [refreshing, setRefreshing] = useState(false);
+  const pullRef = useRef(0);
+  const refreshing = useRef(false);
 
   // Locate the scrollable ancestor once mounted.
   useEffect(() => {
@@ -356,52 +357,81 @@ export function PullToRefresh({
     }
   }, []);
 
+  // Paint the current pull distance with direct DOM writes — NO React state, so
+  // dragging never triggers a pane re-render (the old per-frame setState was the
+  // jank). Transform-only, runs on the compositor.
+  const paint = (dist: number, animate: boolean) => {
+    const c = content.current;
+    const ind = indicator.current;
+    const sp = spinner.current;
+    if (c) {
+      c.style.transition = animate
+        ? "transform 0.32s cubic-bezier(0.16,1,0.3,1)"
+        : "none";
+      c.style.transform = `translate3d(0,${dist}px,0)`;
+    }
+    const progress = Math.min(1, dist / PULL_TRIGGER);
+    if (ind) {
+      ind.style.transition = animate ? "transform 0.32s cubic-bezier(0.16,1,0.3,1), opacity 0.2s" : "none";
+      ind.style.transform = `translate3d(0,${dist - PULL_MAX}px,0)`;
+      ind.style.opacity = String(progress);
+    }
+    if (sp && !refreshing.current) {
+      sp.style.transform = `rotate(${progress * 270}deg)`;
+    }
+  };
+
   useEffect(() => {
     const node = wrap.current;
     if (!node) return;
 
     const onStart = (e: TouchEvent) => {
-      if (refreshing) return;
+      if (refreshing.current) return;
       const sc = scroller.current;
       if (sc && sc.scrollTop > 0) return; // only at the very top
       startY.current = e.touches[0].clientY;
       pulling.current = true;
-      setIsPulling(true);
     };
     const onMove = (e: TouchEvent) => {
-      if (!pulling.current || refreshing) return;
+      if (!pulling.current || refreshing.current) return;
       const sc = scroller.current;
       if (sc && sc.scrollTop > 0) {
         pulling.current = false;
-        setIsPulling(false);
-        setPull(0);
+        pullRef.current = 0;
+        paint(0, true);
         return;
       }
       const dy = e.touches[0].clientY - startY.current;
       if (dy <= 0) {
-        setPull(0);
+        pullRef.current = 0;
+        paint(0, false);
         return;
       }
-      // Resist: asymptotic so it never feels 1:1, capped at PULL_MAX.
-      const damped = Math.min(PULL_MAX, dy * 0.5);
-      setPull(damped);
+      // True rubber-band resistance: stiffens as you pull (asymptotic toward
+      // PULL_MAX), so it never feels 1:1 and matches the iOS spring feel.
+      const damped = PULL_MAX * (1 - Math.exp(-dy / (PULL_MAX * 1.1)));
+      pullRef.current = damped;
+      paint(damped, false);
       if (dy > 6) e.preventDefault(); // stop the native overscroll glow
     };
     const onEnd = async () => {
       if (!pulling.current) return;
       pulling.current = false;
-      setIsPulling(false);
-      if (pull >= PULL_TRIGGER) {
-        setRefreshing(true);
-        setPull(PULL_TRIGGER);
+      if (pullRef.current >= PULL_TRIGGER) {
+        refreshing.current = true;
+        paint(PULL_TRIGGER, true);
+        spinner.current?.classList.add("animate-spin-slow");
         try {
           await onRefresh();
         } finally {
-          setRefreshing(false);
-          setPull(0);
+          refreshing.current = false;
+          spinner.current?.classList.remove("animate-spin-slow");
+          pullRef.current = 0;
+          paint(0, true);
         }
       } else {
-        setPull(0);
+        pullRef.current = 0;
+        paint(0, true);
       }
     };
 
@@ -415,19 +445,14 @@ export function PullToRefresh({
       node.removeEventListener("touchend", onEnd);
       node.removeEventListener("touchcancel", onEnd);
     };
-  }, [pull, refreshing, onRefresh]);
-
-  const progress = Math.min(1, pull / PULL_TRIGGER);
+  }, [onRefresh]);
 
   return (
     <div ref={wrap} className="relative">
       <div
+        ref={indicator}
         className="pointer-events-none absolute inset-x-0 top-0 flex justify-center"
-        style={{
-          height: PULL_MAX,
-          transform: `translateY(${pull - PULL_MAX}px)`,
-          opacity: progress,
-        }}
+        style={{ height: PULL_MAX, transform: `translate3d(0,${-PULL_MAX}px,0)`, opacity: 0 }}
       >
         <span
           className="mt-3 grid h-8 w-8 place-items-center rounded-full border border-border text-midground"
@@ -436,20 +461,12 @@ export function PullToRefresh({
             backdropFilter: "blur(8px)",
           }}
         >
-          <span
-            className={refreshing ? "animate-spin-slow" : ""}
-            style={{ transform: `rotate(${progress * 270}deg)` }}
-          >
+          <span ref={spinner} style={{ willChange: "transform" }}>
             <RefreshIcon width={15} height={15} />
           </span>
         </span>
       </div>
-      <div
-        style={{
-          transform: `translateY(${pull}px)`,
-          transition: isPulling ? "none" : "transform 0.32s cubic-bezier(0.16,1,0.3,1)",
-        }}
-      >
+      <div ref={content} style={{ willChange: "transform" }}>
         {children}
       </div>
     </div>

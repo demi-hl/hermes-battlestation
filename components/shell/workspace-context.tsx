@@ -210,28 +210,41 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
   });
 
   useEffect(() => {
+    let live = true;
+    // `hermes profile list` is ~8s cold; a single shot that misses (server
+    // mid-restart / transient) would strand the UI on the 2-profile fallback
+    // until app reload. Retry until the real list lands so it self-heals.
     (async () => {
-      try {
-        const res = await fetch("/api/profiles", { cache: "no-store" });
-        if (!res.ok) return;
-        const data = (await res.json()) as {
-          profiles?: Array<{ id: string; label: string; model: string; provider: string; effort?: string }>;
-        };
-        if (data.profiles?.length) {
-          setProfiles(
-            data.profiles.map((p) => ({
-              id: p.id,
-              label: p.label,
-              model: p.model,
-              provider: p.provider,
-              effort: p.effort ?? "",
-            })),
-          );
+      for (let attempt = 0; attempt < 5 && live; attempt++) {
+        try {
+          const res = await fetch("/api/profiles", { cache: "no-store" });
+          if (res.ok) {
+            const data = (await res.json()) as {
+              profiles?: Array<{ id: string; label: string; model: string; provider: string; effort?: string }>;
+            };
+            if (data.profiles?.length) {
+              if (!live) return;
+              setProfiles(
+                data.profiles.map((p) => ({
+                  id: p.id,
+                  label: p.label,
+                  model: p.model,
+                  provider: p.provider,
+                  effort: p.effort ?? "",
+                })),
+              );
+              return;
+            }
+          }
+        } catch {
+          /* retry below */
         }
-      } catch {
-        /* keep DEFAULT_PROFILES */
+        await new Promise((r) => setTimeout(r, 2000));
       }
     })();
+    return () => {
+      live = false;
+    };
   }, []);
 
   const setActiveProfile = useCallback((id: string) => {

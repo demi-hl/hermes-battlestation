@@ -207,7 +207,7 @@ function AssistantBubble({ m, onRetry }: { m: ChatMessage; onRetry?: (id: string
           </div>
         )
       ) : (
-        hasText && <Markdown text={m.text} />
+        hasText && <Markdown text={m.text} pending={!!m.pending} />
       )}
       {m.note && !m.error && (
         <p className="mt-1.5 text-[0.7rem] text-text-tertiary">{m.note}</p>

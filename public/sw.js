@@ -3,7 +3,7 @@
 // works offline. NEVER caches /api/* (live ops data) or any auth traffic, and
 // never touches non-GET requests. Self-hosted fonts + brand assets are
 // runtime-cached on first load by the same-origin GET branch below.
-const CACHE = "locals-only-v4";
+const CACHE = "locals-only-v5";
 const SHELL = [
   "/",
   "/manifest.webmanifest",

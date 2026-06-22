@@ -35,17 +35,15 @@ function navToChat(prefill?: string, fresh?: boolean) {
   }
 }
 
-/** Tap a live task → jump to Chat AND open that session's thread (if it maps to
- *  one). The card's id is the Hermes session id; ChatHub resolves it to the
- *  matching chat thread, falling back to whatever thread is active when the
- *  session has no chat thread (fleet/cron/telegram runs). */
-function openTaskInChat(sessionId: string) {
-  window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "chat" } }));
-  setTimeout(() => {
-    window.dispatchEvent(
-      new CustomEvent("lo-open-session", { detail: { sessionId } }),
-    );
-  }, 60);
+/** Tap a task → open the real transcript reader. Tasks are keyed by Hermes
+ * session id, but most task/session rows do NOT have a resumable Chat thread.
+ * `lo-open-session` dead-ends there, so use the full read-only session surface. */
+function openTaskSession(sessionId: string, title: string) {
+  window.dispatchEvent(
+    new CustomEvent("lo-read-session", {
+      detail: { profile: "default", id: sessionId, title },
+    }),
+  );
 }
 
 /* ---- lane vocabulary (dark tokens) ---- */
@@ -382,7 +380,7 @@ function TaskCard({ agent, onArchive }: { agent: FleetAgent; onArchive: () => vo
         onClick={() => {
           if (draggedRef.current) return; // it was a swipe, not a tap
           haptic(8);
-          openTaskInChat(agent.id);
+          openTaskSession(agent.id, objective);
         }}
         className={cn(
           "relative flex w-full touch-pan-y flex-col gap-2 rounded-[var(--radius-md)] border p-3 text-left transition-colors",

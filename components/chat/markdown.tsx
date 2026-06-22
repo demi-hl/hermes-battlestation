@@ -9,7 +9,7 @@ import { Fragment, type ReactNode } from "react";
  * markdown lib added to the bundle) and calm, matching the desktop Hermes chat
  * aesthetic (plain text on background, code as light chips/blocks).
  */
-export function Markdown({ text }: { text: string }) {
+export function Markdown({ text, pending = false }: { text: string; pending?: boolean }) {
   const blocks = splitFences(text);
   return (
     <div className="space-y-2.5 text-[0.92rem] leading-relaxed text-text-primary">
@@ -24,7 +24,17 @@ export function Markdown({ text }: { text: string }) {
             </code>
           </pre>
         ) : (
-          <Fragment key={i}>{renderProse(b.content)}</Fragment>
+          <Fragment key={i}>
+            {renderProse(b.content)}
+            {/* Streaming caret on the last prose block while tokens arrive —
+                eases the per-token "pop" by showing a steady live cursor. */}
+            {pending && i === blocks.length - 1 && (
+              <span
+                aria-hidden
+                className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.18em] rounded-full bg-midground/70 animate-caret-blink align-baseline"
+              />
+            )}
+          </Fragment>
         ),
       )}
     </div>

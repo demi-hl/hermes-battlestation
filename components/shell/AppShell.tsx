@@ -24,6 +24,7 @@ import {
 import { haptic } from "./haptics";
 import { cn } from "@/lib/utils";
 import { IDEShell } from "./ide/IDEShell";
+import { SessionReader } from "./SessionReader";
 
 /** Layout heights consumed by the pane padding + chrome. The context bar is
  *  TWO rows (the h-10 model/meter row + the always-visible profile/sessions
@@ -307,6 +308,7 @@ export function AppShell() {
       </div>
 
       <Splash />
+      <SessionReader />
     </div>
   );
 }

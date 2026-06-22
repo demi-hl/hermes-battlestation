@@ -366,6 +366,19 @@ body {
 .animate-spin-slow {
   animation: spin-slow 12s linear infinite;
 }
+@keyframes caret-blink {
+  0%,
+  45% {
+    opacity: 0.85;
+  }
+  70%,
+  100% {
+    opacity: 0.12;
+  }
+}
+.animate-caret-blink {
+  animation: caret-blink 1.05s ease-in-out infinite alternate;
+}
 @keyframes march {
   to {
     background-position: 0.5rem 0;
