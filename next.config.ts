@@ -21,6 +21,29 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     "*": ["release/**", "dist/**", "*.png", ".next/standalone/**"],
   },
+  // The mobile WKWebView (iOS app) and PWA honor HTTP caching. Next's default
+  // for a statically-prerendered root is `Cache-Control: s-maxage=31536000`,
+  // which makes the WebView serve a year-old HTML shell pointing at stale JS
+  // chunks — a refresh never reaches the new build. Force the HTML document
+  // (and the service worker) to always revalidate; the content-hashed
+  // /_next/static assets keep their immutable long cache (safe — filenames
+  // change per build).
+  async headers() {
+    return [
+      {
+        source: "/",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+      {
+        source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+    ];
+  },
 };
 
 export default nextConfig;
