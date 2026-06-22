@@ -12,6 +12,7 @@ export const dynamic = "force-dynamic";
 const HOME = process.env.HOME ?? process.cwd();
 const HERMES_HOME = process.env.HERMES_HOME || path.join(HOME, ".hermes");
 const DB_PATH = path.join(HERMES_HOME, "state.db");
+const RUNTIME_SESSIONS_PATH = path.join(HERMES_HOME, "sessions", "sessions.json");
 
 /**
  * Real agent board: live Hermes sessions on THIS box (PC = the orchestrator
@@ -101,6 +102,75 @@ function objectiveFor(r: RawRow): string {
   return `${r.source} session`;
 }
 
+/**
+ * Live runtime sessions from ~/.hermes/sessions/sessions.json. A long-lived
+ * gateway conversation (a Telegram DM open all day) is ONE persistent runtime
+ * session that does not re-emit a state.db start/end row per turn, so it ages
+ * out of the state.db window even while actively in use — that's why the badge
+ * read 0 mid-conversation. This map carries a fresh `updated_at` ISO timestamp
+ * on every turn, so it's the reliable "is a conversation active right now"
+ * signal. We surface any session updated within the hour as an agent, deduped
+ * against state.db rows by session_id (state.db wins — richer signal).
+ */
+interface RuntimeSession {
+  session_id?: string;
+  created_at?: string;
+  updated_at?: string;
+  display_name?: string;
+  platform?: string;
+  chat_type?: string;
+}
+
+function isoToEpoch(iso: string | undefined): number {
+  if (!iso) return 0;
+  const ms = Date.parse(iso);
+  return Number.isFinite(ms) ? ms / 1000 : 0;
+}
+
+async function liveRuntimeAgents(
+  now: number,
+  knownIds: Set<string>,
+): Promise<FleetAgent[]> {
+  let raw: string;
+  try {
+    raw = await fs.readFile(RUNTIME_SESSIONS_PATH, "utf8");
+  } catch {
+    return [];
+  }
+  let map: Record<string, RuntimeSession>;
+  try {
+    map = JSON.parse(raw) as Record<string, RuntimeSession>;
+  } catch {
+    return [];
+  }
+  const out: FleetAgent[] = [];
+  for (const s of Object.values(map)) {
+    const id = s.session_id;
+    if (!id || knownIds.has(id)) continue; // state.db row wins
+    const updated = isoToEpoch(s.updated_at);
+    if (updated <= 0) continue;
+    const idle = now - updated;
+    if (idle > WINDOW_SEC) continue; // not active this hour
+    knownIds.add(id);
+    const lane: AgentLane = idle < FRESH_SEC ? "working" : "spawned";
+    const platform = s.platform || "session";
+    const who = s.display_name ? ` · ${s.display_name}` : "";
+    out.push({
+      id,
+      objective: `${platform} ${s.chat_type ?? ""}`.trim() + who,
+      node: nodeForSource(platform),
+      lane,
+      startedAt: Math.round(isoToEpoch(s.created_at) * 1000) || Math.round(updated * 1000),
+      lastSignal: Math.round(updated * 1000),
+      signal:
+        lane === "working"
+          ? `live · ${platform}${who}`
+          : `idle · ${platform}`,
+    });
+  }
+  return out;
+}
+
 export async function GET() {
   const tmp = path.join(os.tmpdir(), `lo-agents-${process.pid}-${Date.now()}.py`);
   let agents: FleetAgent[] = [];
@@ -146,6 +216,17 @@ export async function GET() {
     /* fall through to empty */
   } finally {
     fs.unlink(tmp).catch(() => {});
+  }
+
+  // Fold in live runtime sessions (sessions.json) that aren't already
+  // represented by a state.db row — this is what makes an actively-used
+  // long-lived gateway conversation count as a working agent.
+  try {
+    const knownIds = new Set(agents.map((a) => a.id));
+    const live = await liveRuntimeAgents(Date.now() / 1000, knownIds);
+    if (live.length) agents = agents.concat(live);
+  } catch {
+    /* runtime-session merge is best-effort; never fail the endpoint */
   }
 
   const env: ApiEnvelope<FleetAgent[]> = {
