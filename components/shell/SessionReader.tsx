@@ -59,7 +59,18 @@ export function SessionReader() {
       setOpen(true);
     };
     window.addEventListener("lo-read-session", onRead as EventListener);
-    return () => window.removeEventListener("lo-read-session", onRead as EventListener);
+    // Tapping a bottom tab (or any cross-tab nav) should leave the reader and
+    // land on that tab — the chrome stays visible behind the reader, so its
+    // taps must close this. lo-read-close is fired by the tab bar; lo-nav by
+    // the ContextBar / panes.
+    const onClose = () => setOpen(false);
+    window.addEventListener("lo-read-close", onClose);
+    window.addEventListener("lo-nav", onClose);
+    return () => {
+      window.removeEventListener("lo-read-session", onRead as EventListener);
+      window.removeEventListener("lo-read-close", onClose);
+      window.removeEventListener("lo-nav", onClose);
+    };
   }, []);
 
   useEffect(() => {
@@ -208,18 +219,16 @@ export function SessionReader() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-x-0 top-0 z-[60] mx-auto flex max-w-[560px] flex-col overflow-hidden bg-[color-mix(in_srgb,var(--background-base)_94%,transparent)] backdrop-blur-xl"
+          className="fixed inset-x-0 top-0 z-[40] mx-auto flex max-w-[560px] flex-col overflow-hidden bg-[color-mix(in_srgb,var(--background-base)_94%,transparent)] backdrop-blur-xl"
           style={{
-            // Pin to the keyboard-aware visible height (--app-vh tracks
-            // visualViewport in Providers) instead of inset-0, so the modal
-            // shrinks when the iOS keyboard opens and the composer rides above
-            // it. inset-0 (100dvh) leaves the composer buried under the keyboard.
-            height: "var(--app-vh, 100dvh)",
+            // Stop ABOVE the bottom chrome (context bar + tab bar) so it stays
+            // visible — the reader should feel like the Chat tab, not a full
+            // takeover. When the keyboard opens the chrome translates away
+            // (--kb-open→1), so the subtraction collapses to 0 and the reader
+            // extends full-height with the composer riding above the keyboard.
+            height:
+              "calc(var(--app-vh, 100dvh) - (var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom)) * (1 - var(--kb-open, 0)))",
             paddingTop: "env(safe-area-inset-top)",
-            // Only pad the home-indicator gap when the keyboard is CLOSED; when
-            // open the keyboard already occupies that space (1 - --kb-open).
-            paddingBottom:
-              "calc(env(safe-area-inset-bottom) * (1 - var(--kb-open, 0)))",
           }}
         >
           {/* header */}

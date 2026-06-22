@@ -222,6 +222,9 @@ export function AppShell() {
 
   const goTab = useCallback(
     (id: TabId) => {
+      // A tab tap always leaves the SessionReader (it overlays the active pane
+      // but keeps the chrome visible, so its taps must dismiss the reader).
+      window.dispatchEvent(new CustomEvent("lo-read-close"));
       if (id === activeTab) {
         scrollRefs.current[id]?.scrollTo({ top: 0, behavior: "smooth" });
         return;
