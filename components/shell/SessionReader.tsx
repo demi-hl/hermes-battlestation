@@ -5,6 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { haptic } from "@/components/shell/haptics";
 import { Composer } from "@/components/chat/Composer";
 import { MessageList } from "@/components/chat/MessageList";
+import { Backdrop } from "@/components/shell/Backdrop";
 import type { ChatMessage } from "@/components/chat/useChat";
 
 interface Msg {
@@ -254,15 +255,15 @@ export function SessionReader() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-x-0 top-0 z-[40] mx-auto flex max-w-[560px] flex-col overflow-hidden backdrop-blur-xl"
+          className="fixed inset-x-0 top-0 z-[40] mx-auto flex max-w-[560px] flex-col overflow-hidden"
           style={{
-            // Translucent veil — let the app's green Backdrop show THROUGH like
-            // the Chat tab does (ChatHub paints no opaque bg). A solid base here
-            // regressed to near-black and killed the themed green (the exact
-            // "do not paint opaque over the Backdrop" trap in CLAUDE.md). The
-            // blur + low-alpha tint separates the reader from the pane beneath
-            // without hiding the theme.
-            background: "color-mix(in srgb, var(--background-base) 62%, transparent)",
+            // Match Chat EXACTLY: Chat shows the app-root Backdrop (teal base +
+            // warm-glow vignette + texture) through a transparent ChatHub over
+            // the BLACK document base. The continue overlay covers that root
+            // Backdrop, so we paint the same black base here and mount our OWN
+            // <Backdrop/> child below — reproducing the identical warm blend
+            // instead of a flat veil (which never matched the brown tone).
+            background: "#000",
             // Stop ABOVE the bottom chrome (context bar + tab bar) so it stays
             // visible — the reader should feel like the Chat tab, not a full
             // takeover. When the keyboard opens the chrome translates away
@@ -273,8 +274,14 @@ export function SessionReader() {
             paddingTop: "env(safe-area-inset-top)",
           }}
         >
+          {/* App-root Backdrop, re-mounted inside the overlay so the continue
+              view gets the IDENTICAL teal-base + warm-glow + texture blend Chat
+              shows (Chat sees it through transparent ChatHub). It's fixed +
+              pointer-events-none; the content below sits on top. */}
+          <Backdrop />
+
           {/* header */}
-          <div className="flex items-center gap-2 border-b border-border px-3 py-3">
+          <div className="relative z-[1] flex items-center gap-2 border-b border-border px-3 py-3">
             <button
               type="button"
               onClick={close}
@@ -298,7 +305,7 @@ export function SessionReader() {
           <div
             ref={scrollRef}
             data-msg-scroll
-            className="flex-1 overflow-y-auto overscroll-contain"
+            className="relative z-[1] flex-1 overflow-y-auto overscroll-contain"
           >
             {loading ? (
               <div className="flex items-center gap-2 px-3 py-6">
@@ -316,11 +323,10 @@ export function SessionReader() {
             )}
           </div>
 
-          {/* continue composer — the SAME Composer as the Chat tab. Wrap it on
-              a black base so the Composer's own 0.96 --background-base band
-              reads the same dark/brown as Chat (where it sits over the black
-              document base), not the green message veil above it. */}
-          <div style={{ background: "#000" }}>
+          {/* continue composer — the SAME Composer as the Chat tab. relative
+              z-[1] so it sits above the fixed Backdrop; the Composer paints its
+              own --background-base band over the same warm Backdrop Chat uses. */}
+          <div className="relative z-[1]">
             <Composer
               onSend={(text, images) => enqueue(text, images)}
               onStop={stop}
