@@ -323,10 +323,11 @@ export function SessionReader() {
             )}
           </div>
 
-          {/* continue composer — the SAME Composer as the Chat tab. relative
-              z-[1] so it sits above the fixed Backdrop; the Composer paints its
-              own --background-base band over the same warm Backdrop Chat uses. */}
-          <div className="relative z-[1]">
+          {/* continue composer — the SAME Composer as the Chat tab. Solid
+              --background-base band (the exact dark teal Chat's composer renders
+              to) so the bottom layer can't wash out against the mounted Backdrop.
+              z-[1] keeps it above the fixed Backdrop layers. */}
+          <div className="relative z-[1]" style={{ background: "var(--background-base)" }}>
             <Composer
               onSend={(text, images) => enqueue(text, images)}
               onStop={stop}
