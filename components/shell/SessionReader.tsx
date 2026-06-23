@@ -256,7 +256,13 @@ export function SessionReader() {
           transition={{ duration: 0.18 }}
           className="fixed inset-x-0 top-0 z-[40] mx-auto flex max-w-[560px] flex-col overflow-hidden backdrop-blur-xl"
           style={{
-            background: "var(--background-base)",
+            // Translucent veil — let the app's green Backdrop show THROUGH like
+            // the Chat tab does (ChatHub paints no opaque bg). A solid base here
+            // regressed to near-black and killed the themed green (the exact
+            // "do not paint opaque over the Backdrop" trap in CLAUDE.md). The
+            // blur + low-alpha tint separates the reader from the pane beneath
+            // without hiding the theme.
+            background: "color-mix(in srgb, var(--background-base) 62%, transparent)",
             // Stop ABOVE the bottom chrome (context bar + tab bar) so it stays
             // visible — the reader should feel like the Chat tab, not a full
             // takeover. When the keyboard opens the chrome translates away
