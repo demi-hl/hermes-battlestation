@@ -83,9 +83,6 @@ const KNOWN: { key: string; label: string; group: string; secret?: boolean }[] =
   { key: "SLACK_APP_TOKEN", label: "Slack App", group: "Messaging" },
 ];
 
-// Heuristic: treat as secret if name contains these tokens.
-const SECRET_RX = /(KEY|TOKEN|SECRET|PASSWORD|PASS|CREDENTIAL|API)/i;
-
 function redact(value: string): string {
   const v = value.trim();
   if (!v) return "";
@@ -138,16 +135,18 @@ export async function GET() {
     });
   }
   // Any other env keys actually present that aren't in the known list.
+  // Default to SECRET (redacted) for unknown keys — only the curated KNOWN list
+  // marks keys as non-secret. A short real secret named e.g. WEBHOOK_URL must
+  // not be revealed just because its name lacks KEY/TOKEN.
   for (const [k, v] of env) {
     if (seen.has(k)) continue;
-    const secret = SECRET_RX.test(k);
     items.push({
       key: k,
       label: k,
       group: "Other",
       set: v.length > 0,
-      preview: secret ? redact(v) : v.slice(0, 40),
-      secret,
+      preview: redact(v),
+      secret: true,
     });
   }
 
@@ -166,6 +165,15 @@ export async function POST(req: Request) {
   const value = String(body.value ?? "");
   if (!/^[A-Z0-9_]+$/i.test(key)) {
     return NextResponse.json({ error: "invalid key name" }, { status: 400 });
+  }
+  // Reject newlines / control chars in the value — otherwise a value like
+  // "x\nBATTLESTATION_TOKEN=*** would inject extra lines into ~/.hermes/.env
+  // and let a client set arbitrary OTHER env keys.
+  if (/[\r\n\u0000]/.test(value)) {
+    return NextResponse.json(
+      { error: "value may not contain newlines or control characters" },
+      { status: 400 },
+    );
   }
 
   let text = "";

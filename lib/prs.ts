@@ -33,9 +33,9 @@ export interface PrItem {
 }
 
 export interface RepoPRs {
-  /** Bare repo name, e.g. "hl-media". */
+  /** Bare repo name, e.g. "my-repo". */
   repo: string;
-  /** Owner login, e.g. "demi-hl". */
+  /** Owner login, e.g. "your-org". */
   owner: string;
   /** "owner/repo" for the gh --repo flag + detail links. */
   fullName: string;

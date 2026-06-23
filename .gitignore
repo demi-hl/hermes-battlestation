@@ -34,3 +34,6 @@ yarn-error.log*
 *.log
 ios/App/App/public/
 .workflows/
+
+# internal security audit — not for distribution
+SECURITY_AUDIT.md

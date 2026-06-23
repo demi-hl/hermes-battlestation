@@ -22,15 +22,27 @@ const MIME: Record<string, string> = {
 };
 
 // Roots the WebView is allowed to read media from. Render outputs live under
-// the home dir (~/.hermes, ~/data, /tmp); restrict to these to avoid serving
-// arbitrary host files.
+// these. NOTE: ~/.hermes is deliberately NOT here — it holds .env, auth.json,
+// config.yaml and state.db. Render pipelines that want their output served must
+// write it under ~/.hermes/renders (allowed below) or one of the media dirs.
 const ALLOWED_PREFIXES = [
-  path.join(os.homedir(), ".hermes"),
+  path.join(os.homedir(), ".hermes", "renders"),
   path.join(os.homedir(), "data"),
   path.join(os.homedir(), "Videos"),
   path.join(os.homedir(), "Pictures"),
   "/tmp",
 ];
+
+// Only real media extensions are servable — never .env/.json/.db/.yaml/etc.
+const MEDIA_EXTS = new Set(Object.keys(MIME));
+
+// Path is inside an allowed root only if it equals the root or sits below it
+// (segment boundary) — prevents ~/.hermes-backup or /tmpfoo style escapes.
+function underAllowedRoot(filePath: string): boolean {
+  return ALLOWED_PREFIXES.some(
+    (p) => filePath === p || filePath.startsWith(p + path.sep),
+  );
+}
 
 /**
  * Serve a local media file (render output: mp4/png/etc.) to the WebView so
@@ -43,8 +55,14 @@ export async function GET(req: Request) {
   if (!raw) return new Response("path required", { status: 400 });
 
   const filePath = path.resolve(raw.replace(/^~(?=\/)/, os.homedir()));
-  if (!ALLOWED_PREFIXES.some((p) => filePath.startsWith(p))) {
+  if (!underAllowedRoot(filePath)) {
     return new Response("forbidden", { status: 403 });
+  }
+  // Reject anything that isn't a known media file — blocks .env/.json/.db reads
+  // even if a future root change re-exposed a secrets dir.
+  const ext = path.extname(filePath).toLowerCase();
+  if (!MEDIA_EXTS.has(ext)) {
+    return new Response("unsupported media type", { status: 415 });
   }
 
   let stat;
@@ -55,7 +73,6 @@ export async function GET(req: Request) {
   }
   if (!stat.isFile()) return new Response("not a file", { status: 404 });
 
-  const ext = path.extname(filePath).toLowerCase();
   const type = MIME[ext] || "application/octet-stream";
   const total = stat.size;
   const range = req.headers.get("range");

@@ -12,7 +12,7 @@ module.exports = {
   apps: [
     {
       name: "demi-workspace",
-      cwd: "/home/demi/projects/demi-workspace",
+      cwd: process.cwd(),
       script: "node_modules/next/dist/bin/next",
       args: "start -H ${TAILSCALE_IP:-127.0.0.1} -p 3005",
       interpreter: "node",

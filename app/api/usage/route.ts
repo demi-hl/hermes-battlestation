@@ -8,11 +8,41 @@ export const dynamic = "force-dynamic";
 
 const HOME = process.env.HOME ?? homedir();
 
-// The Anthropic Max/Teams account config dirs Hermes keeps warm on this box.
-// Dir NAMES are historical and can lie about which account they hold, so we
-// read the live uuid/email from each and dedupe by uuid (two dirs sharing one
-// account is a known state). Read-only: this never writes creds or config.
-const ACCOUNT_DIRS = [".claude", ".claude-drainer-b", ".claude-acct-demi2"];
+// Identity config (which account dirs to read, display nicknames, confirmed
+// tier overrides) is PER-USER and loaded at runtime from a gitignored file —
+// never hardcoded, so the repo carries no account UUIDs / billing tells.
+// Default: read only the standard ~/.claude dir, no nicknames, no overrides.
+// To customize, drop ~/.hermes/battlestation-accounts.json:
+//   {
+//     "accountDirs": [".claude", ".claude-other"],
+//     "nicknames":   { "<uuid8>": "Account 1" },
+//     "tierOverrides": { "<uuid8>": { "sub": "max", "tier": "<tier>" } }
+//   }
+const HERMES_HOME = process.env.HERMES_HOME || join(HOME, ".hermes");
+
+interface AccountConfig {
+  accountDirs: string[];
+  nicknames: Record<string, string>;
+  tierOverrides: Record<string, { sub: string; tier: string }>;
+}
+
+async function loadAccountConfig(): Promise<AccountConfig> {
+  const fallback: AccountConfig = {
+    accountDirs: [".claude"],
+    nicknames: {},
+    tierOverrides: {},
+  };
+  const cfg = await readJson(join(HERMES_HOME, "battlestation-accounts.json"));
+  if (!cfg) return fallback;
+  return {
+    accountDirs: Array.isArray(cfg.accountDirs)
+      ? (cfg.accountDirs as string[])
+      : fallback.accountDirs,
+    nicknames: (cfg.nicknames as Record<string, string>) ?? {},
+    tierOverrides:
+      (cfg.tierOverrides as Record<string, { sub: string; tier: string }>) ?? {},
+  };
+}
 
 const USAGE_URL = "https://api.anthropic.com/api/oauth/usage";
 const OAUTH_BETA = "oauth-2025-04-20";
@@ -33,27 +63,6 @@ interface SubRow {
   hasRefresh: boolean;
   status: "ok" | "rate_limited" | "dead" | "no_token";
 }
-
-// Stable display nicknames keyed by account uuid prefix (uuid is truth; the
-// config dir names lie about which account they hold). Lets the cards read
-// "DEMI 1/2/3" instead of raw emails.
-const NICK_BY_UUID8: Record<string, string> = {
-  "0d1ce3d5": "DEMI 1",
-  "0ea64448": "DEMI 2",
-  caf21a84: "DEMI 3",
-};
-
-// Confirmed-true plan, keyed by uuid. The on-disk `rateLimitTier` /
-// `subscriptionType` are a LOGIN-TIME snapshot — they do NOT update on silent
-// token refresh, and the usage API exposes no tier field, so an account
-// upgraded after its last full login reads stale. christophergervais92
-// (DEMI 1) shows "Max plan" in Claude's own billing (verified 2026-06-20) but
-// its box token still reports team/5x. We override only where we have ground
-// truth; everything else falls through to the live token value. Update on a
-// real plan change (or after a full re-login rewrites the cred).
-const TIER_OVERRIDE: Record<string, { sub: string; tier: string }> = {
-  "0d1ce3d5": { sub: "max", tier: "default_claude_max_20x" }, // DEMI 1 main, billing = Max
-};
 
 // A non-Anthropic OAuth provider (Codex/ChatGPT, Grok/xAI). These auth via a
 // consumer plan that exposes NO usage/limit endpoint, so we surface connection
@@ -227,11 +236,12 @@ async function grokConn(): Promise<ConnRow | null> {
  * OAuth connections (Codex, Grok) as health rows.
  */
 export async function GET() {
+  const { accountDirs, nicknames, tierOverrides } = await loadAccountConfig();
   const seen = new Set<string>();
   const seenTokens = new Set<string>();
   const subs: SubRow[] = [];
 
-  for (const dir of ACCOUNT_DIRS) {
+  for (const dir of accountDirs) {
     const base = join(HOME, dir);
     const profile = await readJson(join(base, ".claude.json"));
     const creds = await readJson(join(base, ".credentials.json"));
@@ -248,7 +258,7 @@ export async function GET() {
     // profile uuid while holding the SAME access token as another dir (a known
     // footgun). Without this, the duplicate dir would call the usage API with
     // the other account's token and render that account's burn under the wrong
-    // label (e.g. DEMI 3 showing DEMI 1's meter). Collapse those.
+    // label (e.g. account B showing account A's meter). Collapse those.
     if (token) {
       const tokHash = createHash("sha256").update(token).digest("hex");
       if (seenTokens.has(tokHash)) continue;
@@ -259,9 +269,9 @@ export async function GET() {
     const usage = await fetchUsage(token);
 
     const email = (acct.emailAddress as string) ?? null;
-    const ov = TIER_OVERRIDE[uuid8];
+    const ov = tierOverrides[uuid8];
     subs.push({
-      label: NICK_BY_UUID8[uuid8] ?? email ?? dir,
+      label: nicknames[uuid8] ?? email ?? dir,
       email,
       uuid8,
       sub: ov?.sub ?? (oauth.subscriptionType as string) ?? null,

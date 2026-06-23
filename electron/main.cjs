@@ -154,14 +154,38 @@ async function startServer() {
   return port;
 }
 
+// Resolve a remote thin-client target, if configured. When set, the desktop
+// app does NOT spawn a local server — it loads the remote Hermes box directly,
+// exactly like the iOS app / PWA (same profiles + sessions, mirrored). This is
+// the open-source "connect to your own setup from any machine" path. Without
+// it, the app spawns a local server as before (single-machine desktop).
+function remoteTarget() {
+  const env = loadUserEnv();
+  const raw = (process.env.BATTLESTATION_REMOTE_URL || env.BATTLESTATION_REMOTE_URL || "").trim();
+  if (!raw) return null;
+  let u = raw.replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(u)) u = "https://" + u;
+  return u;
+}
+
 async function createWindow() {
-  let port;
-  try {
-    port = await startServer();
-  } catch (e) {
-    dialog.showErrorBox("Failed to start", String(e && e.message ? e.message : e));
-    app.quit();
-    return;
+  const remote = remoteTarget();
+  let loadTarget;
+
+  if (remote) {
+    // Thin-client mode: no local server. The remote box's middleware shows the
+    // Connect screen for the token if it requires one.
+    loadTarget = `${remote}/`;
+  } else {
+    let port;
+    try {
+      port = await startServer();
+    } catch (e) {
+      dialog.showErrorBox("Failed to start", String(e && e.message ? e.message : e));
+      app.quit();
+      return;
+    }
+    loadTarget = `http://127.0.0.1:${port}/`;
   }
 
   win = new BrowserWindow({
@@ -191,7 +215,7 @@ async function createWindow() {
     return { action: "deny" };
   });
 
-  win.loadURL(`http://127.0.0.1:${port}/`);
+  win.loadURL(loadTarget);
   win.on("closed", () => {
     win = null;
   });

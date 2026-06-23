@@ -29,6 +29,53 @@ The app boots a local server and opens a window. Go to **Settings → Setup** an
 
 It auto-detects whether each is wired and shows a green/amber chip. No env files required.
 
+## Use it from other devices (mirror your setup)
+
+The cockpit is a **thin client to one backend** — the Hermes box where your repos, sessions,
+and `~/.hermes` live. Point any device at that box and you get the *same* profiles and sessions,
+mirrored everywhere (the way a mail app shows the same inbox on every device). Nothing is copied
+or synced — every device reads the one backend live.
+
+**1. Set an access token on the box** (this is what makes it safe to reach over a network):
+
+```bash
+# in the app's environment on the box running it:
+BATTLESTATION_TOKEN=$(openssl rand -base64 24)
+```
+
+With no token set, the app stays loopback-only with no auth (single-machine mode). The moment a
+token is set, every device must present it — unauthenticated requests get a `401` (API) or the
+**Connect** screen (pages).
+
+**2. Make the box reachable** — pick one:
+
+| Path | Notes |
+|---|---|
+| **Tailscale** (recommended) | private mesh, encrypted, no ports exposed publicly |
+| **LAN** | same wifi; bind the server to your LAN IP |
+| **Cloudflare Tunnel / reverse proxy** | public URL — put auth in front; the token is your floor |
+
+**3. Connect from the device** — open the box's URL (or install the app), and the **Connect**
+screen asks for your **Remote URL** + **Access token**. Enter them once; you're in.
+
+### Install on a phone (no developer account, no App Store)
+
+The app is a **PWA** — the zero-friction path for everyone:
+
+1. Open your box's URL in Safari (iOS) or Chrome (Android).
+2. Enter your token on the Connect screen.
+3. **Share → Add to Home Screen.** It launches fullscreen with an icon, like a native app.
+
+No Xcode, no `$99` developer account, no 7-day sideload expiry. (A native build via Capacitor
+exists — `CAP_SERVER_URL` + `npm run cap:build` — and is only worth it if you need native push;
+TestFlight is then the easy distribution path, where only *you* need the developer account.)
+
+### Desktop, pointed at a remote box
+
+By default the desktop app boots its own local server. To make it a thin client to a remote box
+instead (same as the phone), set `BATTLESTATION_REMOTE_URL=https://your-box:port` — it skips the
+local server and loads the remote box, showing the Connect screen for the token.
+
 ## What's inside
 
 - **Chat** — live token-streaming chat with your agent (ACP), one session per repo.
