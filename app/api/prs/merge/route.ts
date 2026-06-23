@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 import { bust } from "@/lib/cache";
 import { isValidFullName, isValidNumber } from "@/lib/prs";
 
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
 
   const r = await run(parts.join(" "), { timeoutMs: 30_000 });
   if (!r.ok) {
-    const msg = (r.stderr.trim() || r.stdout.trim() || "gh pr merge failed").split("\n")[0];
+    const msg = scrubPaths(r.stderr || r.stdout || "gh pr merge failed").split("\n")[0];
     return NextResponse.json({ error: msg }, { status: 500 });
   }
 

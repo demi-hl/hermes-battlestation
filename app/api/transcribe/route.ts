@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { writeFile, unlink, mkdtemp } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
-import { run, shellQuote } from "@/lib/exec";
+import { run, shellQuote, scrubPaths} from "@/lib/exec";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -48,7 +48,7 @@ export async function POST(req: Request) {
     );
     if (!conv.ok) {
       return NextResponse.json(
-        { error: "audio decode failed", detail: conv.stderr.slice(-300) },
+        { error: "audio decode failed", detail: scrubPaths(conv.stderr).slice(-300) },
         { status: 500 },
       );
     }
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     });
     if (!r.ok) {
       return NextResponse.json(
-        { error: "transcription failed", detail: r.stderr.slice(-300) },
+        { error: "transcription failed", detail: scrubPaths(r.stderr).slice(-300) },
         { status: 500 },
       );
     }

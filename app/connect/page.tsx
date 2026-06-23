@@ -107,10 +107,16 @@ export default function ConnectPage() {
   }
 
   return (
-    <main className="flex min-h-dvh w-full items-center justify-center bg-background-base px-5">
+    <main className="relative flex min-h-dvh w-full flex-col items-center justify-center px-5">
+      <div className="mb-6 flex items-center gap-2.5">
+        <img src="/nous-logo.svg" alt="Nous" className="h-7 w-7" />
+        <span className="font-mondwest text-lg tracking-[0.2em] text-text-primary">
+          BATTLESTATION
+        </span>
+      </div>
       <form
         onSubmit={connect}
-        className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-[color-mix(in_srgb,var(--background-base)_80%,transparent)] p-6"
+        className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border border-border bg-[color-mix(in_srgb,var(--background-base)_72%,transparent)] p-6 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.6)] backdrop-blur-sm"
       >
         <div className="flex flex-col gap-1">
           <h1 className="font-mondwest text-xl tracking-wide text-text-primary">

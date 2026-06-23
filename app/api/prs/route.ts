@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { readdir, stat } from "node:fs/promises";
 import { join, resolve } from "node:path";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 import { cached, bust } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import {
@@ -108,7 +108,7 @@ async function prsFor(owner: string, repo: string): Promise<RepoPRs> {
     { timeoutMs: 15_000 },
   );
   const base: RepoPRs = { repo, owner, fullName: full, prs: [] };
-  if (!r.ok) return { ...base, error: r.stderr.trim() || "gh pr list failed" };
+  if (!r.ok) return { ...base, error: scrubPaths(r.stderr) || "gh pr list failed" };
   try {
     const raw = JSON.parse(r.stdout) as RawPr[];
     return { ...base, prs: raw.map(mapPr) };

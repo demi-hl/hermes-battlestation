@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { run, sshReadOnly, isReadOnlyRemote, shellQuote } from "@/lib/exec";
+import { run, sshReadOnly, isReadOnlyRemote, shellQuote, scrubPaths} from "@/lib/exec";
 import { cached } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import type {
@@ -281,7 +281,7 @@ async function probeBot(): Promise<BotHealth> {
       procs: [],
       otherCount: 0,
       lastTrade,
-      error: r.stderr.trim().split("\n")[0] || "pm2 jlist failed",
+      error: scrubPaths(r.stderr).split("\n")[0] || "pm2 jlist failed",
     };
   }
   let list: Pm2Proc[] = [];

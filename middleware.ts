@@ -17,6 +17,13 @@ import type { NextRequest } from "next/server";
 
 const TOKEN = process.env.BATTLESTATION_TOKEN ?? "";
 
+// Cookie lifetime in days (F12) — default 30, override via env. Matches the
+// /api/auth route's COOKIE_MAX_AGE.
+const SESSION_DAYS = Math.max(
+  1,
+  parseInt(process.env.BATTLESTATION_SESSION_DAYS ?? "30", 10) || 30,
+);
+
 // Paths reachable WITHOUT a token: the connect screen, the auth handler, a
 // health probe, and the static/asset/PWA files the login page needs. Matched
 // with a segment boundary (isPublicPath) so e.g. /api/healthz is NOT public.
@@ -126,7 +133,7 @@ export function middleware(req: NextRequest) {
           (req.headers.get("x-forwarded-proto") ?? "").split(",")[0].trim() ===
             "https",
         path: "/",
-        maxAge: 60 * 60 * 24 * 365,
+        maxAge: 60 * 60 * 24 * SESSION_DAYS,
       });
       return res;
     }

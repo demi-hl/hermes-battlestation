@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 import { cached } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import { type AutomationsPayload, parseCronList } from "@/lib/prs";
@@ -22,7 +22,7 @@ export async function GET() {
           data: {
             available: false,
             jobs: [],
-            note: r.stderr.trim() || "hermes cron list failed",
+            note: scrubPaths(r.stderr) || "hermes cron list failed",
           },
           fetchedAt: at,
         };

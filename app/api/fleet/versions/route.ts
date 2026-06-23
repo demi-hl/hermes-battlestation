@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 import { cached } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import { FLEET } from "@/lib/fleet/hosts";
@@ -92,7 +92,7 @@ async function probeBox(
       claudeCode: null,
       hermes: null,
       claudeUpdateAvailable: false,
-      error: r.stderr.trim().split("\n")[0] || "unreachable",
+      error: scrubPaths(r.stderr).split("\n")[0] || "unreachable",
     };
   }
 

@@ -4,7 +4,7 @@ import { promisify } from "node:util";
 import { promises as fs } from "node:fs";
 import { homedir } from "node:os";
 import path from "node:path";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 import { cached } from "@/lib/cache";
 import type { ApiEnvelope, Repo } from "@/lib/types";
 
@@ -33,7 +33,7 @@ export async function GET() {
       return {
         data: null,
         fetchedAt: new Date().toISOString(),
-        error: r.stderr.trim() || "gh repo list failed",
+        error: scrubPaths(r.stderr) || "gh repo list failed",
       };
     }
     let repos: Repo[] = [];
@@ -115,7 +115,7 @@ export async function POST(req: Request) {
       return Response.json({ ok: true, name, path: dest });
     } catch (e) {
       const err = e as { stderr?: string; message?: string };
-      const detail = (err.stderr ?? err.message ?? "git clone failed").trim();
+      const detail = scrubPaths(err.stderr ?? err.message ?? "git clone failed");
       return Response.json({ ok: false, error: detail, name, path: dest }, { status: 200 });
     }
   }

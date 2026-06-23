@@ -40,11 +40,22 @@ export function run(
 // fixed remote string — the fleet uses SSH ONLY for read-only telemetry.
 export function sshCmd(host: string, remote: string, connectTimeout = 6): string {
   const safeRemote = remote.replace(/'/g, "'\\''");
+  // Quote the host too (defense-in-depth: env-derived today, but a future
+  // client-controlled host must not be able to inject shell args — F14).
   return (
     `ssh -o BatchMode=yes -o ConnectTimeout=${connectTimeout} ` +
     `-o RequestTTY=no -o ForwardAgent=no -o ForwardX11=no -o ClearAllForwardings=yes ` +
-    `-T ${host} '${safeRemote}'`
+    `-T ${shellQuote(host)} '${safeRemote}'`
   );
+}
+
+// Strip the host home path + username from a string before returning it to a
+// client, so error output can't leak local filesystem layout / the OS user
+// (F13). Replaces /home/<user> and /Users/<user> with ~.
+export function scrubPaths(s: string): string {
+  return s
+    .replace(/\/(?:home|Users)\/[^/\s:'"]+/g, "~")
+    .trim();
 }
 
 // Read-only command allowlist for fleet SSH probes. A remote command must start

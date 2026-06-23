@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import path from "node:path";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,7 +42,7 @@ export async function POST(req: Request) {
   const r = await run(`python3 -c ${JSON.stringify(py)}`, { timeoutMs: 10000 });
   if (!r.ok || !r.stdout.trim().startsWith("ok")) {
     return NextResponse.json(
-      { error: r.stderr.trim().split("\n")[0] || "clear failed" },
+      { error: scrubPaths(r.stderr).split("\n")[0] || "clear failed" },
       { status: 500 },
     );
   }

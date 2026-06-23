@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 import { cached } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import {
@@ -65,7 +65,7 @@ export async function GET(req: Request) {
       return {
         data: null,
         fetchedAt: at,
-        error: r.stderr.trim() || "gh pr view failed",
+        error: scrubPaths(r.stderr) || "gh pr view failed",
       } satisfies ApiEnvelope<PrDetail>;
     }
     let raw: RawDetail;

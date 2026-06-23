@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { cached } from "@/lib/cache";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 import type { ApiEnvelope, CronList, CronJob } from "@/lib/types";
 
 export const runtime = "nodejs";
@@ -26,7 +26,7 @@ export async function GET() {
         data: {
           available: false,
           jobs: [],
-          note: res.stderr.trim() || "hermes cron list returned nothing",
+          note: scrubPaths(res.stderr) || "hermes cron list returned nothing",
         },
         fetchedAt: at,
       };

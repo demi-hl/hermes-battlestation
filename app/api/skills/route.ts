@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import path from "node:path";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 import { cached, bust } from "@/lib/cache";
 import type {
   SkillEntry,
@@ -251,7 +251,7 @@ export async function POST(req: Request) {
   const res = await run(`python3 -c ${JSON.stringify(py)}`, { timeoutMs: 10000 });
   if (!res.ok || !res.stdout.includes("ok")) {
     return NextResponse.json(
-      { error: (res.stderr || res.stdout || "config write failed").trim().slice(0, 500) },
+      { error: scrubPaths(res.stderr || res.stdout || "config write failed").slice(0, 500) },
       { status: 500 },
     );
   }

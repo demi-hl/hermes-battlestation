@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -163,7 +163,7 @@ async function runCli(cmd: string, timeoutMs: number) {
   const res = await run(cmd, { timeoutMs });
   if (!res.ok) {
     return NextResponse.json(
-      { error: (res.stderr || res.stdout || "command failed").trim().slice(0, 800) },
+      { error: scrubPaths(res.stderr || res.stdout || "command failed").slice(0, 800) },
       { status: 500 },
     );
   }
@@ -192,7 +192,7 @@ async function toggleServer(name: string, enabled: boolean) {
   }
   if (!res.ok || !res.stdout.includes("ok")) {
     return NextResponse.json(
-      { error: (res.stderr || "toggle failed").trim().slice(0, 300) },
+      { error: scrubPaths(res.stderr || "toggle failed").slice(0, 300) },
       { status: 500 },
     );
   }

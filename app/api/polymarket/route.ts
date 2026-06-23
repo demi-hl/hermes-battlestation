@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { run, sshCmd } from "@/lib/exec";
+import { run, sshCmd, scrubPaths} from "@/lib/exec";
 import { cached } from "@/lib/cache";
 import type { ApiEnvelope, BotStatus } from "@/lib/types";
 
@@ -57,7 +57,7 @@ export async function GET() {
           cpu: null,
           memBytes: null,
           pnl: { available: false, reason: PNL_REASON },
-          error: r.stderr.trim() || `ssh ${HOST} unreachable`,
+          error: scrubPaths(r.stderr) || `ssh ${HOST} unreachable`,
         };
         return { data: status, fetchedAt: at };
       }

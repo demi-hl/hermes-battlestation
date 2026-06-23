@@ -1,4 +1,5 @@
 import { exec } from "node:child_process";
+import { scrubPaths } from "@/lib/exec";
 import { promisify } from "node:util";
 import { promises as fs } from "node:fs";
 import os from "node:os";
@@ -181,7 +182,7 @@ export async function POST(req: Request) {
     () => ({ ok: true, err: "" }),
     (e: { stderr?: string; message?: string }) => ({
       ok: false,
-      err: (e.stderr || e.message || "config set failed").split("\n")[0],
+      err: scrubPaths(e.stderr || e.message || "config set failed").split("\n")[0],
     }),
   );
   if (!r.ok) return Response.json({ error: r.err }, { status: 500 });

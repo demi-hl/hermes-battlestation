@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 import { bust } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import type { KanbanTaskDetail } from "@/lib/kanban/types";
@@ -27,7 +27,7 @@ export async function GET(
     const env: ApiEnvelope<null> = {
       data: null,
       fetchedAt: now,
-      error: r.stderr.trim().split("\n")[0] || "hermes kanban show failed",
+      error: scrubPaths(r.stderr).split("\n")[0] || "hermes kanban show failed",
     };
     return NextResponse.json(env);
   }
@@ -84,7 +84,7 @@ export async function PATCH(
   const r = await run(build(id), { timeoutMs: 15000 });
   if (!r.ok) {
     return NextResponse.json(
-      { error: r.stderr.trim().split("\n")[0] || `hermes kanban ${action} failed` },
+      { error: scrubPaths(r.stderr).split("\n")[0] || `hermes kanban ${action} failed` },
       { status: 500 },
     );
   }

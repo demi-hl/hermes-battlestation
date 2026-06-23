@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 import { cached, bust } from "@/lib/cache";
 import type { ApiEnvelope } from "@/lib/types";
 import type { KanbanData, KanbanTask } from "@/lib/kanban/types";
@@ -23,7 +23,7 @@ export async function GET() {
         return {
           data: null,
           fetchedAt: new Date().toISOString(),
-          error: r.stderr.trim().split("\n")[0] || "hermes kanban ls failed",
+          error: scrubPaths(r.stderr).split("\n")[0] || "hermes kanban ls failed",
         };
       }
       let tasks: KanbanTask[] = [];
@@ -68,7 +68,7 @@ export async function POST(req: Request) {
   const r = await run(parts.join(" "), { timeoutMs: 15000 });
   if (!r.ok) {
     return NextResponse.json(
-      { error: r.stderr.trim().split("\n")[0] || "hermes kanban create failed" },
+      { error: scrubPaths(r.stderr).split("\n")[0] || "hermes kanban create failed" },
       { status: 500 },
     );
   }

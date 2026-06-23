@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { run } from "@/lib/exec";
+import { run, scrubPaths} from "@/lib/exec";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -68,7 +68,7 @@ export async function GET(req: Request) {
     const res = await run(`python3 ${tmp}`, { timeoutMs: 15000 });
     if (!res.ok) {
       return NextResponse.json(
-        { error: "analytics query failed", detail: res.stderr.slice(0, 300) },
+        { error: "analytics query failed", detail: scrubPaths(res.stderr).slice(0, 300) },
         { status: 500 },
       );
     }

@@ -1,4 +1,5 @@
 import { execFile } from "node:child_process";
+import { scrubPaths } from "@/lib/exec";
 import { promisify } from "node:util";
 import { resolveRepoCwd } from "@/lib/local-repos";
 
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
     return Response.json({ ok: true, branch, cwd });
   } catch (e) {
     const err = e as { stderr?: string; message?: string };
-    const detail = (err.stderr ?? err.message ?? "git checkout failed").trim();
+    const detail = scrubPaths(err.stderr ?? err.message ?? "git checkout failed");
     return Response.json({ ok: false, error: detail, branch, cwd }, { status: 200 });
   }
 }

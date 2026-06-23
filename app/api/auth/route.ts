@@ -25,6 +25,15 @@ function isSecureRequest(req: NextRequest): boolean {
   return req.nextUrl.protocol === "https:" || xfproto === "https";
 }
 
+// Cookie lifetime in days. Default 30 (was 365 — F12); override with
+// BATTLESTATION_SESSION_DAYS. A leaked cookie self-expires instead of being
+// valid for a year. Rotating BATTLESTATION_TOKEN still invalidates all cookies.
+const SESSION_DAYS = Math.max(
+  1,
+  parseInt(process.env.BATTLESTATION_SESSION_DAYS ?? "30", 10) || 30,
+);
+const COOKIE_MAX_AGE = 60 * 60 * 24 * SESSION_DAYS;
+
 // In-memory per-IP brute-force throttle (F4). Single-box self-hosted app, so an
 // in-process limiter is adequate. Sliding window + exponential lockout.
 type Attempt = { fails: number; lockUntil: number };
@@ -94,7 +103,7 @@ export async function POST(req: NextRequest) {
     sameSite: "lax",
     secure: isSecureRequest(req),
     path: "/",
-    maxAge: 60 * 60 * 24 * 365,
+    maxAge: COOKIE_MAX_AGE,
   });
   return res;
 }
