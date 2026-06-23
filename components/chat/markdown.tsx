@@ -289,7 +289,7 @@ function MediaEmbed({
     <img
       src={src}
       alt={alt}
-      loading="lazy"
+      decoding="async"
       className="max-h-[420px] w-auto max-w-full rounded-[var(--radius-md)] border border-border object-contain"
     />
   );
