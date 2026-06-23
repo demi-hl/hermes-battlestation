@@ -104,6 +104,15 @@ function renderProse(prose: string): ReactNode {
 
   lines.forEach((raw, i) => {
     const line = raw.trimEnd();
+    // Media on its own line: ![alt](url) image, or a bare MEDIA:/path or
+    // image/video URL the render pipeline emits. Render as real <img>/<video>.
+    const media = parseMediaLine(line);
+    if (media) {
+      flushPara(`p${i}`);
+      flushList(`l${i}`);
+      nodes.push(<MediaEmbed key={`m${i}`} src={media.src} kind={media.kind} alt={media.alt} />);
+      return;
+    }
     const bullet = line.match(/^\s*[-*]\s+(.*)$/);
     const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
     const heading = line.match(/^(#{1,4})\s+(.*)$/);
@@ -204,4 +213,84 @@ function inline(text: string): ReactNode {
   }
   if (last < text.length) parts.push(text.slice(last));
   return parts.length ? parts : text;
+}
+
+const IMG_EXT = /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?[^\s]*)?$/i;
+const VID_EXT = /\.(mp4|webm|mov|m4v)(\?[^\s]*)?$/i;
+
+/**
+ * Detect a line that is *just* a piece of media so it renders as a real
+ * <img>/<video> instead of plain text. Handles three shapes the Hermes agent
+ * emits:
+ *   1. `![alt](url-or-path)`            markdown image
+ *   2. `MEDIA:/abs/path/to/file.mp4`    gateway media directive
+ *   3. a bare image/video URL on its own line
+ * Local paths are routed through /api/media so the WebView can load files that
+ * live on the host filesystem.
+ */
+function parseMediaLine(
+  line: string,
+): { src: string; kind: "image" | "video"; alt: string } | null {
+  const t = line.trim();
+  if (!t) return null;
+
+  // 1. ![alt](src)
+  const md = t.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
+  if (md) {
+    const raw = md[2];
+    return { src: toSrc(raw), kind: VID_EXT.test(raw) ? "video" : "image", alt: md[1] };
+  }
+
+  // 2. MEDIA:/path  (optionally the whole line is just that)
+  const mediaDirective = t.match(/^MEDIA:\s*(\S+)$/);
+  if (mediaDirective) {
+    const raw = mediaDirective[1];
+    return { src: toSrc(raw), kind: VID_EXT.test(raw) ? "video" : "image", alt: "" };
+  }
+
+  // 3. bare URL/path on its own line ending in a known media extension
+  if (!/\s/.test(t) && (IMG_EXT.test(t) || VID_EXT.test(t))) {
+    return { src: toSrc(t), kind: VID_EXT.test(t) ? "video" : "image", alt: "" };
+  }
+
+  return null;
+}
+
+/** Local filesystem paths → proxied through the media route; URLs pass through. */
+function toSrc(raw: string): string {
+  if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
+  // absolute or ~ path → media proxy
+  const path = raw.replace(/^~(?=\/)/, "");
+  return `/api/media?path=${encodeURIComponent(path)}`;
+}
+
+function MediaEmbed({
+  src,
+  kind,
+  alt,
+}: {
+  src: string;
+  kind: "image" | "video";
+  alt: string;
+}) {
+  if (kind === "video") {
+    return (
+      <video
+        src={src}
+        controls
+        playsInline
+        preload="metadata"
+        className="max-h-[420px] w-full rounded-[var(--radius-md)] border border-border bg-black"
+      />
+    );
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt={alt}
+      loading="lazy"
+      className="max-h-[420px] w-auto max-w-full rounded-[var(--radius-md)] border border-border object-contain"
+    />
+  );
 }
