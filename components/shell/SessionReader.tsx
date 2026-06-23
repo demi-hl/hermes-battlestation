@@ -316,21 +316,26 @@ export function SessionReader() {
             )}
           </div>
 
-          {/* continue composer — the SAME Composer as the Chat tab */}
-          <Composer
-            onSend={(text, images) => enqueue(text, images)}
-            onStop={stop}
-            onNewSession={close}
-            onTask={() => {}}
-            sending={sending}
-            queued={queued.map((q) => ({ id: q.id, text: q.text }))}
-            onCancelQueued={cancelQueued}
-            skills={[]}
-            onRemoveSkill={() => {}}
-            onOpenSkills={() => {}}
-            contextLabel={title}
-            placeholder="Continue session"
-          />
+          {/* continue composer — the SAME Composer as the Chat tab. Wrap it on
+              a black base so the Composer's own 0.96 --background-base band
+              reads the same dark/brown as Chat (where it sits over the black
+              document base), not the green message veil above it. */}
+          <div style={{ background: "#000" }}>
+            <Composer
+              onSend={(text, images) => enqueue(text, images)}
+              onStop={stop}
+              onNewSession={close}
+              onTask={() => {}}
+              sending={sending}
+              queued={queued.map((q) => ({ id: q.id, text: q.text }))}
+              onCancelQueued={cancelQueued}
+              skills={[]}
+              onRemoveSkill={() => {}}
+              onOpenSkills={() => {}}
+              contextLabel={title}
+              placeholder="Continue session"
+            />
+          </div>
         </motion.div>
       )}
     </AnimatePresence>
