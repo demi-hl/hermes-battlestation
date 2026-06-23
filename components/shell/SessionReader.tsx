@@ -255,7 +255,7 @@ export function SessionReader() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-x-0 top-0 z-[40] mx-auto flex max-w-[560px] flex-col overflow-hidden"
+          className="fixed inset-x-0 top-0 z-[210] mx-auto flex max-w-[560px] flex-col overflow-hidden [isolation:isolate]"
           style={{
             // Match Chat EXACTLY: Chat shows the app-root Backdrop (teal base +
             // warm-glow vignette + texture) through a transparent ChatHub over
