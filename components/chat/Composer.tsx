@@ -334,8 +334,13 @@ export function Composer({
     <div
       className="border-t border-border px-3 pt-2.5"
       style={{
-        background: "var(--background-base)",
-        opacity: 0.96,
+        // Solid warm near-black band sampled EXACTLY from DEMI's reference
+        // (composer band reads (0,0,0)→(16,10,8) brown-black). Opaque + no
+        // opacity:0.96 so nothing bleeds through — this is what made the
+        // continue overlay read GREEN (teal --background-base at 0.96 over the
+        // overlay) while Chat read near-black over the page. Now identical on
+        // every chatbox and every renderer (browser + iOS WebView).
+        background: "#120c09",
         backdropFilter: "blur(20px) saturate(150%)",
         WebkitBackdropFilter: "blur(20px) saturate(150%)",
         // Sit flush on the keyboard when open (Telegram-style): the home
