@@ -316,11 +316,13 @@ export function SessionReader() {
             )}
           </div>
 
-          {/* continue composer — the SAME Composer as the Chat tab. Wrap it on
-              a black base so the Composer's own 0.96 --background-base band
-              reads the same dark/brown as Chat (where it sits over the black
-              document base), not the green message veil above it. */}
-          <div style={{ background: "#000" }}>
+          {/* continue composer — SAME Composer as Chat. The Composer paints a
+              0.96-opacity --background-base band that relies on backdrop-blur
+              bleed; that resolves BLACK over Chat's true-black page on the iOS
+              WebView but TEAL over this overlay. Paint an explicit opaque black
+              base here so the band reads the same near-black on every renderer
+              (phone included), not dependent on what bleeds through. */}
+          <div style={{ background: "#000", isolation: "isolate" }}>
             <Composer
               onSend={(text, images) => enqueue(text, images)}
               onStop={stop}
