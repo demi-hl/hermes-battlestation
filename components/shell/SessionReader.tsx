@@ -254,15 +254,15 @@ export function SessionReader() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-x-0 top-0 z-[40] mx-auto flex max-w-[560px] flex-col overflow-hidden"
+          className="fixed inset-x-0 top-0 z-[40] mx-auto flex max-w-[560px] flex-col overflow-hidden backdrop-blur-xl"
           style={{
-            // Solid dark-teal panel (the theme base). Opaque so the Sessions
-            // pane behind is hidden, and — crucially — the height calc below
-            // makes this panel STOP above the bottom chrome so the context bar +
-            // tab bar stay visible (a mounted full-screen Backdrop here painted
-            // OVER the tab bar and removed it). Composer band reads brown over
-            // this base, matching Chat.
-            background: "var(--background-base)",
+            // Translucent veil — let the app's green Backdrop show THROUGH like
+            // the Chat tab does (ChatHub paints no opaque bg). A solid base here
+            // regressed to near-black and killed the themed green (the exact
+            // "do not paint opaque over the Backdrop" trap in CLAUDE.md). The
+            // blur + low-alpha tint separates the reader from the pane beneath
+            // without hiding the theme.
+            background: "color-mix(in srgb, var(--background-base) 62%, transparent)",
             // Stop ABOVE the bottom chrome (context bar + tab bar) so it stays
             // visible — the reader should feel like the Chat tab, not a full
             // takeover. When the keyboard opens the chrome translates away
@@ -273,9 +273,8 @@ export function SessionReader() {
             paddingTop: "env(safe-area-inset-top)",
           }}
         >
-
           {/* header */}
-          <div className="relative z-[1] flex items-center gap-2 border-b border-border px-3 py-3">
+          <div className="flex items-center gap-2 border-b border-border px-3 py-3">
             <button
               type="button"
               onClick={close}
@@ -299,7 +298,7 @@ export function SessionReader() {
           <div
             ref={scrollRef}
             data-msg-scroll
-            className="relative z-[1] flex-1 overflow-y-auto overscroll-contain"
+            className="flex-1 overflow-y-auto overscroll-contain"
           >
             {loading ? (
               <div className="flex items-center gap-2 px-3 py-6">
@@ -317,11 +316,11 @@ export function SessionReader() {
             )}
           </div>
 
-          {/* continue composer — the SAME Composer as the Chat tab. Solid
-              --background-base band (the exact dark teal Chat's composer renders
-              to) so the bottom layer can't wash out against the mounted Backdrop.
-              z-[1] keeps it above the fixed Backdrop layers. */}
-          <div className="relative z-[1]" style={{ background: "var(--background-base)" }}>
+          {/* continue composer — the SAME Composer as the Chat tab. Wrap it on
+              a black base so the Composer's own 0.96 --background-base band
+              reads the same dark/brown as Chat (where it sits over the black
+              document base), not the green message veil above it. */}
+          <div style={{ background: "#000" }}>
             <Composer
               onSend={(text, images) => enqueue(text, images)}
               onStop={stop}
