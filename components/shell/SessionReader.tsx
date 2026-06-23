@@ -5,7 +5,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { haptic } from "@/components/shell/haptics";
 import { Composer } from "@/components/chat/Composer";
 import { MessageList } from "@/components/chat/MessageList";
-import { Backdrop } from "@/components/shell/Backdrop";
 import type { ChatMessage } from "@/components/chat/useChat";
 
 interface Msg {
@@ -255,15 +254,15 @@ export function SessionReader() {
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={{ duration: 0.18 }}
-          className="fixed inset-x-0 top-0 z-[210] mx-auto flex max-w-[560px] flex-col overflow-hidden [isolation:isolate]"
+          className="fixed inset-x-0 top-0 z-[40] mx-auto flex max-w-[560px] flex-col overflow-hidden"
           style={{
-            // Match Chat EXACTLY: Chat shows the app-root Backdrop (teal base +
-            // warm-glow vignette + texture) through a transparent ChatHub over
-            // the BLACK document base. The continue overlay covers that root
-            // Backdrop, so we paint the same black base here and mount our OWN
-            // <Backdrop/> child below — reproducing the identical warm blend
-            // instead of a flat veil (which never matched the brown tone).
-            background: "#000",
+            // Solid dark-teal panel (the theme base). Opaque so the Sessions
+            // pane behind is hidden, and — crucially — the height calc below
+            // makes this panel STOP above the bottom chrome so the context bar +
+            // tab bar stay visible (a mounted full-screen Backdrop here painted
+            // OVER the tab bar and removed it). Composer band reads brown over
+            // this base, matching Chat.
+            background: "var(--background-base)",
             // Stop ABOVE the bottom chrome (context bar + tab bar) so it stays
             // visible — the reader should feel like the Chat tab, not a full
             // takeover. When the keyboard opens the chrome translates away
@@ -274,11 +273,6 @@ export function SessionReader() {
             paddingTop: "env(safe-area-inset-top)",
           }}
         >
-          {/* App-root Backdrop, re-mounted inside the overlay so the continue
-              view gets the IDENTICAL teal-base + warm-glow + texture blend Chat
-              shows (Chat sees it through transparent ChatHub). It's fixed +
-              pointer-events-none; the content below sits on top. */}
-          <Backdrop />
 
           {/* header */}
           <div className="relative z-[1] flex items-center gap-2 border-b border-border px-3 py-3">
