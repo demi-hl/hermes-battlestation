@@ -15,6 +15,7 @@ import { haptic } from "./haptics";
 import { usePush } from "./usePush";
 import { cn } from "@/lib/utils";
 import { profileTint } from "@/lib/profile-color";
+import { usePet } from "@/lib/pet";
 import { usePolling } from "@/components/usePolling";
 import type { FleetAgent } from "@/lib/fleet/types";
 import { AnimatePresence, motion } from "framer-motion";
@@ -53,6 +54,7 @@ export function ContextBar() {
   } = useWorkspace();
 
   const [sheet, setSheet] = useState<"model" | "profile" | "effort" | null>(null);
+  const { pet } = usePet();
 
   // Live turn timer — ticks m:ss while a turn is running so you can SEE the
   // agent is thinking. Cleared (null) when idle. 1s cadence is enough; we round
@@ -237,23 +239,37 @@ export function ContextBar() {
               <ChevronUpDownIcon width={10} height={10} className="text-text-tertiary" />
             </button>
 
-            <div className="min-w-0 flex-1" />
-
-            {/* App-session timer — steady green dot + uptime since open */}
+            {/* App-session timer — sits NEXT TO the profile. Its leading marker
+                is the chosen PET sprite (replaces the status dot), or a steady
+                green dot when no pet is selected. Pick the pet in Settings. */}
             <span
               className="flex shrink-0 items-center gap-1.5 font-mono-ui tabular text-[0.62rem] text-text-tertiary"
-              title="app session uptime"
+              title={pet.src ? `${pet.label} · app session uptime` : "app session uptime"}
             >
-              <span
-                aria-hidden
-                className="h-1.5 w-1.5 rounded-full"
-                style={{
-                  background: "var(--color-success)",
-                  boxShadow: "0 0 5px var(--color-success)",
-                }}
-              />
+              {pet.src ? (
+                <motion.img
+                  src={pet.src}
+                  alt={pet.label}
+                  aria-hidden
+                  className="h-4 w-4 shrink-0 object-contain"
+                  style={{ filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 55%, transparent))" }}
+                  animate={{ y: [0, -1.5, 0] }}
+                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
+                />
+              ) : (
+                <span
+                  aria-hidden
+                  className="h-1.5 w-1.5 rounded-full"
+                  style={{
+                    background: "var(--color-success)",
+                    boxShadow: "0 0 5px var(--color-success)",
+                  }}
+                />
+              )}
               {sessionLabel}
             </span>
+
+            <div className="min-w-0 flex-1" />
 
             {/* Context meter + compress — dropped below so the tree name has the
                 full top row. */}

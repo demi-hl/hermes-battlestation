@@ -15,6 +15,7 @@ import {
   PlugIcon,
 } from "@/components/shell/icons";
 import { haptic } from "@/components/shell/haptics";
+import { usePet, PETS } from "@/lib/pet";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui";
 import type { ComponentType, SVGProps } from "react";
@@ -51,7 +52,9 @@ export function SettingsPane() {
   const [bgOpen, setBgOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
+  const [petOpen, setPetOpen] = useState(false);
   const { theme, bgOverride } = useTheme();
+  const { pet, setPetId } = usePet();
   const { model } = useWorkspace();
   const [setup, setSetup] = useState<SetupState | null>(null);
 
@@ -120,6 +123,16 @@ export function SettingsPane() {
             setBgOpen(true);
           }}
         />
+        <Row
+          icon={PawIcon}
+          label="Pet"
+          value={pet.label}
+          hint="Sits by your profile, marks the session timer"
+          onClick={() => {
+            haptic(10);
+            setPetOpen(true);
+          }}
+        />
       </section>
 
       <section className="flex flex-col gap-1.5">
@@ -175,6 +188,7 @@ export function SettingsPane() {
         onSaved={loadSetup}
       />
       <LinkSheet open={linkOpen} onClose={() => setLinkOpen(false)} />
+      <PetSheet open={petOpen} onClose={() => setPetOpen(false)} petId={pet.id} setPetId={setPetId} />
     </div>
   );
 }
@@ -187,6 +201,79 @@ function QrIcon(props: SVGProps<SVGSVGElement>) {
       <rect x="14" y="3" width="7" height="7" rx="1.5" />
       <rect x="3" y="14" width="7" height="7" rx="1.5" />
       <path d="M14 14h3v3M20 14v.01M14 20h.01M17 20h.01M20 17v4" />
+    </svg>
+  );
+}
+
+// Inline paw glyph (house line-icon style).
+function PawIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" stroke="none" {...props}>
+      <ellipse cx="7" cy="9" rx="1.7" ry="2.2" />
+      <ellipse cx="12" cy="7" rx="1.7" ry="2.3" />
+      <ellipse cx="17" cy="9" rx="1.7" ry="2.2" />
+      <path d="M12 12c-3 0-5 2.2-5 4.4 0 1.7 1.4 2.6 3 2.6 1 0 1.4-.4 2-.4s1 .4 2 .4c1.6 0 3-.9 3-2.6 0-2.2-2-4.4-5-4.4z" />
+    </svg>
+  );
+}
+
+// Pet picker — choose the sprite that sits by your profile and marks the
+// session timer (replacing the status dot), or "Status dot" to disable it.
+function PetSheet({
+  open,
+  onClose,
+  petId,
+  setPetId,
+}: {
+  open: boolean;
+  onClose: () => void;
+  petId: string;
+  setPetId: (id: string) => void;
+}) {
+  return (
+    <Sheet open={open} onClose={onClose} title="Pet">
+      <div className="flex flex-col gap-1.5 p-1">
+        {PETS.map((p) => (
+          <button
+            key={p.id}
+            type="button"
+            onClick={() => {
+              haptic(8);
+              setPetId(p.id);
+            }}
+            className={cn(
+              "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
+              p.id === petId
+                ? "border-[color:var(--color-success)] bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)]"
+                : "border-border/60 active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
+            )}
+          >
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center">
+              {p.src ? (
+                <img src={p.src} alt={p.label} className="h-7 w-7 object-contain" />
+              ) : (
+                <span
+                  className="h-2.5 w-2.5 rounded-full"
+                  style={{ background: "var(--color-success)", boxShadow: "0 0 6px var(--color-success)" }}
+                />
+              )}
+            </span>
+            <span className="flex-1 text-sm text-midground">{p.label}</span>
+            {p.id === petId && <CheckIconInline />}
+          </button>
+        ))}
+        <p className="px-1 pt-1 text-[0.7rem] text-text-tertiary">
+          Your pet sits next to the profile and marks the live session timer.
+        </p>
+      </div>
+    </Sheet>
+  );
+}
+
+function CheckIconInline() {
+  return (
+    <svg viewBox="0 0 24 24" width={16} height={16} fill="none" stroke="var(--color-success)" strokeWidth={2.4}>
+      <path d="M5 13l4 4L19 7" />
     </svg>
   );
 }
