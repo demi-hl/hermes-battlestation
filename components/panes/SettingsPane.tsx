@@ -123,9 +123,13 @@ export function SettingsPane() {
             setBgOpen(true);
           }}
         />
+      </section>
+
+      <section className="flex flex-col gap-1.5">
+        <SectionLabel>Pet</SectionLabel>
         <Row
           icon={PawIcon}
-          label="Pet"
+          label="Companion"
           value={pet.label}
           hint="Sits by your profile, marks the session timer"
           onClick={() => {
@@ -231,38 +235,42 @@ function PetSheet({
   setPetId: (id: string) => void;
 }) {
   return (
-    <Sheet open={open} onClose={onClose} title="Pet">
-      <div className="flex flex-col gap-1.5 p-1">
-        {PETS.map((p) => (
-          <button
-            key={p.id}
-            type="button"
-            onClick={() => {
-              haptic(8);
-              setPetId(p.id);
-            }}
-            className={cn(
-              "flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left transition-colors",
-              p.id === petId
-                ? "border-[color:var(--color-success)] bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)]"
-                : "border-border/60 active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
-            )}
-          >
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center">
-              {p.src ? (
-                <img src={p.src} alt={p.label} className="h-7 w-7 object-contain" />
-              ) : (
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ background: "var(--color-success)", boxShadow: "0 0 6px var(--color-success)" }}
-                />
+    <Sheet open={open} onClose={onClose} title="Choose your pet">
+      <div className="p-1">
+        <div className="grid grid-cols-3 gap-2">
+          {PETS.map((p) => (
+            <button
+              key={p.id}
+              type="button"
+              onClick={() => {
+                haptic(8);
+                setPetId(p.id);
+              }}
+              className={cn(
+                "flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 transition-colors",
+                p.id === petId
+                  ? "border-[color:var(--color-success)] bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)]"
+                  : "border-border/60 active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
               )}
-            </span>
-            <span className="flex-1 text-sm text-midground">{p.label}</span>
-            {p.id === petId && <CheckIconInline />}
-          </button>
-        ))}
-        <p className="px-1 pt-1 text-[0.7rem] text-text-tertiary">
+            >
+              <span className="flex h-12 w-12 items-center justify-center">
+                {p.src ? (
+                  <img src={p.src} alt={p.label} className="h-11 w-11 object-contain" />
+                ) : (
+                  <span
+                    className="h-3 w-3 rounded-full"
+                    style={{ background: "var(--color-success)", boxShadow: "0 0 8px var(--color-success)" }}
+                  />
+                )}
+              </span>
+              <span className="flex items-center gap-1 text-[0.72rem] text-midground">
+                {p.label}
+                {p.id === petId && <CheckIconInline />}
+              </span>
+            </button>
+          ))}
+        </div>
+        <p className="px-1 pt-3 text-[0.7rem] text-text-tertiary">
           Your pet sits next to the profile and marks the live session timer.
         </p>
       </div>

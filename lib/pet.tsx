@@ -19,6 +19,11 @@ export interface Pet {
 export const PETS: Pet[] = [
   { id: "none", label: "Status dot", src: null },
   { id: "psycat", label: "Psycat", src: "/pets/psycat.png" },
+  { id: "ember", label: "Ember", src: "/pets/ember.png" },
+  { id: "tide", label: "Tide", src: "/pets/tide.png" },
+  { id: "sprout", label: "Sprout", src: "/pets/sprout.png" },
+  { id: "storm", label: "Storm", src: "/pets/storm.png" },
+  { id: "wisp", label: "Wisp", src: "/pets/wisp.png" },
 ];
 
 export const DEFAULT_PET_ID = "none";
