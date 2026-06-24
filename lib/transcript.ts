@@ -2,18 +2,29 @@
 // app's ChatMessage form. Used by /api/chat/history so the iOS app can hydrate
 // its conversation from backend truth instead of device-local localStorage.
 //
-// We surface only user + assistant *text* turns (the conversation as a human
-// reads it). Tool-call rows and empty assistant shells (pure tool dispatch with
-// no prose) are dropped — they belong to the live-stream ToolTray, not the
-// persisted scrollback.
+// TRUE PARITY: we surface user + assistant text AND reconstruct the tool-call
+// activity (the ToolTray chips) that ran during each assistant turn, so a
+// reopened session matches what was shown live. Each `role=tool` row in the DB
+// is attached to the assistant turn it belongs to as a ToolActivity, with `ok`
+// derived from the tool result's exit_code/error. Empty assistant shells that
+// dispatched tools are KEPT (they carry the tray), unlike before.
 
 import { spawn } from "node:child_process";
+
+export interface TranscriptTool {
+  id: string;
+  name: string;
+  title: string;
+  done: boolean;
+  ok: boolean;
+}
 
 export interface TranscriptMessage {
   id: string;
   role: "user" | "assistant";
   text: string;
   ts: number;
+  tools?: TranscriptTool[];
 }
 
 const READ_SCRIPT = `
@@ -24,7 +35,6 @@ con.row_factory = sqlite3.Row
 sid = sys.argv[1]
 
 def flatten(content):
-    # content is TEXT, may be a JSON string (list of parts) or a plain string.
     if content is None:
         return ""
     s = content
@@ -45,12 +55,42 @@ def flatten(content):
                             parts.append(it["content"])
                     elif isinstance(it, str):
                         parts.append(it)
-                return "\\n".join(p for p in parts if p).strip()
+                return "\\\\n".join(p for p in parts if p).strip()
             if isinstance(data, dict) and isinstance(data.get("text"), str):
                 return data["text"]
             return s
         return s
     return str(s)
+
+def tool_ok(content):
+    # A tool result is OK unless its JSON payload carries a non-zero exit_code
+    # or a non-null error. Non-JSON output is treated as success.
+    if not content:
+        return True
+    t = content.strip()
+    if not (t.startswith("{") or t.startswith("[")):
+        return True
+    try:
+        d = json.loads(t)
+    except Exception:
+        return True
+    if isinstance(d, dict):
+        if d.get("error"):
+            return False
+        ec = d.get("exit_code")
+        if isinstance(ec, int) and ec != 0:
+            return False
+    return True
+
+HUMAN = {
+    "terminal": "Terminal", "read_file": "Read file", "write_file": "Write file",
+    "patch": "Edit file", "search_files": "Search", "web_search": "Web search",
+    "web_extract": "Fetch page", "todo": "Todo", "process": "Process",
+}
+def titler(name):
+    if not name:
+        return "tool"
+    return HUMAN.get(name, name.replace("_", " ").strip().title())
 
 rows = con.execute(
     "SELECT id, role, content, tool_call_id, tool_name, timestamp "
@@ -60,28 +100,50 @@ rows = con.execute(
 ).fetchall()
 
 out = []
+last_assistant = None  # the assistant msg dict tool rows attach to
+
 for r in rows:
     role = r["role"]
+
+    # Tool result rows -> attach to the current assistant turn as activity.
+    if role == "tool" or r["tool_call_id"] or r["tool_name"]:
+        name = r["tool_name"] or "tool"
+        tool = {
+            "id": f"db{r['id']}",
+            "name": name,
+            "title": titler(name),
+            "done": True,
+            "ok": tool_ok(r["content"]),
+        }
+        if last_assistant is not None:
+            last_assistant.setdefault("tools", []).append(tool)
+        continue
+
     if role not in ("user", "assistant"):
         continue
-    # Skip tool-result rows masquerading as user/assistant.
-    if r["tool_call_id"] or r["tool_name"]:
-        continue
+
     text = flatten(r["content"])
-    if not text or not text.strip():
-        continue
-    # Drop internal plumbing that is not part of the human-readable conversation:
-    # context-compaction summaries and system-reminder fallbacks injected as
-    # pseudo-turns.
-    stripped = text.lstrip()
+    stripped = (text or "").lstrip()
     if stripped.startswith("[CONTEXT COMPACTION") or stripped.startswith("[System note:"):
         continue
-    out.append({
+
+    msg = {
         "id": f"db{r['id']}",
         "role": role,
-        "text": text,
+        "text": text or "",
         "ts": int((r["timestamp"] or 0) * 1000),
-    })
+    }
+    if role == "assistant":
+        last_assistant = msg
+        out.append(msg)
+    else:
+        # user row: only keep if it has text
+        last_assistant = None
+        if text and text.strip():
+            out.append(msg)
+
+# Drop assistant shells that ended up with NEITHER text NOR tools (pure noise).
+out = [m for m in out if (m["role"] == "user") or m.get("text", "").strip() or m.get("tools")]
 
 print(json.dumps(out))
 `;
