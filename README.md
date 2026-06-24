@@ -36,6 +36,10 @@ and `~/.hermes` live. Point any device at that box and you get the *same* profil
 mirrored everywhere (the way a mail app shows the same inbox on every device). Nothing is copied
 or synced — every device reads the one backend live.
 
+> **The agent is god-mode** — terminal, fleet control, your billing, every session. Treat reaching
+> it like SSH access, not a website. That's why the recommended path keeps it off the public
+> internet entirely.
+
 **1. Set an access token on the box** (this is what makes it safe to reach over a network):
 
 ```bash
@@ -47,23 +51,51 @@ With no token set, the app stays loopback-only with no auth (single-machine mode
 token is set, every device must present it — unauthenticated requests get a `401` (API) or the
 **Connect** screen (pages).
 
-**2. Make the box reachable** — pick one:
+**2. Make the box reachable — use [Tailscale](https://tailscale.com) (recommended).** It's a
+free private mesh VPN; your phone reaches the box directly, and the box is *never* exposed to the
+public internet — no open ports, no public URL for anyone to find or brute-force.
 
-| Path | Notes |
-|---|---|
-| **Tailscale** (recommended) | private mesh, encrypted, no ports exposed publicly |
-| **LAN** | same wifi; bind the server to your LAN IP |
-| **Cloudflare Tunnel / reverse proxy** | public URL — put auth in front; the token is your floor |
+```bash
+# on the box:
+tailscale up
+tailscale serve --bg 9119          # front the app on your tailnet with real TLS
+```
 
-**3. Connect from the device** — open the box's URL (or install the app), and the **Connect**
-screen asks for your **Remote URL** + **Access token**. Enter them once; you're in.
+Then install Tailscale on the phone (App Store / Play Store) and sign into the **same account**.
+That's the only setup — one app, one sign-in, done.
+
+**3. Connect from the device** — open the box's tailnet URL (e.g.
+`https://your-box.tail-xxxx.ts.net`). The **Connect** screen asks for your **Access token** (leave
+Remote URL blank — you opened the box directly). Enter it once; you're in. Or use **Link a device**
+(below) to skip typing entirely.
+
+<details>
+<summary>Other reachability paths (advanced)</summary>
+
+| Path | Need a VPN? | Tradeoff |
+|---|---|---|
+| **Tailscale** (recommended) | yes (1-tap app) | private mesh, nothing exposed publicly |
+| **LAN** | no | free, but only works on your home wifi |
+| **Cloudflare Tunnel / reverse proxy** | no | public URL, works anywhere — but puts the agent on the open internet behind only the token. Accept the exposure before choosing this. |
+
+</details>
+
+### Link a device (no typing)
+
+Already signed in on one device? Open **Settings → Link a device** — it shows a QR that encodes
+your box URL + token. Scan it with a new phone (camera app) and it opens the web app already logged
+in. Same model as WhatsApp Web: the device you're already on mints the QR for the new one.
+
+> The very first device can't use the QR (there'd be no signed-in device to show it) — type the
+> token once on the Connect screen, or have the box owner hand you a QR out-of-band. A QR carries
+> full credentials, so only share it with **your own** devices.
 
 ### Install on a phone (no developer account, no App Store)
 
 The app is a **PWA** — the zero-friction path for everyone:
 
 1. Open your box's URL in Safari (iOS) or Chrome (Android).
-2. Enter your token on the Connect screen.
+2. Enter your token on the Connect screen (or scan a Link-a-device QR).
 3. **Share → Add to Home Screen.** It launches fullscreen with an icon, like a native app.
 
 No Xcode, no `$99` developer account, no 7-day sideload expiry. (A native build via Capacitor
@@ -75,6 +107,7 @@ TestFlight is then the easy distribution path, where only *you* need the develop
 By default the desktop app boots its own local server. To make it a thin client to a remote box
 instead (same as the phone), set `BATTLESTATION_REMOTE_URL=https://your-box:port` — it skips the
 local server and loads the remote box, showing the Connect screen for the token.
+
 
 ## What's inside
 

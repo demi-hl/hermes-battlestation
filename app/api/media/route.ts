@@ -36,6 +36,7 @@ const MIME: Record<string, string> = {
 // write it under ~/.hermes/renders (allowed below) or one of the media dirs.
 const ALLOWED_PREFIXES = [
   path.join(os.homedir(), ".hermes", "renders"),
+  path.join(os.homedir(), "projects"),
   path.join(os.homedir(), "data"),
   path.join(os.homedir(), "Videos"),
   path.join(os.homedir(), "Pictures"),

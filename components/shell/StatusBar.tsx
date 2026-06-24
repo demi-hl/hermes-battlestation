@@ -139,8 +139,12 @@ export function StatusBar() {
           </span>
         )}
 
-        <span className="tabular" title="app session uptime">
-          Session {fmtElapsed(now - start)}
+        <span className="flex items-center gap-1.5 tabular" title="app session uptime">
+          <span
+            className="inline-block h-1.5 w-1.5 rounded-full"
+            style={{ background: "var(--positive, #6ee7b7)", boxShadow: "0 0 6px var(--positive, #6ee7b7)" }}
+          />
+          <span>Session {fmtElapsed(now - start)}</span>
         </span>
 
         <span className="flex items-center gap-1" title={`${model.id} · effort ${rc.data?.agent?.reasoning_effort ?? "?"}`}>

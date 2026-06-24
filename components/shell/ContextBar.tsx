@@ -69,6 +69,20 @@ export function ContextBar() {
   const elapsedLabel =
     elapsed != null ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}` : null;
 
+  // App-session timer — persistent uptime since the app opened (ticks every 1s),
+  // shown with a steady green dot. Distinct from the per-turn `elapsed` above.
+  const [sessionStart] = useState(() => Date.now());
+  const [sessionNow, setSessionNow] = useState(() => Date.now());
+  useEffect(() => {
+    const t = setInterval(() => setSessionNow(Date.now()), 1000);
+    return () => clearInterval(t);
+  }, []);
+  const sessSecs = Math.max(0, Math.floor((sessionNow - sessionStart) / 1000));
+  const sessionLabel =
+    sessSecs >= 3600
+      ? `${Math.floor(sessSecs / 3600)}:${String(Math.floor((sessSecs % 3600) / 60)).padStart(2, "0")}:${String(sessSecs % 60).padStart(2, "0")}`
+      : `${Math.floor(sessSecs / 60)}:${String(sessSecs % 60).padStart(2, "0")}`;
+
   // Live active-agent count — same source + lanes as the desktop status bar
   // (working + spawned). Surfaced as a tappable "# N" badge that jumps to the
   // Tasks board so the active sessions are one tap away.
@@ -224,6 +238,22 @@ export function ContextBar() {
             </button>
 
             <div className="min-w-0 flex-1" />
+
+            {/* App-session timer — steady green dot + uptime since open */}
+            <span
+              className="flex shrink-0 items-center gap-1.5 font-mono-ui tabular text-[0.62rem] text-text-tertiary"
+              title="app session uptime"
+            >
+              <span
+                aria-hidden
+                className="h-1.5 w-1.5 rounded-full"
+                style={{
+                  background: "var(--color-success)",
+                  boxShadow: "0 0 5px var(--color-success)",
+                }}
+              />
+              {sessionLabel}
+            </span>
 
             {/* Context meter + compress — dropped below so the tree name has the
                 full top row. */}

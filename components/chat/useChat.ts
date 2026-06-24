@@ -222,8 +222,12 @@ export function useChat() {
           abortRef.current = null;
           setSending(false);
           setStatus("online");
-          setTurnStartedAt(null);
         }
+        // Host says the turn is done. Always stop the bottom-bar timer, even if
+        // abortRef was already cleared (the stream froze on background and never
+        // ran its finally, or the turn was started under a different surface) —
+        // otherwise the m:ss stopwatch climbs forever on a finished turn.
+        if (!running) setTurnStartedAt(null);
 
         try {
           const res = await fetch(`/api/chat/history?${qs.toString()}`, { cache: "no-store" });

@@ -117,13 +117,30 @@ export function Composer({
   };
 
   const onPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
-    const imgs = Array.from(e.clipboardData?.files ?? []).filter((f) =>
+    const cd = e.clipboardData;
+    if (!cd) return;
+    // iOS WKWebView delivers pasted images via clipboardData.items (getAsFile),
+    // NOT clipboardData.files — read both and dedupe so paste works everywhere.
+    const fromFiles = Array.from(cd.files ?? []);
+    const fromItems = Array.from(cd.items ?? [])
+      .filter((it) => it.kind === "file" && it.type.startsWith("image/"))
+      .map((it) => it.getAsFile())
+      .filter((f): f is File => f !== null);
+    const imgs = [...fromFiles, ...fromItems].filter((f) =>
       f.type.startsWith("image/"),
     );
-    if (imgs.length) {
+    // Dedupe (same image can appear in both files and items).
+    const seen = new Set<string>();
+    const unique = imgs.filter((f) => {
+      const k = `${f.name}:${f.size}:${f.type}`;
+      if (seen.has(k)) return false;
+      seen.add(k);
+      return true;
+    });
+    if (unique.length) {
       e.preventDefault();
       haptic(8);
-      addFiles(imgs);
+      addFiles(unique);
     }
   };
 

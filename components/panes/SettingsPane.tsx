@@ -50,6 +50,7 @@ export function SettingsPane() {
   const [themeOpen, setThemeOpen] = useState(false);
   const [bgOpen, setBgOpen] = useState(false);
   const [setupOpen, setSetupOpen] = useState(false);
+  const [linkOpen, setLinkOpen] = useState(false);
   const { theme, bgOverride } = useTheme();
   const { model } = useWorkspace();
   const [setup, setSetup] = useState<SetupState | null>(null);
@@ -84,6 +85,16 @@ export function SettingsPane() {
           onClick={() => {
             haptic(10);
             setSetupOpen(true);
+          }}
+        />
+        <Row
+          icon={QrIcon}
+          label="Link a device"
+          value="QR"
+          hint="Scan from a new phone to sign in"
+          onClick={() => {
+            haptic(10);
+            setLinkOpen(true);
           }}
         />
       </section>
@@ -163,9 +174,92 @@ export function SettingsPane() {
         setup={setup}
         onSaved={loadSetup}
       />
+      <LinkSheet open={linkOpen} onClose={() => setLinkOpen(false)} />
     </div>
   );
 }
+
+// Inline QR glyph (house line-icon style).
+function QrIcon(props: SVGProps<SVGSVGElement>) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.7} {...props}>
+      <rect x="3" y="3" width="7" height="7" rx="1.5" />
+      <rect x="14" y="3" width="7" height="7" rx="1.5" />
+      <rect x="3" y="14" width="7" height="7" rx="1.5" />
+      <path d="M14 14h3v3M20 14v.01M14 20h.01M17 20h.01M20 17v4" />
+    </svg>
+  );
+}
+
+// Link a device — fetches /api/link (server reads its own URL+token, returns a
+// data-URL QR). Scanning it on a new phone opens the app already signed in.
+function LinkSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [qr, setQr] = useState<string | null>(null);
+  const [url, setUrl] = useState<string>("");
+  const [hasToken, setHasToken] = useState(true);
+  const [err, setErr] = useState(false);
+
+  useEffect(() => {
+    if (!open) return;
+    setQr(null);
+    setErr(false);
+    fetch("/api/link", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : Promise.reject()))
+      .then((d: { qr: string; url: string; hasToken: boolean }) => {
+        setQr(d.qr);
+        setUrl(d.url);
+        setHasToken(d.hasToken);
+      })
+      .catch(() => setErr(true));
+  }, [open]);
+
+  return (
+    <Sheet open={open} onClose={onClose} title="Link a device">
+      <div className="flex flex-col items-center gap-4 px-3 pb-4 pt-1 text-center">
+        <p className="text-[0.8rem] leading-relaxed text-text-tertiary">
+          Scan with a new phone&apos;s camera to open the app already signed in.
+          The device needs to reach this box (Tailscale on, same network, or your
+          tunnel).
+        </p>
+
+        {err ? (
+          <p className="text-[0.8rem] text-[color:var(--negative,#f87171)]">
+            Couldn&apos;t build the QR — is the app reachable?
+          </p>
+        ) : qr ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
+            src={qr}
+            alt="Device login QR"
+            width={240}
+            height={240}
+            className="rounded-[var(--radius-lg)] border border-border bg-white p-2"
+          />
+        ) : (
+          <div className="h-[240px] w-[240px] animate-pulse rounded-[var(--radius-lg)] border border-border bg-[color-mix(in_srgb,var(--midground)_6%,transparent)]" />
+        )}
+
+        {!hasToken && (
+          <p className="text-[0.72rem] text-[color:var(--warning,#fbbf24)]">
+            No access token set on this box — the QR links in without auth. Set
+            BATTLESTATION_TOKEN before sharing.
+          </p>
+        )}
+
+        {url && (
+          <p className="break-all font-mono-ui text-[0.6rem] text-text-quaternary">
+            {url.replace(/token=[^&]+/, "token=•••")}
+          </p>
+        )}
+
+        <p className="text-[0.68rem] text-text-quaternary">
+          A QR carries full access — only scan it on devices you own.
+        </p>
+      </div>
+    </Sheet>
+  );
+}
+
 
 function SetupSheet({
   open,
