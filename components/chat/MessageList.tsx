@@ -118,7 +118,7 @@ export function MessageList({
                 )}
                 {m.text && (
                   <div className="rounded-[calc(var(--theme-radius)+4px)] rounded-br-md border border-border bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] px-3.5 py-2 text-[0.92rem] leading-relaxed text-text-primary">
-                    {m.text}
+                    <Markdown text={m.text} />
                   </div>
                 )}
               </div>
