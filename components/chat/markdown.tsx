@@ -217,6 +217,14 @@ function inline(text: string): ReactNode {
 
 const IMG_EXT = /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?[^\s]*)?$/i;
 const VID_EXT = /\.(mp4|webm|mov|m4v)(\?[^\s]*)?$/i;
+const AUD_EXT = /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac|weba)(\?[^\s]*)?$/i;
+
+// Classify a raw media reference by extension.
+function mediaKind(raw: string): "image" | "video" | "audio" {
+  if (VID_EXT.test(raw)) return "video";
+  if (AUD_EXT.test(raw)) return "audio";
+  return "image";
+}
 
 /**
  * Detect a line that is *just* a piece of media so it renders as a real
@@ -230,7 +238,7 @@ const VID_EXT = /\.(mp4|webm|mov|m4v)(\?[^\s]*)?$/i;
  */
 function parseMediaLine(
   line: string,
-): { src: string; kind: "image" | "video"; alt: string } | null {
+): { src: string; kind: "image" | "video" | "audio"; alt: string } | null {
   const t = line.trim();
   if (!t) return null;
 
@@ -238,19 +246,19 @@ function parseMediaLine(
   const md = t.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
   if (md) {
     const raw = md[2];
-    return { src: toSrc(raw), kind: VID_EXT.test(raw) ? "video" : "image", alt: md[1] };
+    return { src: toSrc(raw), kind: mediaKind(raw), alt: md[1] };
   }
 
   // 2. MEDIA:/path  (optionally the whole line is just that)
   const mediaDirective = t.match(/^MEDIA:\s*(\S+)$/);
   if (mediaDirective) {
     const raw = mediaDirective[1];
-    return { src: toSrc(raw), kind: VID_EXT.test(raw) ? "video" : "image", alt: "" };
+    return { src: toSrc(raw), kind: mediaKind(raw), alt: "" };
   }
 
   // 3. bare URL/path on its own line ending in a known media extension
-  if (!/\s/.test(t) && (IMG_EXT.test(t) || VID_EXT.test(t))) {
-    return { src: toSrc(t), kind: VID_EXT.test(t) ? "video" : "image", alt: "" };
+  if (!/\s/.test(t) && (IMG_EXT.test(t) || VID_EXT.test(t) || AUD_EXT.test(t))) {
+    return { src: toSrc(t), kind: mediaKind(t), alt: "" };
   }
 
   return null;
@@ -270,7 +278,7 @@ function MediaEmbed({
   alt,
 }: {
   src: string;
-  kind: "image" | "video";
+  kind: "image" | "video" | "audio";
   alt: string;
 }) {
   if (kind === "video") {
@@ -281,6 +289,16 @@ function MediaEmbed({
         playsInline
         preload="metadata"
         className="max-h-[420px] w-full rounded-[var(--radius-md)] border border-border bg-black"
+      />
+    );
+  }
+  if (kind === "audio") {
+    return (
+      <audio
+        src={src}
+        controls
+        preload="metadata"
+        className="w-full max-w-[420px]"
       />
     );
   }
