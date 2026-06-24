@@ -6,6 +6,7 @@ import { haptic } from "@/components/shell/haptics";
 import { Composer } from "@/components/chat/Composer";
 import { MessageList } from "@/components/chat/MessageList";
 import type { ChatMessage } from "@/components/chat/useChat";
+import { useWorkspace } from "@/components/shell/workspace-context";
 
 interface Msg {
   id: string;
@@ -20,6 +21,8 @@ interface StreamEvent {
   type: string;
   text?: string;
   error?: string;
+  sessionId?: string;
+  isNew?: boolean;
 }
 
 let _idc = 0;
@@ -35,6 +38,7 @@ const mkId = () => `sr${Date.now().toString(36)}_${++_idc}`;
  * `lo-read-session` { profile, id, title }. Sessions rows + Tasks cards open it.
  */
 export function SessionReader() {
+  const { model } = useWorkspace();
   const [open, setOpen] = useState(false);
   const [title, setTitle] = useState<string>("");
   const [meta, setMeta] = useState<{ profile: string; id: string } | null>(null);
@@ -166,7 +170,14 @@ export function SessionReader() {
       const res = await fetch("/api/sessions/continue", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ sessionId: meta.id, profile: meta.profile, message: trimmed, images }),
+        body: JSON.stringify({
+          sessionId: meta.id,
+          profile: meta.profile,
+          message: trimmed,
+          images,
+          model: model.id,
+          provider: model.provider,
+        }),
         signal: ctrl.signal,
       });
       if (!res.ok || !res.body) {
@@ -196,6 +207,8 @@ export function SessionReader() {
             setMsgs((m) =>
               (m ?? []).map((x) => (x.id === pendingId ? { ...x, text: x.text + ev.text } : x)),
             );
+          } else if (ev.type === "session" && ev.sessionId) {
+            setMeta((cur) => (cur ? { ...cur, id: ev.sessionId! } : cur));
           } else if (ev.type === "message" && ev.text) {
             patch({ pending: false, text: ev.text });
           } else if (ev.type === "error") {
@@ -269,7 +282,7 @@ export function SessionReader() {
             // (--kb-open→1), so the subtraction collapses to 0 and the reader
             // extends full-height with the composer riding above the keyboard.
             height:
-              "calc(var(--app-vh, 100dvh) - (var(--app-context-h) + var(--app-tabbar-h) + env(safe-area-inset-bottom)) * (1 - var(--kb-open, 0)))",
+              "calc(var(--app-vh, 100dvh) - (var(--app-context-h, 0px) + var(--app-tabbar-h, 0px) + env(safe-area-inset-bottom)) * (1 - var(--kb-open, 0)))",
             paddingTop: "env(safe-area-inset-top)",
           }}
         >

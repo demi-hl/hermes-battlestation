@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
-import { readProfileTranscript } from "@/lib/profile-sessions";
+import {
+  normalizeProfileName,
+  readProfileTranscript,
+  validSessionId,
+} from "@/lib/profile-sessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,10 +14,13 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   const url = new URL(req.url);
-  const profile = url.searchParams.get("profile") || "default";
+  const profile = normalizeProfileName(url.searchParams.get("profile"));
   const id = url.searchParams.get("id");
-  if (!id) {
-    return NextResponse.json({ messages: [], error: "id required" }, { status: 400 });
+  if (!profile) {
+    return NextResponse.json({ messages: [], error: "bad profile" }, { status: 400 });
+  }
+  if (!validSessionId(id)) {
+    return NextResponse.json({ messages: [], error: "bad id" }, { status: 400 });
   }
   try {
     const messages = await readProfileTranscript(profile, id);

@@ -3,6 +3,7 @@ import { promises as fs } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { resolveRepoCwd } from "@/lib/local-repos";
+import { resolveInRepo } from "@/lib/workspace-fs";
 import { run } from "@/lib/exec";
 import {
   sessionTitleFor,
@@ -47,12 +48,24 @@ export async function POST(req: Request) {
   const cwd = await resolveRepoCwd(body.repo);
   if (!cwd) return json({ ok: false, files: [], sessionId: null, error: "unknown repo" }, 404);
 
-  // Resolve + contain the target path within the repo (no traversal).
-  const abs = path.resolve(cwd, body.path ?? "");
-  const rel = path.relative(cwd, abs);
-  if (rel.startsWith("..") || path.isAbsolute(rel)) {
+  if (!body.path) {
+    return json({ ok: false, files: [], sessionId: null, error: "missing path" }, 400);
+  }
+
+  // Resolve + contain the target path within the repo, including symlink escapes.
+  let root = cwd;
+  try {
+    root = await fs.realpath(cwd);
+  } catch {
+    /* keep cwd */
+  }
+  let abs: string;
+  try {
+    abs = await resolveInRepo(root, body.path);
+  } catch {
     return json({ ok: false, files: [], sessionId: null, error: "path escapes repo" }, 400);
   }
+  const rel = path.relative(root, abs);
 
   const title = sessionTitleFor(body.repo);
   if (!tryLock(title)) {

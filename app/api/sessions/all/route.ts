@@ -3,6 +3,7 @@ import {
   listProfiles,
   listSessionsForProfile,
   DEFAULT_PROFILE,
+  normalizeProfileName,
 } from "@/lib/profile-sessions";
 
 export const runtime = "nodejs";
@@ -16,8 +17,12 @@ export const dynamic = "force-dynamic";
  */
 export async function GET(req: Request) {
   const fetchedAt = new Date().toISOString();
-  const profile = new URL(req.url).searchParams.get("profile");
+  const rawProfile = new URL(req.url).searchParams.get("profile");
+  const profile = rawProfile == null ? null : normalizeProfileName(rawProfile);
   try {
+    if (rawProfile != null && !profile) {
+      return NextResponse.json({ profile: rawProfile, sessions: [], fetchedAt, error: "bad profile" }, { status: 400 });
+    }
     if (!profile) {
       const profiles = await listProfiles();
       return NextResponse.json({ profiles, fetchedAt });

@@ -16,6 +16,15 @@ export const DEFAULT_PROFILE = "default";
 
 const PROFILE_NAME = /^[a-zA-Z0-9._-]+$/;
 
+export function normalizeProfileName(profile: string | null | undefined): string | null {
+  const p = (profile || DEFAULT_PROFILE).trim() || DEFAULT_PROFILE;
+  return PROFILE_NAME.test(p) ? p : null;
+}
+
+export function validSessionId(id: string | null | undefined): id is string {
+  return typeof id === "string" && /^[A-Za-z0-9_.:-]{1,160}$/.test(id);
+}
+
 /** Resolve a profile name to its state.db path (validated, never shell-bound). */
 export function dbPathForProfile(profile: string): string | null {
   if (profile === DEFAULT_PROFILE) return path.join(HOME, ".hermes", "state.db");
@@ -221,25 +230,31 @@ except Exception:
 export async function sessionMeta(
   profile: string,
   sessionId: string,
-): Promise<{ cwd: string | null; source: string | null }> {
+): Promise<{ cwd: string | null; source: string | null; model: string | null; provider: string | null }> {
   const db = dbPathForProfile(profile);
-  if (!db) return { cwd: null, source: null };
-  return runPy<{ cwd: string | null; source: string | null }>(
+  if (!db) return { cwd: null, source: null, model: null, provider: null };
+  return runPy<{ cwd: string | null; source: string | null; model: string | null; provider: string | null }>(
     `
 import sqlite3, sys, json
 db, sid = sys.argv[1], sys.argv[2]
 try:
     con = sqlite3.connect(f"file:{db}?mode=ro", uri=True)
-    row = con.execute("SELECT cwd, source FROM sessions WHERE id=?", (sid,)).fetchone()
+    row = con.execute("SELECT cwd, source, model, model_config FROM sessions WHERE id=?", (sid,)).fetchone()
     if row:
-        print(json.dumps({"cwd": row[0] or None, "source": row[1] or None}))
+        provider = None
+        try:
+            cfg = json.loads(row[3] or "{}")
+            provider = cfg.get("provider")
+        except Exception:
+            provider = None
+        print(json.dumps({"cwd": row[0] or None, "source": row[1] or None, "model": row[2] or None, "provider": provider or None}))
     else:
-        print(json.dumps({"cwd": None, "source": None}))
+        print(json.dumps({"cwd": None, "source": None, "model": None, "provider": None}))
 except Exception:
-    print(json.dumps({"cwd": None, "source": None}))
+    print(json.dumps({"cwd": None, "source": None, "model": None, "provider": None}))
 `,
     [db, sessionId],
-    { cwd: null, source: null },
+    { cwd: null, source: null, model: null, provider: null },
   );
 }
 

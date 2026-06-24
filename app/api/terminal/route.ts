@@ -123,7 +123,12 @@ export async function POST(req: Request) {
   } catch {
     return Response.json({ error: "invalid json" }, { status: 400 });
   }
-  const id = sessionId(payload.repo ?? null);
+  const repo = payload.repo ?? null;
+  const cwd = await cwdFor(repo);
+  if (cwd === null) {
+    return Response.json({ error: "unknown repo" }, { status: 404 });
+  }
+  const id = sessionId(repo);
 
   if (payload.kill) {
     const ok = killSession(id);

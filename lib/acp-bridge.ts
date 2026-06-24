@@ -267,6 +267,20 @@ class AcpBridge {
     });
   }
 
+  private targetModelChoice(): string | null {
+    const model = (this.target.model ?? "").trim();
+    if (!model) return null;
+    const provider = (this.target.provider ?? "").trim();
+    if (!provider || model.includes(":")) return model;
+    return `${provider}:${model}`;
+  }
+
+  private async applyTargetModel(sessionId: string): Promise<void> {
+    const modelId = this.targetModelChoice();
+    if (!modelId) return;
+    await this.rpc("session/set_model", { sessionId, modelId });
+  }
+
   /** Resolve (creating or loading) the ACP session bound to a repo+cwd. */
   private async resolveSession(repo: string, cwd: string): Promise<{ id: string; isNew: boolean }> {
     const known = this.repoSession.get(repo);
@@ -275,6 +289,7 @@ class AcpBridge {
       // Cold start: the adapter persisted this session — load it.
       try {
         await this.rpc("session/load", { sessionId: known, cwd, mcpServers: [] });
+        await this.applyTargetModel(known);
         this.liveSessions.add(known);
         return { id: known, isNew: false };
       } catch {
@@ -286,6 +301,7 @@ class AcpBridge {
       sessionId: string;
     };
     const id = res.sessionId;
+    await this.applyTargetModel(id);
     this.repoSession.set(repo, id);
     this.liveSessions.add(id);
     this.saveMap();
@@ -398,6 +414,7 @@ class AcpBridge {
     if (!this.liveSessions.has(sessionId)) {
       try {
         await this.rpc("session/load", { sessionId, cwd, mcpServers: [] });
+        await this.applyTargetModel(sessionId);
         this.liveSessions.add(sessionId);
       } catch (e) {
         onEvent({
@@ -458,6 +475,7 @@ class AcpBridge {
         sessionId: string;
       };
       id = res.sessionId;
+      await this.applyTargetModel(id);
       this.liveSessions.add(id);
     } catch (e) {
       onEvent({ kind: "error", error: e instanceof Error ? e.message : "could not start session" });

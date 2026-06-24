@@ -1,5 +1,10 @@
 import { acpBridge, type AcpTurnEvent } from "@/lib/acp-bridge";
-import { sessionMeta, readProfileTranscript } from "@/lib/profile-sessions";
+import {
+  normalizeProfileName,
+  readProfileTranscript,
+  sessionMeta,
+  validSessionId,
+} from "@/lib/profile-sessions";
 import type { ChatStreamEvent } from "@/lib/chat-types";
 import { homedir } from "node:os";
 
@@ -17,7 +22,15 @@ interface ContinueRequest {
   /** Profile that owns the session (default unless cross-profile). */
   profile?: string;
   message: string;
+  model?: string;
+  provider?: string;
   images?: { data: string; mime: string }[];
+}
+
+function cleanOverride(value: string | null | undefined): string | undefined {
+  const v = value?.trim();
+  if (!v || v.length > 200 || /[\0\r\n]/.test(v)) return undefined;
+  return v;
 }
 
 /** Build a compact seed context from a transcript: keep the head (the goal)
@@ -71,17 +84,23 @@ export async function POST(req: Request) {
 
   const sessionId = (body.sessionId ?? "").trim();
   const message = (body.message ?? "").trim();
-  if (!sessionId) return new Response("sessionId required", { status: 400 });
+  if (!validSessionId(sessionId)) return new Response("bad sessionId", { status: 400 });
   if (!message) return new Response("empty message", { status: 400 });
 
-  const profile = (body.profile || "default").trim() || "default";
+  const profile = normalizeProfileName(body.profile);
+  if (!profile) return new Response("bad profile", { status: 400 });
+  const requestedModel = cleanOverride(body.model);
+  const requestedProvider = cleanOverride(body.provider);
   const meta = await sessionMeta(profile, sessionId);
   const cwd = meta.cwd || homedir();
   const isAcp = meta.source === "acp";
+  const exactResume =
+    isAcp &&
+    (!requestedModel || requestedModel === meta.model) &&
+    (!requestedProvider || requestedProvider === meta.provider);
 
-  // For the seeded path, pull the transcript to prime the fresh session.
   let seed = "";
-  if (!isAcp) {
+  if (!exactResume) {
     try {
       const transcript = await readProfileTranscript(profile, sessionId);
       seed = buildSeed(transcript);
@@ -96,6 +115,12 @@ export async function POST(req: Request) {
     .filter((im) => im && typeof im.data === "string" && im.data.length <= MAX_IMG_CHARS)
     .slice(0, MAX_IMAGES)
     .map((im) => ({ data: im.data, mime: typeof im.mime === "string" ? im.mime : "image/png" }));
+
+  const target = {
+    profile,
+    model: requestedModel,
+    provider: requestedProvider,
+  };
 
   const started = Date.now();
   let heartbeat: ReturnType<typeof setInterval> | null = null;
@@ -155,8 +180,8 @@ export async function POST(req: Request) {
       };
 
       try {
-        const bridge = acpBridge({ profile });
-        if (isAcp) {
+        const bridge = acpBridge(target);
+        if (exactResume) {
           await bridge.promptSession(sessionId, cwd, message, relay, images);
         } else {
           await bridge.promptSeeded(cwd, seed, message, relay, images);

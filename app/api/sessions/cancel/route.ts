@@ -1,4 +1,5 @@
 import { acpBridge } from "@/lib/acp-bridge";
+import { normalizeProfileName, validSessionId } from "@/lib/profile-sessions";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -25,8 +26,11 @@ export async function POST(req: Request) {
     return Response.json({ ok: false, error: "bad request" }, { status: 400 });
   }
   const sessionId = (body.sessionId ?? "").trim();
-  if (!sessionId) return Response.json({ ok: false, error: "sessionId required" }, { status: 400 });
-  const profile = (body.profile || "default").trim() || "default";
+  if (!validSessionId(sessionId)) {
+    return Response.json({ ok: false, error: "bad sessionId" }, { status: 400 });
+  }
+  const profile = normalizeProfileName(body.profile);
+  if (!profile) return Response.json({ ok: false, error: "bad profile" }, { status: 400 });
   const bridge = acpBridge({ profile });
   const cancelled = await bridge.cancelBySessionId(sessionId);
   return Response.json({ ok: true, cancelled });

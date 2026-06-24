@@ -280,7 +280,10 @@ export function AppShell() {
     /* ------------------------------------------------
        DESKTOP LAYOUT: god-mode IDE (rail + agent spine + source panel)
     ------------------------------------------------ */
-    <IDEShell />
+    <>
+      <IDEShell />
+      <SessionReader />
+    </>
   ) : (
     /* ------------------------------------------------
        MOBILE LAYOUT: active pane + bottom tabs (tap to switch).
