@@ -99,13 +99,6 @@
         "filter": [
           "**/*"
         ]
-      },
-      {
-        "from": "public",
-        "to": "standalone/public",
-        "filter": [
-          "**/*"
-        ]
       }
     ],
     "asarUnpack": [
