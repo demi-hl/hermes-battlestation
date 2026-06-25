@@ -10,10 +10,16 @@ import { cn } from "@/lib/utils";
 
 // Discoverable slash commands. Typing "/" surfaces this menu. Prompt commands
 // (compress/summary/cost) are expanded into instructions in useChat.send;
-// action commands (new/clear) are intercepted here and run newSession instead.
-type SlashCmd = { name: string; desc: string; action?: boolean };
+// native Hermes commands pass through as real slash prompts.
+type SlashCmd = { name: string; desc: string; action?: boolean; needsInput?: boolean };
 const SLASH_COMMANDS: SlashCmd[] = [
   { name: "task", desc: "File this as a Kanban card", action: true },
+  { name: "learn", desc: "Distill a reusable skill", needsInput: true },
+  { name: "skills", desc: "Search and manage skills" },
+  { name: "curator", desc: "Skill maintenance" },
+  { name: "busy", desc: "Queue, steer, or interrupt", needsInput: true },
+  { name: "indicator", desc: "Set busy indicator", needsInput: true },
+  { name: "reload-skills", desc: "Re-scan skill registry" },
   { name: "compress", desc: "Summarize context, free up tokens" },
   { name: "summary", desc: "Recap decisions and open items" },
   { name: "cost", desc: "Token usage this session" },
@@ -292,9 +298,9 @@ export function Composer({
 
   const runCommand = (c: SlashCmd) => {
     haptic(10);
-    // /task needs a title — picking it from the menu just primes the input.
-    if (c.name === "task") {
-      setValue("/task ");
+    // Commands that need an argument just prime the input.
+    if (c.name === "task" || c.needsInput) {
+      setValue("/" + c.name + " ");
       requestAnimationFrame(() => taRef.current?.focus());
       return;
     }

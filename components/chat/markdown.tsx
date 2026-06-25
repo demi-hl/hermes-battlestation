@@ -1,38 +1,27 @@
 "use client";
 
 import { Fragment, type ReactNode } from "react";
+import { MediaActions } from "./MessageActions";
 
-/**
- * Minimal, dependency-free markdown renderer for assistant turns. Handles the
- * subset the Hermes agent actually emits in chat: fenced code blocks, inline
- * code, bold, headings, and bullet/numbered lists. Deliberately small (no
- * markdown lib added to the bundle) and calm, matching the desktop Hermes chat
- * aesthetic (plain text on background, code as light chips/blocks).
- */
+type ListItem = { text: string; checked?: boolean };
+type ListState = { ordered: boolean; items: ListItem[] };
+type Block = { type: "code" | "prose"; content: string; lang?: string };
+
 export function Markdown({ text, pending = false }: { text: string; pending?: boolean }) {
   const blocks = splitFences(text);
   return (
-    <div className="space-y-2.5 text-[0.92rem] leading-relaxed text-text-primary">
+    <div className="hermes-md space-y-2.5 text-[0.92rem] leading-relaxed text-text-primary">
       {blocks.map((b, i) =>
         b.type === "code" ? (
-          <pre
-            key={i}
-            className="overflow-x-auto rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] p-3"
-          >
-            <code className="font-mono text-[0.8rem] leading-relaxed text-text-secondary">
-              {b.content}
-            </code>
+          <pre key={i} className="hermes-md-enter overflow-x-auto rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] p-3">
+            {b.lang && <span className="mb-2 block font-mono-ui text-[0.58rem] uppercase tracking-wider text-text-tertiary">{b.lang}</span>}
+            <code className="font-mono text-[0.8rem] leading-relaxed text-text-secondary">{b.content}</code>
           </pre>
         ) : (
           <Fragment key={i}>
             {renderProse(b.content)}
-            {/* Streaming caret on the last prose block while tokens arrive —
-                eases the per-token "pop" by showing a steady live cursor. */}
             {pending && i === blocks.length - 1 && (
-              <span
-                aria-hidden
-                className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.18em] rounded-full bg-midground/70 animate-caret-blink align-baseline"
-              />
+              <span aria-hidden className="ml-0.5 inline-block h-[1.05em] w-[2px] translate-y-[0.18em] rounded-full bg-midground/70 animate-caret-blink align-baseline" />
             )}
           </Fragment>
         ),
@@ -41,16 +30,14 @@ export function Markdown({ text, pending = false }: { text: string; pending?: bo
   );
 }
 
-type Block = { type: "code" | "prose"; content: string };
-
 function splitFences(text: string): Block[] {
   const out: Block[] = [];
-  const re = /```[^\n]*\n?([\s\S]*?)```/g;
+  const re = /```([^\n`]*)\n?([\s\S]*?)```/g;
   let last = 0;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text))) {
     if (m.index > last) out.push({ type: "prose", content: text.slice(last, m.index) });
-    out.push({ type: "code", content: m[1].replace(/\n$/, "") });
+    out.push({ type: "code", lang: m[1].trim(), content: m[2].replace(/\n$/, "") });
     last = re.lastIndex;
   }
   if (last < text.length) out.push({ type: "prose", content: text.slice(last) });
@@ -58,23 +45,14 @@ function splitFences(text: string): Block[] {
 }
 
 function renderProse(prose: string): ReactNode {
-  // Collapse 3+ blank lines to a single paragraph break, then split into
-  // paragraph groups on blank lines so spacing is consistent (one gap between
-  // paragraphs, not a gap per newline). Within a group, single newlines become
-  // soft line breaks so multi-line sentences stay together visually.
   const lines = prose.replace(/\n{3,}/g, "\n\n").split("\n");
   const nodes: ReactNode[] = [];
-  let list: { ordered: boolean; items: string[] } | null = null;
+  let list: ListState | null = null;
   let para: string[] = [];
 
   const flushPara = (key: string) => {
     if (!para.length) return;
-    const joined = para.join("\n");
-    nodes.push(
-      <p key={key} className="whitespace-pre-wrap break-words">
-        {inline(joined)}
-      </p>,
-    );
+    nodes.push(<p key={key} className="hermes-md-enter whitespace-pre-wrap break-words">{inline(para.join("\n"))}</p>);
     para = [];
   };
 
@@ -83,17 +61,19 @@ function renderProse(prose: string): ReactNode {
     const L = list;
     nodes.push(
       L.ordered ? (
-        <ol key={key} className="ml-4 list-decimal space-y-1 marker:text-text-tertiary">
-          {L.items.map((it, i) => (
-            <li key={i} className="break-words pl-1">{inline(it)}</li>
-          ))}
+        <ol key={key} className="hermes-md-enter ml-4 list-decimal space-y-1 marker:text-text-tertiary">
+          {L.items.map((it, i) => <li key={i} className="break-words pl-1">{inline(it.text)}</li>)}
         </ol>
       ) : (
-        <ul key={key} className="ml-1 space-y-1">
+        <ul key={key} className="hermes-md-enter ml-1 space-y-1">
           {L.items.map((it, i) => (
             <li key={i} className="flex gap-2">
-              <span className="mt-[0.5em] h-1 w-1 shrink-0 rounded-full bg-text-tertiary" />
-              <span className="min-w-0 break-words">{inline(it)}</span>
+              {typeof it.checked === "boolean" ? (
+                <span className="mt-[0.25em] grid h-4 w-4 shrink-0 place-items-center rounded border border-border bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] text-[0.6rem] text-midground">{it.checked ? "✓" : ""}</span>
+              ) : (
+                <span className="mt-[0.5em] h-1 w-1 shrink-0 rounded-full bg-text-tertiary" />
+              )}
+              <span className="min-w-0 break-words">{inline(it.text)}</span>
             </li>
           ))}
         </ul>
@@ -102,67 +82,120 @@ function renderProse(prose: string): ReactNode {
     list = null;
   };
 
-  lines.forEach((raw, i) => {
-    const line = raw.trimEnd();
-    // Media on its own line: ![alt](url) image, or a bare MEDIA:/path or
-    // image/video URL the render pipeline emits. Render as real <img>/<video>.
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i].trimEnd();
     const media = parseMediaLine(line);
     if (media) {
-      flushPara(`p${i}`);
-      flushList(`l${i}`);
+      flushPara(`p${i}`); flushList(`l${i}`);
       nodes.push(<MediaEmbed key={`m${i}`} src={media.src} kind={media.kind} alt={media.alt} />);
-      return;
+      continue;
     }
+
+    if (isTableStart(lines, i)) {
+      flushPara(`p${i}`); flushList(`l${i}`);
+      const parsed = collectTable(lines, i);
+      nodes.push(<MarkdownTable key={`t${i}`} headers={parsed.headers} rows={parsed.rows} />);
+      i = parsed.next - 1;
+      continue;
+    }
+
+    const task = line.match(/^\s*[-*]\s+\[([ xX])\]\s+(.*)$/);
     const bullet = line.match(/^\s*[-*]\s+(.*)$/);
     const numbered = line.match(/^\s*\d+[.)]\s+(.*)$/);
     const heading = line.match(/^(#{1,4})\s+(.*)$/);
+    const quote = line.match(/^>\s?(.*)$/);
 
+    if (task) {
+      flushPara(`p${i}`);
+      if (!list || list.ordered) flushList(`l${i}`);
+      list = list ?? { ordered: false, items: [] };
+      list.items.push({ text: task[2], checked: task[1].toLowerCase() === "x" });
+      continue;
+    }
     if (bullet) {
       flushPara(`p${i}`);
       if (!list || list.ordered) flushList(`l${i}`);
       list = list ?? { ordered: false, items: [] };
-      list.items.push(bullet[1]);
-      return;
+      list.items.push({ text: bullet[1] });
+      continue;
     }
     if (numbered) {
       flushPara(`p${i}`);
       if (!list || !list.ordered) flushList(`l${i}`);
       list = list ?? { ordered: true, items: [] };
-      list.items.push(numbered[1]);
-      return;
+      list.items.push({ text: numbered[1] });
+      continue;
     }
     flushList(`l${i}`);
 
+    if (/^\s*---+\s*$/.test(line)) {
+      flushPara(`p${i}`);
+      nodes.push(<hr key={`hr${i}`} className="hermes-md-enter border-border/70" />);
+      continue;
+    }
     if (heading) {
       flushPara(`p${i}`);
-      nodes.push(
-        <p
-          key={i}
-          className="font-mondwest text-display text-[0.82rem] tracking-wide text-midground"
-        >
-          {inline(heading[2])}
-        </p>,
-      );
-      return;
+      const sizes = ["text-[1.05rem]", "text-[0.95rem]", "text-[0.86rem]", "text-[0.8rem]"];
+      nodes.push(<p key={i} className={`hermes-md-enter font-mondwest text-display ${sizes[heading[1].length - 1]} tracking-wide text-midground`}>{inline(heading[2])}</p>);
+      continue;
     }
-    // Blank line = paragraph boundary; otherwise accumulate into the paragraph.
+    if (quote) {
+      flushPara(`p${i}`);
+      nodes.push(<blockquote key={`q${i}`} className="hermes-md-enter border-l-2 border-midground/40 pl-3 text-text-secondary">{inline(quote[1])}</blockquote>);
+      continue;
+    }
     if (!line.trim()) {
       flushPara(`p${i}`);
-      return;
+      continue;
     }
     para.push(line);
-  });
+  }
   flushList("lend");
   flushPara("pend");
   return <>{nodes}</>;
 }
 
-// Inline: `code`, **bold**, *italic*, [text](url). Order matters — code first
-// so backtick contents are never re-parsed as bold/italic/links.
+function isTableStart(lines: string[], i: number): boolean {
+  return !!lines[i]?.includes("|") && !!lines[i + 1] && /^\s*\|?\s*:?-{3,}:?\s*(\|\s*:?-{3,}:?\s*)+\|?\s*$/.test(lines[i + 1]);
+}
+
+function splitRow(line: string): string[] {
+  return line.trim().replace(/^\|/, "").replace(/\|$/, "").split("|").map((x) => x.trim());
+}
+
+function collectTable(lines: string[], start: number): { headers: string[]; rows: string[][]; next: number } {
+  const headers = splitRow(lines[start]);
+  const rows: string[][] = [];
+  let i = start + 2;
+  while (i < lines.length && lines[i].includes("|") && lines[i].trim()) {
+    rows.push(splitRow(lines[i]));
+    i++;
+  }
+  return { headers, rows, next: i };
+}
+
+function MarkdownTable({ headers, rows }: { headers: string[]; rows: string[][] }) {
+  return (
+    <div className="hermes-md-enter overflow-x-auto rounded-[var(--radius-md)] border border-border">
+      <table className="min-w-full border-collapse text-left text-[0.78rem]">
+        <thead className="bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] text-midground">
+          <tr>{headers.map((h, i) => <th key={i} className="border-b border-border px-2.5 py-2 font-medium">{inline(h)}</th>)}</tr>
+        </thead>
+        <tbody>
+          {rows.map((r, i) => (
+            <tr key={i} className="border-t border-border/60">
+              {headers.map((_, j) => <td key={j} className="px-2.5 py-2 text-text-secondary align-top">{inline(r[j] ?? "")}</td>)}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
 function inline(text: string): ReactNode {
   const parts: ReactNode[] = [];
-  const re =
-    /(`[^`]+`)|(\*\*[^*]+\*\*)|(\*[^*\n]+\*)|(\[[^\]]+\]\((?:https?:\/\/|\/)[^)\s]+\))/g;
+  const re = /(`[^`]+`)|(\*\*[^*]+\*\*)|(__[^_]+__)|(~~[^~]+~~)|(==[^=]+==)|(\|\|[^|]+\|\|)|(\*[^*\n]+\*)|(\[[^\]]+\]\((?:https?:\/\/|\/)[^)\s]+\))/g;
   let last = 0;
   let m: RegExpExecArray | null;
   let k = 0;
@@ -170,44 +203,22 @@ function inline(text: string): ReactNode {
     if (m.index > last) parts.push(text.slice(last, m.index));
     const tok = m[0];
     if (tok.startsWith("`")) {
-      parts.push(
-        <code
-          key={k++}
-          className="rounded bg-[color-mix(in_srgb,var(--midground)_10%,transparent)] px-1 py-0.5 font-mono text-[0.78em] text-midground"
-        >
-          {tok.slice(1, -1)}
-        </code>,
-      );
+      parts.push(<code key={k++} className="rounded bg-[color-mix(in_srgb,var(--midground)_10%,transparent)] px-1 py-0.5 font-mono text-[0.78em] text-midground">{tok.slice(1, -1)}</code>);
     } else if (tok.startsWith("**")) {
-      parts.push(
-        <strong key={k++} className="font-semibold text-midground">
-          {tok.slice(2, -2)}
-        </strong>,
-      );
+      parts.push(<strong key={k++} className="font-semibold text-midground">{tok.slice(2, -2)}</strong>);
+    } else if (tok.startsWith("__")) {
+      parts.push(<span key={k++} className="underline decoration-text-tertiary underline-offset-2">{tok.slice(2, -2)}</span>);
+    } else if (tok.startsWith("~~")) {
+      parts.push(<span key={k++} className="line-through decoration-text-tertiary">{tok.slice(2, -2)}</span>);
+    } else if (tok.startsWith("==")) {
+      parts.push(<mark key={k++} className="rounded bg-[color-mix(in_srgb,var(--color-warning)_22%,transparent)] px-0.5 text-text-primary">{tok.slice(2, -2)}</mark>);
+    } else if (tok.startsWith("||")) {
+      parts.push(<span key={k++} className="rounded bg-midground/80 px-1 text-background-base active:bg-midground/20 active:text-text-primary">{tok.slice(2, -2)}</span>);
     } else if (tok.startsWith("[")) {
       const lm = tok.match(/^\[([^\]]+)\]\(([^)]+)\)$/);
-      if (lm) {
-        parts.push(
-          <a
-            key={k++}
-            href={lm[2]}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-midground underline decoration-text-tertiary underline-offset-2 break-all"
-          >
-            {lm[1]}
-          </a>,
-        );
-      } else {
-        parts.push(tok);
-      }
+      parts.push(lm ? <a key={k++} href={lm[2]} target="_blank" rel="noopener noreferrer" className="break-all text-midground underline decoration-text-tertiary underline-offset-2">{lm[1]}</a> : tok);
     } else {
-      // *italic*
-      parts.push(
-        <em key={k++} className="italic">
-          {tok.slice(1, -1)}
-        </em>,
-      );
+      parts.push(<em key={k++} className="italic">{tok.slice(1, -1)}</em>);
     }
     last = re.lastIndex;
   }
@@ -219,96 +230,43 @@ const IMG_EXT = /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?[^\s]*)?$/i;
 const VID_EXT = /\.(mp4|webm|mov|m4v)(\?[^\s]*)?$/i;
 const AUD_EXT = /\.(mp3|m4a|aac|ogg|oga|opus|wav|flac|weba)(\?[^\s]*)?$/i;
 
-// Classify a raw media reference by extension.
 function mediaKind(raw: string): "image" | "video" | "audio" {
   if (VID_EXT.test(raw)) return "video";
   if (AUD_EXT.test(raw)) return "audio";
   return "image";
 }
 
-/**
- * Detect a line that is *just* a piece of media so it renders as a real
- * <img>/<video> instead of plain text. Handles three shapes the Hermes agent
- * emits:
- *   1. `![alt](url-or-path)`            markdown image
- *   2. `MEDIA:/abs/path/to/file.mp4`    gateway media directive
- *   3. a bare image/video URL on its own line
- * Local paths are routed through /api/media so the WebView can load files that
- * live on the host filesystem.
- */
-function parseMediaLine(
-  line: string,
-): { src: string; kind: "image" | "video" | "audio"; alt: string } | null {
+function parseMediaLine(line: string): { src: string; kind: "image" | "video" | "audio"; alt: string } | null {
   const t = line.trim();
   if (!t) return null;
-
-  // 1. ![alt](src)
   const md = t.match(/^!\[([^\]]*)\]\(([^)\s]+)\)$/);
-  if (md) {
-    const raw = md[2];
-    return { src: toSrc(raw), kind: mediaKind(raw), alt: md[1] };
-  }
-
-  // 2. MEDIA:/path  (optionally the whole line is just that)
+  if (md) return { src: toSrc(md[2]), kind: mediaKind(md[2]), alt: md[1] };
   const mediaDirective = t.match(/^MEDIA:\s*(\S+)$/);
-  if (mediaDirective) {
-    const raw = mediaDirective[1];
-    return { src: toSrc(raw), kind: mediaKind(raw), alt: "" };
-  }
-
-  // 3. bare URL/path on its own line ending in a known media extension
-  if (!/\s/.test(t) && (IMG_EXT.test(t) || VID_EXT.test(t) || AUD_EXT.test(t))) {
-    return { src: toSrc(t), kind: mediaKind(t), alt: "" };
-  }
-
+  if (mediaDirective) return { src: toSrc(mediaDirective[1]), kind: mediaKind(mediaDirective[1]), alt: "" };
+  if (!/\s/.test(t) && (IMG_EXT.test(t) || VID_EXT.test(t) || AUD_EXT.test(t))) return { src: toSrc(t), kind: mediaKind(t), alt: "" };
   return null;
 }
 
-/** Local filesystem paths → proxied through the media route; URLs pass through. */
 function toSrc(raw: string): string {
   if (/^https?:\/\//i.test(raw) || raw.startsWith("data:")) return raw;
-  // absolute or ~ path → media proxy
-  const path = raw.replace(/^~(?=\/)/, "");
-  return `/api/media?path=${encodeURIComponent(path)}`;
+  return `/api/media?path=${encodeURIComponent(raw.replace(/^~(?=\/)/, ""))}`;
 }
 
-function MediaEmbed({
-  src,
-  kind,
-  alt,
-}: {
-  src: string;
-  kind: "image" | "video" | "audio";
-  alt: string;
-}) {
-  if (kind === "video") {
-    return (
-      <video
-        src={src}
-        controls
-        playsInline
-        preload="metadata"
-        className="max-h-[420px] w-full rounded-[var(--radius-md)] border border-border bg-black"
-      />
+function MediaEmbed({ src, kind, alt }: { src: string; kind: "image" | "video" | "audio"; alt: string }) {
+  const media =
+    kind === "video" ? (
+      <video src={src} controls playsInline preload="metadata" className="max-h-[420px] w-full rounded-[var(--radius-md)] border border-border bg-black" />
+    ) : kind === "audio" ? (
+      <audio src={src} controls preload="metadata" className="w-full max-w-[420px]" />
+    ) : (
+      // eslint-disable-next-line @next/next/no-img-element
+      <img src={src} alt={alt} decoding="async" className="max-h-[420px] w-auto max-w-full rounded-[var(--radius-md)] border border-border object-contain" />
     );
-  }
-  if (kind === "audio") {
-    return (
-      <audio
-        src={src}
-        controls
-        preload="metadata"
-        className="w-full max-w-[420px]"
-      />
-    );
-  }
+
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={src}
-      alt={alt}
-      decoding="async"
-      className="max-h-[420px] w-auto max-w-full rounded-[var(--radius-md)] border border-border object-contain"
-    />
+    <div className="hermes-md-enter space-y-1.5">
+      {media}
+      <MediaActions src={src} kind={kind} alt={alt} className={kind === "audio" ? "max-w-[420px]" : undefined} />
+    </div>
   );
 }

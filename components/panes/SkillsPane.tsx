@@ -274,6 +274,19 @@ export function SkillsPane() {
     });
   };
 
+  const openChatCommand = (text: string) => {
+    haptic(10);
+    window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "chat" } }));
+    window.setTimeout(() => {
+      window.dispatchEvent(new CustomEvent("lo-prefill", { detail: { text } }));
+    }, 80);
+  };
+
+  const openConfig = () => {
+    haptic(10);
+    window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "config" } }));
+  };
+
   // First-load expand: all groups on desktop, just the first group on mobile
   // (a wall of expanded skills hurts hierarchy on a phone — audit P2 #15).
   useEffect(() => {
@@ -326,6 +339,30 @@ export function SkillsPane() {
           <span className="ml-auto font-mono-ui text-[0.58rem] text-text-tertiary">
             {updatedAt ? relativeTime(updatedAt) : ""}
           </span>
+        </div>
+
+        {/* learn + management shortcuts */}
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          <SkillAction
+            title="Learn"
+            blurb="make a skill from notes, URL, or workflow"
+            onClick={() => openChatCommand("/learn ")}
+          />
+          <SkillAction
+            title="Pending"
+            blurb="review staged skill writes"
+            onClick={() => openChatCommand("/skills pending")}
+          />
+          <SkillAction
+            title="Reload"
+            blurb="rescan installed skills"
+            onClick={() => openChatCommand("/reload-skills")}
+          />
+          <SkillAction
+            title="Config"
+            blurb="approval + curator settings"
+            onClick={openConfig}
+          />
         </div>
 
         {/* error banner */}
@@ -443,6 +480,31 @@ export function SkillsPane() {
 }
 
 /* ========================================================================= */
+
+function SkillAction({
+  title,
+  blurb,
+  onClick,
+}: {
+  title: string;
+  blurb: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className="rounded-[var(--radius-md)] border border-border px-3 py-2 text-left transition-colors active:bg-[color-mix(in_srgb,var(--midground)_7%,transparent)]"
+    >
+      <span className="block font-mondwest text-display text-[0.76rem] tracking-[0.08em] text-midground">
+        {title}
+      </span>
+      <span className="mt-0.5 block text-[0.64rem] leading-snug text-text-tertiary">
+        {blurb}
+      </span>
+    </button>
+  );
+}
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (

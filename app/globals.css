@@ -379,6 +379,33 @@ body {
 .animate-caret-blink {
   animation: caret-blink 1.05s ease-in-out infinite alternate;
 }
+
+@keyframes hermes-md-in {
+  from {
+    opacity: 0;
+    transform: translate3d(0, 5px, 0) scale(0.995);
+    filter: blur(2px);
+  }
+  to {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+    filter: blur(0);
+  }
+}
+
+.hermes-md-enter {
+  animation: hermes-md-in 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.hermes-md table code,
+.hermes-md li code,
+.hermes-md p code {
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--midground) 12%, transparent);
+}
+
+.hermes-md mark {
+  color: var(--text-primary);
+}
 @keyframes march {
   to {
     background-position: 0.5rem 0;
@@ -472,6 +499,76 @@ body {
   background: var(--arc-gradient);
   background-size: 300% 300%;
   animation: gradient-stroke var(--arc-duration) linear infinite;
+}
+
+@keyframes hermes-pet-bob {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(-1deg) scale(1);
+  }
+  35% {
+    transform: translate3d(0, -9%, 0) rotate(3deg) scale(1.04);
+  }
+  65% {
+    transform: translate3d(0, -3%, 0) rotate(-2deg) scale(0.99);
+  }
+}
+
+@keyframes hermes-pet-wiggle {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg) scale(1);
+  }
+  22% {
+    transform: translate3d(0, -7%, 0) rotate(-5deg) scale(1.03);
+  }
+  44% {
+    transform: translate3d(0, -2%, 0) rotate(4deg) scale(0.99);
+  }
+  70% {
+    transform: translate3d(0, -8%, 0) rotate(2deg) scale(1.04);
+  }
+}
+
+@keyframes hermes-pet-hover {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(0, -10%, 0) scale(1.05);
+  }
+}
+
+.hermes-pet-sprite {
+  transform-origin: 50% 86%;
+  animation: hermes-pet-bob 2.25s ease-in-out infinite;
+  will-change: transform;
+}
+
+.hermes-pet-sprite--psycat,
+.hermes-pet-sprite--storm {
+  animation-name: hermes-pet-wiggle;
+}
+
+.hermes-pet-sprite--wisp,
+.hermes-pet-sprite--tide {
+  animation-name: hermes-pet-hover;
+  animation-duration: 2.7s;
+}
+
+.hermes-pet-sprite--ember {
+  animation-duration: 1.9s;
+}
+
+.hermes-pet-sprite--sprout {
+  animation-duration: 2.55s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hermes-pet-sprite {
+    animation: none;
+  }
 }
 
 /* Animated film-grain shift for the Backdrop noise layer. The static SVG noise

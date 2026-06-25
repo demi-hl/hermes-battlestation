@@ -23,6 +23,27 @@ interface RuntimeConfig {
   model: { default: string; provider: string; base_url: string };
   approvals: { mode: string };
   agent: { reasoning_effort: string; max_turns: number };
+  display: {
+    busy_input_mode: string;
+    tui_status_indicator: string;
+    tool_progress: string;
+    background_process_notifications: string;
+    runtime_footer_enabled: boolean;
+  };
+  skills: {
+    write_approval: boolean;
+    guard_agent_created: boolean;
+    creation_nudge_interval: number;
+    disabled: string[];
+  };
+  curator: {
+    enabled: boolean;
+    consolidate: boolean;
+    prune_builtins: boolean;
+    interval_hours: number;
+    stale_after_days: number;
+    archive_after_days: number;
+  };
 }
 
 interface ModelOption {
@@ -53,9 +74,37 @@ const REASONING_EFFORTS: SelectOption[] = [
   { value: "xhigh", label: "X-High" },
 ];
 
+const BUSY_INPUT_MODES: SelectOption[] = [
+  { value: "interrupt", label: "Interrupt" },
+  { value: "queue", label: "Queue" },
+  { value: "steer", label: "Steer" },
+];
+
+const INDICATOR_STYLES: SelectOption[] = [
+  { value: "kaomoji", label: "Kaomoji" },
+  { value: "emoji", label: "Emoji" },
+  { value: "unicode", label: "Unicode" },
+  { value: "ascii", label: "ASCII" },
+];
+
+const TOOL_PROGRESS_MODES: SelectOption[] = [
+  { value: "none", label: "None" },
+  { value: "off", label: "Off" },
+  { value: "new", label: "New tools" },
+  { value: "all", label: "All tools" },
+  { value: "verbose", label: "Verbose" },
+];
+
+const BACKGROUND_NOTIFY_MODES: SelectOption[] = [
+  { value: "all", label: "All" },
+  { value: "result", label: "Result" },
+  { value: "error", label: "Errors only" },
+  { value: "off", label: "Off" },
+];
+
 /* ========================================================================= */
 
-async function postConfig(key: string, value: string | number): Promise<void> {
+async function postConfig(key: string, value: string | number | boolean): Promise<void> {
   const res = await fetch("/api/runtime-config", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -70,7 +119,7 @@ function useFieldSave(configKey: string) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const save = useCallback(
-    async (value: string | number): Promise<boolean> => {
+    async (value: string | number | boolean): Promise<boolean> => {
       if (timer.current) clearTimeout(timer.current);
       setStatus("saving");
       haptic(6);
@@ -322,6 +371,64 @@ function SelectField({
   );
 }
 
+function BooleanField({
+  configKey,
+  label,
+  hint,
+  initial,
+}: {
+  configKey: string;
+  label: string;
+  hint?: string;
+  initial: boolean;
+}) {
+  const { status, save } = useFieldSave(configKey);
+  const [value, setValue] = useState(initial);
+  const [prevInitial, setPrevInitial] = useState(initial);
+  if (initial !== prevInitial) {
+    setPrevInitial(initial);
+    setValue(initial);
+  }
+
+  const onToggle = async () => {
+    const next = !value;
+    setValue(next);
+    if (!(await save(next))) setValue(value);
+  };
+
+  return (
+    <FieldShell label={label} hint={hint} status={status}>
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-pressed={value}
+        className={cn(
+          INPUT_CLASS,
+          "flex items-center justify-between text-left transition-colors",
+          value &&
+            "border-[color-mix(in_srgb,var(--color-success,#4ade80)_45%,transparent)] bg-[color-mix(in_srgb,var(--color-success,#4ade80)_10%,transparent)]",
+        )}
+      >
+        <span>{value ? "Enabled" : "Disabled"}</span>
+        <span
+          className={cn(
+            "relative h-5 w-9 rounded-full border border-border transition-colors",
+            value &&
+              "border-[color:var(--color-success,#4ade80)] bg-[color-mix(in_srgb,var(--color-success,#4ade80)_16%,transparent)]",
+          )}
+        >
+          <span
+            className={cn(
+              "absolute top-1/2 h-3.5 w-3.5 -translate-y-1/2 rounded-full bg-text-tertiary transition-transform",
+              value ? "translate-x-4 bg-[color:var(--color-success,#4ade80)]" : "translate-x-1",
+            )}
+          />
+        </span>
+      </button>
+    </FieldShell>
+  );
+}
+
 /* ========================================================================= */
 
 export function RuntimeConfigPane() {
@@ -478,6 +585,115 @@ export function RuntimeConfigPane() {
               configKey="agent.max_turns"
               label="Max turns"
               initial={config.agent.max_turns}
+              min={1}
+            />
+          </section>
+
+          {/* Display */}
+          <section className="flex flex-col gap-3">
+            <SectionLabel>Display</SectionLabel>
+            <SelectField
+              configKey="display.busy_input_mode"
+              label="Busy input"
+              hint="Enter while agent works"
+              initial={config.display.busy_input_mode}
+              options={BUSY_INPUT_MODES}
+            />
+            <SelectField
+              configKey="display.tui_status_indicator"
+              label="Indicator"
+              hint="CLI busy style"
+              initial={config.display.tui_status_indicator}
+              options={INDICATOR_STYLES}
+            />
+            <SelectField
+              configKey="display.tool_progress"
+              label="Tool progress"
+              hint="gateway updates"
+              initial={config.display.tool_progress}
+              options={TOOL_PROGRESS_MODES}
+            />
+            <SelectField
+              configKey="display.background_process_notifications"
+              label="Background notifications"
+              initial={config.display.background_process_notifications}
+              options={BACKGROUND_NOTIFY_MODES}
+            />
+            <BooleanField
+              configKey="display.runtime_footer.enabled"
+              label="Runtime footer"
+              hint="final reply metadata"
+              initial={config.display.runtime_footer_enabled}
+            />
+          </section>
+
+          {/* Skills */}
+          <section className="flex flex-col gap-3">
+            <SectionLabel>Skills</SectionLabel>
+            <BooleanField
+              configKey="skills.write_approval"
+              label="Write approval"
+              hint="ask before saving skills"
+              initial={config.skills.write_approval}
+            />
+            <BooleanField
+              configKey="skills.guard_agent_created"
+              label="Guard agent-created"
+              hint="protect generated skills"
+              initial={config.skills.guard_agent_created}
+            />
+            <NumberField
+              configKey="skills.creation_nudge_interval"
+              label="Nudge interval"
+              hint="turns between save prompts"
+              initial={config.skills.creation_nudge_interval}
+              min={1}
+            />
+            <div className="rounded-[var(--radius-md)] border border-border px-3 py-2">
+              <div className="font-mono-ui text-[0.6rem] uppercase tracking-[0.14em] text-text-tertiary">
+                Disabled skills
+              </div>
+              <div className="mt-1 font-mono-ui text-[0.74rem] text-text-secondary">
+                {config.skills.disabled.length} hidden from auto-load
+              </div>
+            </div>
+          </section>
+
+          {/* Curator */}
+          <section className="flex flex-col gap-3">
+            <SectionLabel>Curator</SectionLabel>
+            <BooleanField
+              configKey="curator.enabled"
+              label="Enabled"
+              hint="skill maintenance"
+              initial={config.curator.enabled}
+            />
+            <BooleanField
+              configKey="curator.consolidate"
+              label="Consolidate"
+              initial={config.curator.consolidate}
+            />
+            <BooleanField
+              configKey="curator.prune_builtins"
+              label="Prune builtins"
+              initial={config.curator.prune_builtins}
+            />
+            <NumberField
+              configKey="curator.interval_hours"
+              label="Interval hours"
+              initial={config.curator.interval_hours}
+              min={1}
+            />
+            <NumberField
+              configKey="curator.stale_after_days"
+              label="Stale after days"
+              initial={config.curator.stale_after_days}
+              min={1}
+            />
+            <NumberField
+              configKey="curator.archive_after_days"
+              label="Archive after days"
+              initial={config.curator.archive_after_days}
               min={1}
             />
           </section>

@@ -15,7 +15,7 @@ import { haptic } from "./haptics";
 import { usePush } from "./usePush";
 import { cn } from "@/lib/utils";
 import { profileTint } from "@/lib/profile-color";
-import { usePet } from "@/lib/pet";
+import { PetSprite, usePet } from "@/lib/pet";
 import { usePolling } from "@/components/usePolling";
 import type { FleetAgent } from "@/lib/fleet/types";
 import { AnimatePresence, motion } from "framer-motion";
@@ -244,28 +244,13 @@ export function ContextBar() {
                 green dot when no pet is selected. Pick the pet in Settings. */}
             <span
               className="flex shrink-0 items-center gap-1.5 font-mono-ui tabular text-[0.62rem] text-text-tertiary"
-              title={pet.src ? `${pet.label} · app session uptime` : "app session uptime"}
+              title={pet.enabled ? `${pet.label} · app session uptime` : "app session uptime"}
             >
-              {pet.src ? (
-                <motion.img
-                  src={pet.src}
-                  alt={pet.label}
-                  aria-hidden
-                  className="h-4 w-4 shrink-0 object-contain"
-                  style={{ filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 55%, transparent))" }}
-                  animate={{ y: [0, -1.5, 0] }}
-                  transition={{ duration: 2.2, repeat: Infinity, ease: "easeInOut" }}
-                />
-              ) : (
-                <span
-                  aria-hidden
-                  className="h-1.5 w-1.5 rounded-full"
-                  style={{
-                    background: "var(--color-success)",
-                    boxShadow: "0 0 5px var(--color-success)",
-                  }}
-                />
-              )}
+              <PetSprite
+                pet={pet}
+                className={cn("h-4 w-4 shrink-0", pet.enabled && "scale-[1.35]")}
+                style={{ filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 55%, transparent))" }}
+              />
               {sessionLabel}
             </span>
 

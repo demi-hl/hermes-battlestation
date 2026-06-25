@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
   // which electron-builder then packs — recursively bloating the installer
   // (saw 166MB -> 347MB). Exclude them from tracing for every route.
   outputFileTracingExcludes: {
-    "*": ["release/**", "dist/**", "*.png", ".next/standalone/**"],
+    "*": ["release/**", "dist/**", "*.png", ".next/standalone/**", "next.config.*"],
   },
   // The mobile WKWebView (iOS app) and PWA honor HTTP caching. Next's default
   // for a statically-prerendered root is `Cache-Control: s-maxage=31536000`,
@@ -38,6 +38,17 @@ const nextConfig: NextConfig = {
       },
       {
         source: "/sw.js",
+        headers: [
+          { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
+        ],
+      },
+      {
+        // The mobile WKWebView (iOS app) keeps its own NSURLCache. Any /api
+        // response that lacks an explicit cache directive gets HEURISTICALLY
+        // cached, so the 15s pollers (Kanban, Sessions, Fleet…) serve stale
+        // bodies even though the server data changed — the "board not updating
+        // on the phone" bug. Force every API response to revalidate.
+        source: "/api/:path*",
         headers: [
           { key: "Cache-Control", value: "no-cache, no-store, must-revalidate" },
         ],

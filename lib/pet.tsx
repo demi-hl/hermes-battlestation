@@ -1,77 +1,146 @@
 "use client";
 
-import { useEffect, useState, useCallback } from "react";
-
-// ---------------------------------------------------------------------------
-// Pet feature — an optional sprite that replaces the app-session status dot.
-// Lives next to the profile chip; the session timer stays. Choose/disable in
-// Settings. Persisted to localStorage so it survives reloads and syncs across
-// the app's surfaces (desktop / PWA / dashboard) on the same device.
-// ---------------------------------------------------------------------------
+import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
+import { cn } from "@/lib/utils";
 
 export interface Pet {
   id: string;
   label: string;
-  /** public/ path to a transparent sprite PNG, or null = the classic dot. */
-  src: string | null;
+  enabled: boolean;
+  frames: string[];
+  loopMs?: number;
+  frameW?: number;
+  frameH?: number;
 }
 
-export const PETS: Pet[] = [
-  { id: "none", label: "Status dot", src: null },
-  { id: "psycat", label: "Psycat", src: "/pets/psycat.png" },
-  { id: "ember", label: "Ember", src: "/pets/ember.png" },
-  { id: "tide", label: "Tide", src: "/pets/tide.png" },
-  { id: "sprout", label: "Sprout", src: "/pets/sprout.png" },
-  { id: "storm", label: "Storm", src: "/pets/storm.png" },
-  { id: "wisp", label: "Wisp", src: "/pets/wisp.png" },
-];
-
-export const DEFAULT_PET_ID = "none";
-
-const STORAGE_KEY = "hermes-pet";
-
-export function getPet(id: string): Pet {
-  return PETS.find((p) => p.id === id) ?? PETS[0];
+export interface PetGalleryItem {
+  slug: string;
+  displayName: string;
+  installed: boolean;
+  active: boolean;
+  curated: boolean;
+  spritesheetUrl: string;
 }
 
-/** Read the persisted pet id once (safe pre-mount; returns default on SSR). */
-function readStoredPetId(): string {
-  if (typeof window === "undefined") return DEFAULT_PET_ID;
-  try {
-    return window.localStorage.getItem(STORAGE_KEY) ?? DEFAULT_PET_ID;
-  } catch {
-    return DEFAULT_PET_ID;
-  }
+const DEFAULT_PET: Pet = {
+  id: "none",
+  label: "Status dot",
+  enabled: false,
+  frames: [],
+};
+
+const PET_CHANGED = "pet-changed";
+
+async function fetchPet(): Promise<Pet> {
+  const res = await fetch("/api/pets?mode=info", { cache: "no-store" });
+  if (!res.ok) return DEFAULT_PET;
+  const data = (await res.json()) as { ok?: boolean; pet?: Partial<Pet> };
+  if (!data.ok || !data.pet?.enabled || !Array.isArray(data.pet.frames)) return DEFAULT_PET;
+  return {
+    id: data.pet.id || "pet",
+    label: data.pet.label || data.pet.id || "Pet",
+    enabled: true,
+    frames: data.pet.frames,
+    loopMs: data.pet.loopMs,
+    frameW: data.pet.frameW,
+    frameH: data.pet.frameH,
+  };
 }
 
-/**
- * usePet — the active pet + a setter. Persists to localStorage and listens for
- * `storage` (other tabs) and a same-tab `pet-changed` event so the ContextBar
- * and the Settings picker stay in sync without a shared store.
- */
-export function usePet(): { pet: Pet; petId: string; setPetId: (id: string) => void } {
-  const [petId, setPetIdState] = useState<string>(DEFAULT_PET_ID);
+export function usePet(): {
+  pet: Pet;
+  reloadPet: () => Promise<void>;
+  setPetId: (id: string) => Promise<void>;
+} {
+  const [pet, setPet] = useState<Pet>(DEFAULT_PET);
+
+  const reloadPet = useCallback(async () => {
+    setPet(await fetchPet());
+  }, []);
 
   useEffect(() => {
-    setPetIdState(readStoredPetId());
-    const sync = () => setPetIdState(readStoredPetId());
-    window.addEventListener("storage", sync);
-    window.addEventListener("pet-changed", sync);
+    reloadPet();
+    const sync = () => void reloadPet();
+    window.addEventListener(PET_CHANGED, sync);
+    const timer = window.setInterval(sync, 30_000);
     return () => {
-      window.removeEventListener("storage", sync);
-      window.removeEventListener("pet-changed", sync);
+      window.removeEventListener(PET_CHANGED, sync);
+      window.clearInterval(timer);
     };
-  }, []);
+  }, [reloadPet]);
 
-  const setPetId = useCallback((id: string) => {
-    try {
-      window.localStorage.setItem(STORAGE_KEY, id);
-    } catch {
-      /* ignore quota / disabled storage */
-    }
-    setPetIdState(id);
-    window.dispatchEvent(new Event("pet-changed"));
-  }, []);
+  const setPetId = useCallback(
+    async (id: string) => {
+      const off = id === "none";
+      const res = await fetch("/api/pets", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify(off ? { action: "off" } : { action: "select", slug: id }),
+      });
+      if (!res.ok) throw new Error("pet update failed");
+      const data = (await res.json()) as { ok?: boolean; error?: string; pet?: Pet };
+      if (!data.ok) throw new Error(data.error || "pet update failed");
+      setPet(data.pet?.enabled ? data.pet : DEFAULT_PET);
+      window.dispatchEvent(new Event(PET_CHANGED));
+    },
+    [],
+  );
 
-  return { pet: getPet(petId), petId, setPetId };
+  return { pet, reloadPet, setPetId };
+}
+
+export function PetSprite({
+  pet,
+  className,
+  style,
+  alt,
+}: {
+  pet: Pet;
+  className?: string;
+  style?: CSSProperties;
+  alt?: string;
+}) {
+  const frames = pet.enabled ? pet.frames : [];
+  const [frame, setFrame] = useState(0);
+
+  const delay = useMemo(() => {
+    const loop = pet.loopMs && pet.loopMs > 0 ? pet.loopMs : 1100;
+    return Math.max(90, Math.round(loop / Math.max(1, frames.length || 1)));
+  }, [frames.length, pet.loopMs]);
+
+  useEffect(() => {
+    setFrame(0);
+    if (frames.length <= 1) return;
+    const t = window.setInterval(() => {
+      setFrame((n) => (n + 1) % frames.length);
+    }, delay);
+    return () => window.clearInterval(t);
+  }, [delay, frames.length, pet.id]);
+
+  if (!frames.length) {
+    return (
+      <span
+        aria-hidden
+        className={cn("h-1.5 w-1.5 rounded-full", className)}
+        style={{
+          background: "var(--color-success)",
+          boxShadow: "0 0 5px var(--color-success)",
+          ...style,
+        }}
+      />
+    );
+  }
+
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={frames[frame]}
+      alt={alt ?? pet.label}
+      aria-hidden={alt ? undefined : true}
+      decoding="async"
+      draggable={false}
+      className={cn("hermes-pet-sprite hermes-pet-sprite--petdex object-contain", className)}
+      style={style}
+    />
+  );
 }

@@ -10,15 +10,12 @@
 // `hermes -p <profile> acp --accept-hooks`, so switching profile in the app
 // actually changes which brain (model + system prompt + toolset + .env) runs
 // the turn. Sessions are multiplexed over each adapter: each repo gets one ACP
-// session (cwd = repo path), persisted to a per-profile map so they survive a
-// server restart and never collide across profiles.
+// session (cwd = repo path), cached per profile while the server process runs
+// so concurrent targets never collide.
 
 import { spawn, type ChildProcessWithoutNullStreams } from "node:child_process";
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
-import { homedir } from "node:os";
-import { join } from "node:path";
 
-const HOME = process.env.HOME ?? homedir();
+const HOME = process.env.HOME ?? "/tmp";
 
 /** A streamed turn event, normalized from ACP `session/update`. */
 export type AcpTurnEvent =
@@ -56,6 +53,8 @@ function targetSlug(t: BridgeTarget): string {
   return targetKey(t).replace(/[^a-zA-Z0-9._-]/g, "_");
 }
 
+const SESSION_MAPS = new Map<string, Map<string, string>>();
+
 class AcpBridge {
   private child: ChildProcessWithoutNullStreams | null = null;
   private buf = "";
@@ -64,9 +63,9 @@ class AcpBridge {
   private ready: Promise<void> | null = null;
 
   private readonly target: BridgeTarget;
-  private readonly mapPath: string;
+  private readonly mapKey: string;
 
-  // repo -> ACP session id (persisted across restarts).
+  // repo -> ACP session id (kept in-process per target).
   private repoSession = new Map<string, string>();
   // sessions we've created/loaded in THIS process (no reload needed).
   private liveSessions = new Set<string>();
@@ -87,31 +86,18 @@ class AcpBridge {
     // general/repo sessions carry over. Everything else is namespaced.
     const isLegacy =
       (target.profile || "default") === "default" && !target.model && !target.provider;
-    this.mapPath = isLegacy
-      ? join(HOME, ".hermes", "lo-acp-sessions.json")
-      : join(HOME, ".hermes", `lo-acp-sessions__${targetSlug(target)}.json`);
+    this.mapKey = isLegacy ? "lo-acp-sessions" : `lo-acp-sessions__${targetSlug(target)}`;
     this.loadMap();
   }
 
   private loadMap() {
-    try {
-      const raw = readFileSync(this.mapPath, "utf8");
-      const obj = JSON.parse(raw) as Record<string, string>;
-      for (const [k, v] of Object.entries(obj)) this.repoSession.set(k, v);
-    } catch {
-      /* first run — no map yet */
-    }
+    const map = SESSION_MAPS.get(this.mapKey);
+    if (!map) return;
+    this.repoSession = new Map(map);
   }
 
   private saveMap() {
-    try {
-      mkdirSync(join(HOME, ".hermes"), { recursive: true });
-      const obj: Record<string, string> = {};
-      for (const [k, v] of this.repoSession) obj[k] = v;
-      writeFileSync(this.mapPath, JSON.stringify(obj));
-    } catch {
-      /* best-effort */
-    }
+    SESSION_MAPS.set(this.mapKey, new Map(this.repoSession));
   }
 
   /** `hermes -p <profile> [-m <model>] [--provider <prov>] acp --accept-hooks` */

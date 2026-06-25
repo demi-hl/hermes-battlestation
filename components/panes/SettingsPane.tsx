@@ -13,9 +13,12 @@ import {
   VaultIcon,
   KeyIcon,
   PlugIcon,
+  SettingsIcon,
+  SkillsIcon,
+  TerminalIcon,
 } from "@/components/shell/icons";
 import { haptic } from "@/components/shell/haptics";
-import { usePet, PETS } from "@/lib/pet";
+import { PetSprite, usePet, type PetGalleryItem } from "@/lib/pet";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui";
 import type { ComponentType, SVGProps } from "react";
@@ -147,6 +150,36 @@ export function SettingsPane() {
           value={model.label}
           hint="Switch from the context bar"
         />
+        <Row
+          icon={SkillsIcon}
+          label="Skills"
+          value="learn"
+          hint="/learn, pending writes, reload"
+          onClick={() => {
+            haptic(10);
+            window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "skills" } }));
+          }}
+        />
+        <Row
+          icon={SettingsIcon}
+          label="Runtime config"
+          value="edit"
+          hint="busy mode, indicators, curator"
+          onClick={() => {
+            haptic(10);
+            window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "config" } }));
+          }}
+        />
+        <Row
+          icon={TerminalIcon}
+          label="Terminal"
+          value="shell"
+          hint="Open the live host terminal"
+          onClick={() => {
+            haptic(10);
+            window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "terminal" } }));
+          }}
+        />
       </section>
 
       <section className="flex flex-col gap-1.5">
@@ -192,7 +225,7 @@ export function SettingsPane() {
         onSaved={loadSetup}
       />
       <LinkSheet open={linkOpen} onClose={() => setLinkOpen(false)} />
-      <PetSheet open={petOpen} onClose={() => setPetOpen(false)} petId={pet.id} setPetId={setPetId} />
+      <PetSheet open={petOpen} onClose={() => setPetOpen(false)} petId={pet.id} activePet={pet} setPetId={setPetId} />
     </div>
   );
 }
@@ -227,54 +260,174 @@ function PetSheet({
   open,
   onClose,
   petId,
+  activePet,
   setPetId,
 }: {
   open: boolean;
   onClose: () => void;
   petId: string;
-  setPetId: (id: string) => void;
+  activePet: ReturnType<typeof usePet>["pet"];
+  setPetId: (id: string) => Promise<void>;
 }) {
+  const [query, setQuery] = useState("");
+  const [gallery, setGallery] = useState<{
+    enabled: boolean;
+    active: string;
+    total: number;
+    pets: PetGalleryItem[];
+  } | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const load = useCallback(async () => {
+    if (!open) return;
+    setLoading(true);
+    setError(null);
+    try {
+      const qs = new URLSearchParams({ mode: "gallery", limit: query.trim() ? "72" : "48" });
+      if (query.trim()) qs.set("query", query.trim());
+      const res = await fetch(`/api/pets?${qs.toString()}`, { cache: "no-store" });
+      const data = await res.json() as typeof gallery & { ok?: boolean; error?: string };
+      if (!res.ok || !data?.ok) throw new Error(data?.error || "could not load petdex");
+      setGallery(data);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "could not load petdex");
+    } finally {
+      setLoading(false);
+    }
+  }, [open, query]);
+
+  useEffect(() => {
+    if (!open) return;
+    const t = window.setTimeout(() => void load(), 220);
+    return () => window.clearTimeout(t);
+  }, [load, open]);
+
+  const select = useCallback(async (id: string) => {
+    setBusy(id);
+    setError(null);
+    try {
+      await setPetId(id);
+      await load();
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "pet update failed");
+    } finally {
+      setBusy(null);
+    }
+  }, [load, setPetId]);
+
   return (
-    <Sheet open={open} onClose={onClose} title="Choose your pet">
-      <div className="p-1">
-        <div className="grid grid-cols-3 gap-2">
-          {PETS.map((p) => (
-            <button
-              key={p.id}
+    <Sheet open={open} onClose={onClose} title="Petdex companion">
+      <div className="flex flex-col gap-3 p-1">
+        <div className="rounded-xl border border-border/70 bg-[color-mix(in_srgb,var(--midground)_4%,transparent)] p-3">
+          <div className="flex items-center gap-3">
+            <span className="grid h-14 w-14 shrink-0 place-items-center rounded-xl border border-border/70 bg-black/20">
+              <PetSprite pet={activePet} className={cn("h-12 w-12", activePet.enabled && "scale-125")} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <p className="font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">active pet</p>
+              <p className="truncate text-[0.9rem] text-midground">{activePet.label}</p>
+              <p className="text-[0.72rem] text-text-tertiary">Animated from the same desktop petdex sprite sheets.</p>
+            </div>
+            <Button
               type="button"
+              size="sm"
+              invert
+              disabled={busy === "none" || !activePet.enabled}
               onClick={() => {
                 haptic(8);
-                setPetId(p.id);
+                void select("none");
               }}
-              className={cn(
-                "flex flex-col items-center gap-1.5 rounded-xl border px-2 py-3 transition-colors",
-                p.id === petId
-                  ? "border-[color:var(--color-success)] bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)]"
-                  : "border-border/60 active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
-              )}
             >
-              <span className="flex h-12 w-12 items-center justify-center">
-                {p.src ? (
-                  <img src={p.src} alt={p.label} className="h-11 w-11 object-contain" />
-                ) : (
-                  <span
-                    className="h-3 w-3 rounded-full"
-                    style={{ background: "var(--color-success)", boxShadow: "0 0 8px var(--color-success)" }}
-                  />
-                )}
-              </span>
-              <span className="flex items-center gap-1 text-[0.72rem] text-midground">
-                {p.label}
-                {p.id === petId && <CheckIconInline />}
-              </span>
-            </button>
-          ))}
+              off
+            </Button>
+          </div>
         </div>
-        <p className="px-1 pt-3 text-[0.7rem] text-text-tertiary">
-          Your pet sits next to the profile and marks the live session timer.
-        </p>
+
+        <label className="flex flex-col gap-1">
+          <span className="font-mono-ui text-[0.62rem] uppercase tracking-wider text-text-tertiary">Search 3k+ desktop pets</span>
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="boba, homelander, gundam…"
+            className="rounded-xl border border-border bg-[color-mix(in_srgb,var(--background-base)_70%,transparent)] px-3 py-2 text-[0.85rem] text-text-primary outline-none placeholder:text-text-disabled focus:border-midground/50"
+          />
+        </label>
+
+        <div className="flex items-center justify-between px-1 font-mono-ui text-[0.64rem] uppercase tracking-wider text-text-tertiary">
+          <span>{loading ? "loading" : gallery ? `showing ${gallery.pets.length} / ${gallery.total}` : "petdex"}</span>
+          {error && <span className="text-[color:var(--color-destructive)]">{error}</span>}
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 pb-2 sm:grid-cols-3">
+          {(gallery?.pets ?? []).map((p) => {
+            const active = p.slug === petId && activePet.enabled;
+            return (
+              <button
+                key={p.slug}
+                type="button"
+                disabled={busy !== null}
+                onClick={() => {
+                  haptic(8);
+                  void select(p.slug);
+                }}
+                className={cn(
+                  "group relative flex min-h-[8.5rem] flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-center transition-colors",
+                  active
+                    ? "border-[color:var(--color-success)] bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)]"
+                    : "border-border/60 bg-[color-mix(in_srgb,var(--midground)_3%,transparent)] active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
+                  busy === p.slug && "opacity-70",
+                )}
+              >
+                <span className="grid h-16 w-16 place-items-center rounded-xl bg-black/20">
+                  <PetThumb pet={p} active={active} />
+                </span>
+                <span className="line-clamp-2 min-h-[2rem] text-[0.74rem] leading-tight text-midground">{p.displayName}</span>
+                <span className="font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
+                  {active ? "active" : p.installed ? "installed" : p.curated ? "curated" : "petdex"}
+                </span>
+                {active && <span className="absolute right-2 top-2"><CheckIconInline /></span>}
+              </button>
+            );
+          })}
+        </div>
+
+        {!loading && gallery?.pets.length === 0 && (
+          <p className="px-1 py-6 text-center text-[0.78rem] text-text-tertiary">No petdex matches.</p>
+        )}
       </div>
     </Sheet>
+  );
+}
+
+function PetThumb({ pet, active }: { pet: PetGalleryItem; active: boolean }) {
+  const [src, setSrc] = useState<string | null>(null);
+  useEffect(() => {
+    let cancelled = false;
+    setSrc(null);
+    const qs = new URLSearchParams({ mode: "thumb", slug: pet.slug });
+    if (pet.spritesheetUrl) qs.set("url", pet.spritesheetUrl);
+    fetch(`/api/pets?${qs.toString()}`, { cache: "force-cache" })
+      .then((r) => r.json() as Promise<{ ok?: boolean; dataUri?: string }>)
+      .then((d) => { if (!cancelled && d.ok && d.dataUri) setSrc(d.dataUri); })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [pet.slug, pet.spritesheetUrl]);
+
+  if (!src) {
+    return <PawIcon className="h-7 w-7 text-text-disabled" />;
+  }
+  return (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={src}
+      alt=""
+      className={cn("h-14 w-14 object-contain [image-rendering:pixelated]", active && "hermes-pet-sprite")}
+      loading="lazy"
+      decoding="async"
+      draggable={false}
+    />
   );
 }
 
