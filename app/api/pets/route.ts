@@ -120,8 +120,10 @@ try:
     active = str(cfg.get("slug", "") or "")
     enabled = bool(cfg.get("enabled"))
     rows = []
+    manifest_slugs = set()
     for entry in fetch_manifest():
         slug = entry.slug
+        manifest_slugs.add(slug)
         if slug.lower().startswith("clawd-") or slug.lower() == "clawd":
             continue
         display = entry.display_name
@@ -136,6 +138,22 @@ try:
             "active": enabled and slug == active,
             "curated": curated,
             "spritesheetUrl": entry.spritesheet_url,
+        })
+    for pet in store.installed_pets():
+        slug = pet.slug
+        if slug in manifest_slugs:
+            continue
+        display = pet.display_name
+        hay = (slug + " " + display).lower()
+        if params["query"] and params["query"] not in hay:
+            continue
+        rows.append({
+            "slug": slug,
+            "displayName": display,
+            "installed": True,
+            "active": enabled and slug == active,
+            "curated": True,
+            "spritesheetUrl": "",
         })
     rows.sort(key=lambda p: (not p["active"], not p["installed"], not p["curated"], p["displayName"].lower()))
     total = len(rows)
@@ -197,7 +215,9 @@ except Exception as exc:
   const script = `${pyPrelude({ slug })}
 try:
     from hermes_cli.pets import _set_active
-    pet = store.install_pet(params["slug"])
+    pet = store.load_pet(params["slug"])
+    if pet is None or not pet.exists:
+        pet = store.install_pet(params["slug"])
     _set_active(pet.slug)
     emit({"ok": True, "pet": active_info()})
 except Exception as exc:
