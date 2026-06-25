@@ -46,7 +46,7 @@ jobs:
           PY="$(python -c 'import sys; print(sys.executable)')"
           echo "PYTHON=$PY" >> "$GITHUB_ENV"
           echo "npm_config_python=$PY" >> "$GITHUB_ENV"
-          npm config set python "$PY"
+          echo "NODE_GYP_FORCE_PYTHON=$PY" >> "$GITHUB_ENV"
 
       - name: Install dependencies
         run: npm ci
