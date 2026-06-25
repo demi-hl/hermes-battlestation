@@ -410,7 +410,7 @@ function PetThumb({ pet, active, featured = false }: { pet: PetGalleryItem; acti
     setSrc(null);
     const qs = new URLSearchParams({ mode: "thumb", slug: pet.slug });
     if (pet.spritesheetUrl) qs.set("url", pet.spritesheetUrl);
-    fetch(`/api/pets?${qs.toString()}`, { cache: "force-cache" })
+    fetch(`/api/pets?${qs.toString()}`, { cache: "no-store" })
       .then((r) => r.json() as Promise<{ ok?: boolean; dataUri?: string }>)
       .then((d) => { if (!cancelled && d.ok && d.dataUri) setSrc(d.dataUri); })
       .catch(() => {});

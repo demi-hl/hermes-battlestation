@@ -84,6 +84,28 @@ def active_info():
         }
     except Exception as exc:
         return {"enabled": False, "id": "none", "label": "Status dot", "frames": [], "error": str(exc)}
+
+def tight_thumb_png(data, size=128, pad=6):
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(data)).convert("RGBA")
+        bbox = im.getbbox()
+        if not bbox:
+            return data
+        crop = im.crop(bbox)
+        max_w = max(1, size - pad * 2)
+        max_h = max(1, size - pad * 2)
+        scale = min(max_w / max(1, crop.width), max_h / max(1, crop.height))
+        w = max(1, int(round(crop.width * scale)))
+        h = max(1, int(round(crop.height * scale)))
+        crop = crop.resize((w, h), Image.NEAREST)
+        canvas = Image.new("RGBA", (size, size), (0, 0, 0, 0))
+        canvas.alpha_composite(crop, ((size - w) // 2, (size - h) // 2))
+        buf = io.BytesIO()
+        canvas.save(buf, format="PNG")
+        return buf.getvalue()
+    except Exception:
+        return data
 `;
 }
 
@@ -176,6 +198,7 @@ try:
     if not data:
         emit({"ok": False, "slug": params["slug"]})
     else:
+        data = tight_thumb_png(data)
         emit({"ok": True, "slug": params["slug"], "dataUri": "data:image/png;base64," + base64.standard_b64encode(data).decode("ascii")})
 except Exception as exc:
     emit({"ok": False, "slug": params["slug"], "error": str(exc)})
