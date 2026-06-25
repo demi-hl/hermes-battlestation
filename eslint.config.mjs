@@ -18,13 +18,12 @@ const config = [
   ...next,
   {
     // Re-register the react-hooks plugin so we can tune its rules. Next 16
-    // bundles the react-compiler-era rules as hard errors; they fire on the
-    // standard async-fetch-in-effect pattern (usePolling's load(), session
-    // spawn) which is correct here — downgrade to warnings so the gate stays
-    // green and still surfaces them, without rewriting working effects.
+    // bundles the react-compiler-era rules as hard errors. The set-state-in-effect
+    // check fires on this app's intentional load-on-mount/polling effects; keep the
+    // actionable compiler checks as warnings, but do not fail the repo on that pattern.
     plugins: { "react-hooks": reactHooks },
     rules: {
-      "react-hooks/set-state-in-effect": "warn",
+      "react-hooks/set-state-in-effect": "off",
       "react-hooks/refs": "warn",
       "react-hooks/purity": "warn",
       "react-hooks/immutability": "warn",
