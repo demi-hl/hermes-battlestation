@@ -363,6 +363,7 @@ function PetSheet({
         <div className="grid grid-cols-2 gap-2 pb-2 sm:grid-cols-3">
           {(gallery?.pets ?? []).map((p) => {
             const active = p.slug === petId && activePet.enabled;
+            const featured = isCharmanderPet(p);
             return (
               <button
                 key={p.slug}
@@ -374,18 +375,19 @@ function PetSheet({
                 }}
                 className={cn(
                   "group relative flex min-h-[8.5rem] flex-col items-center gap-1 rounded-xl border px-2 py-2.5 text-center transition-colors",
+                  featured && "min-h-[10rem] border-midground/40 bg-[color-mix(in_srgb,var(--midground)_5%,transparent)]",
                   active
                     ? "border-[color:var(--color-success)] bg-[color-mix(in_srgb,var(--color-success)_10%,transparent)]"
                     : "border-border/60 bg-[color-mix(in_srgb,var(--midground)_3%,transparent)] active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]",
                   busy === p.slug && "opacity-70",
                 )}
               >
-                <span className="grid h-16 w-16 place-items-center rounded-xl bg-black/20">
-                  <PetThumb pet={p} active={active} />
+                <span className={cn("grid place-items-center rounded-xl bg-black/20", featured ? "h-24 w-24" : "h-16 w-16")}>
+                  <PetThumb pet={p} active={active} featured={featured} />
                 </span>
                 <span className="line-clamp-2 min-h-[2rem] text-[0.74rem] leading-tight text-midground">{p.displayName}</span>
                 <span className="font-mono-ui text-[0.55rem] uppercase tracking-wider text-text-tertiary">
-                  {active ? "active" : p.installed ? "installed" : p.curated ? "curated" : "petdex"}
+                  {active ? "active" : featured ? "featured" : p.installed ? "installed" : p.curated ? "curated" : "petdex"}
                 </span>
                 {active && <span className="absolute right-2 top-2"><CheckIconInline /></span>}
               </button>
@@ -401,7 +403,7 @@ function PetSheet({
   );
 }
 
-function PetThumb({ pet, active }: { pet: PetGalleryItem; active: boolean }) {
+function PetThumb({ pet, active, featured = false }: { pet: PetGalleryItem; active: boolean; featured?: boolean }) {
   const [src, setSrc] = useState<string | null>(null);
   useEffect(() => {
     let cancelled = false;
@@ -423,12 +425,20 @@ function PetThumb({ pet, active }: { pet: PetGalleryItem; active: boolean }) {
     <img
       src={src}
       alt=""
-      className={cn("h-14 w-14 object-contain [image-rendering:pixelated]", active && "hermes-pet-sprite")}
+      className={cn(
+        "object-contain [image-rendering:pixelated]",
+        featured ? "h-20 w-20" : "h-14 w-14",
+        active && "hermes-pet-sprite",
+      )}
       loading="lazy"
       decoding="async"
       draggable={false}
     />
   );
+}
+
+function isCharmanderPet(p: PetGalleryItem): boolean {
+  return `${p.slug} ${p.displayName}`.toLowerCase().includes("charmander");
 }
 
 function CheckIconInline() {

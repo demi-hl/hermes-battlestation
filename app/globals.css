@@ -406,6 +406,18 @@ body {
 .hermes-md mark {
   color: var(--text-primary);
 }
+
+.hermes-md,
+.hermes-md * {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.hermes-md button,
+.hermes-md button * {
+  -webkit-user-select: none;
+  user-select: none;
+}
 @keyframes march {
   to {
     background-position: 0.5rem 0;

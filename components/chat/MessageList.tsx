@@ -3,7 +3,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Markdown } from "./markdown";
-import { MediaActions, TextActions } from "./MessageActions";
+import { MediaActions } from "./MessageActions";
 import type { ChatMessage } from "./useChat";
 import type { ChatThread } from "@/lib/chat-types";
 import { cn } from "@/lib/utils";
@@ -120,12 +120,9 @@ export function MessageList({
                   </div>
                 )}
                 {m.text && (
-                  <>
-                    <div className="rounded-[calc(var(--theme-radius)+4px)] rounded-br-md border border-border bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] px-3.5 py-2 text-[0.92rem] leading-relaxed text-text-primary">
-                      <Markdown text={m.text} />
-                    </div>
-                    <TextActions text={m.text} align="right" className="-mt-0.5" />
-                  </>
+                  <div className="select-text rounded-[calc(var(--theme-radius)+4px)] rounded-br-md border border-border bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] px-3.5 py-2 text-[0.92rem] leading-relaxed text-text-primary">
+                    <Markdown text={m.text} />
+                  </div>
                 )}
               </div>
             ) : (
@@ -220,7 +217,6 @@ function AssistantBubble({ m, onRetry }: { m: ChatMessage; onRetry?: (id: string
             transition={{ duration: 0.16 }}
           >
             <Markdown text={m.text} pending={!!m.pending} />
-            {!m.pending && <TextActions text={m.text} className="mt-2" />}
           </motion.div>
         )
       )}

@@ -1,7 +1,8 @@
 "use client";
 
-import { Fragment, type ReactNode } from "react";
-import { MediaActions } from "./MessageActions";
+import { Fragment, useState, type ReactNode } from "react";
+import { MediaActions, copyText } from "./MessageActions";
+import { haptic } from "@/components/shell/haptics";
 
 type ListItem = { text: string; checked?: boolean };
 type ListState = { ordered: boolean; items: ListItem[] };
@@ -13,10 +14,7 @@ export function Markdown({ text, pending = false }: { text: string; pending?: bo
     <div className="hermes-md space-y-2.5 text-[0.92rem] leading-relaxed text-text-primary">
       {blocks.map((b, i) =>
         b.type === "code" ? (
-          <pre key={i} className="hermes-md-enter overflow-x-auto rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] p-3">
-            {b.lang && <span className="mb-2 block font-mono-ui text-[0.58rem] uppercase tracking-wider text-text-tertiary">{b.lang}</span>}
-            <code className="font-mono text-[0.8rem] leading-relaxed text-text-secondary">{b.content}</code>
-          </pre>
+          <CodeBlock key={i} lang={b.lang} content={b.content} />
         ) : (
           <Fragment key={i}>
             {renderProse(b.content)}
@@ -27,6 +25,42 @@ export function Markdown({ text, pending = false }: { text: string; pending?: bo
         ),
       )}
     </div>
+  );
+}
+
+function CodeBlock({ lang, content }: { lang?: string; content: string }) {
+  const [copied, setCopied] = useState(false);
+  const command = commandText(content, lang);
+
+  const copyCommand = async () => {
+    if (!command) return;
+    void haptic(8);
+    await copyText(command);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1400);
+  };
+
+  return (
+    <pre className="hermes-md-enter relative overflow-x-auto rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] p-3 pr-14">
+      <span className="mb-2 flex items-center justify-between gap-3">
+        {lang ? (
+          <span className="font-mono-ui text-[0.58rem] uppercase tracking-wider text-text-tertiary">{lang}</span>
+        ) : (
+          <span aria-hidden />
+        )}
+        {command && (
+          <button
+            type="button"
+            aria-label="Copy command"
+            onClick={copyCommand}
+            className="shrink-0 rounded-full border border-border/70 px-2 py-1 font-mono-ui text-[0.55rem] uppercase tracking-[0.12em] text-text-tertiary transition-colors hover:text-midground active:scale-95"
+          >
+            {copied ? "copied" : "copy"}
+          </button>
+        )}
+      </span>
+      <code className="font-mono text-[0.8rem] leading-relaxed text-text-secondary">{content}</code>
+    </pre>
   );
 }
 
@@ -224,6 +258,23 @@ function inline(text: string): ReactNode {
   }
   if (last < text.length) parts.push(text.slice(last));
   return parts.length ? parts : text;
+}
+
+function commandText(content: string, lang?: string): string | null {
+  const normalized = content
+    .split("\n")
+    .map((line) => line.replace(/^\s*[$❯>]\s?/, "").trimEnd())
+    .join("\n")
+    .trim();
+  if (!normalized) return null;
+  const language = (lang ?? "").toLowerCase();
+  if (/^(bash|sh|shell|zsh|fish|console|terminal)$/.test(language)) return normalized;
+  if (/^(json|yaml|yml|toml|tsx?|jsx?|css|html|markdown|md|diff|python|py)$/.test(language)) return null;
+  const first = normalized.split("\n").find((line) => line.trim() && !line.trim().startsWith("#"))?.trim() ?? "";
+  if (!first) return null;
+  return /^(cd|npm|npx|pnpm|yarn|bun|node|python3?|uv|git|gh|curl|wget|ssh|scp|rsync|docker|docker-compose|kubectl|systemctl|journalctl|hermes|claude|codex|ffmpeg|ffprobe|xcodebuild|make|cargo|go|rustup|pipx?|brew|sudo)\b/.test(first)
+    ? normalized
+    : null;
 }
 
 const IMG_EXT = /\.(png|jpe?g|webp|gif|avif|bmp|svg)(\?[^\s]*)?$/i;

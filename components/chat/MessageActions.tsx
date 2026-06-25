@@ -46,34 +46,6 @@ const KIND_MIME: Record<MediaKind, string> = {
   audio: "audio/mp4",
 };
 
-export function TextActions({
-  text,
-  align = "left",
-  className,
-}: {
-  text: string;
-  align?: ActionAlign;
-  className?: string;
-}) {
-  const [state, setState] = useState<ActionState>("idle");
-  const value = text.trim();
-  if (!value) return null;
-
-  const mark = (next: ActionState) => flashState(next, setState);
-
-  return (
-    <div className={actionRowClass(align, className)}>
-      <ActionButton ariaLabel="Copy message text" onClick={() => void copyMessage(value, mark)}>
-        copy
-      </ActionButton>
-      <ActionButton ariaLabel="Share message text" onClick={() => void shareMessage(value, mark)}>
-        share
-      </ActionButton>
-      <ActionStatus state={state} />
-    </div>
-  );
-}
-
 export function MediaActions({
   src,
   kind,
@@ -88,37 +60,55 @@ export function MediaActions({
   className?: string;
 }) {
   const [state, setState] = useState<ActionState>("idle");
+  const [open, setOpen] = useState(false);
   const fileName = mediaFileName(src, kind, alt);
   const mark = (next: ActionState) => flashState(next, setState);
 
+  const run = (fn: () => Promise<void>) => {
+    setOpen(false);
+    void fn();
+  };
+
   return (
-    <div className={actionRowClass(align, className)}>
-      <ActionButton ariaLabel={`Save ${kind}`} onClick={() => void saveMedia(src, kind, fileName, mark)}>
-        save
-      </ActionButton>
-      <ActionButton ariaLabel={`Share ${kind}`} onClick={() => void shareMedia(src, kind, fileName, mark)}>
-        share
-      </ActionButton>
+    <div className={cn(actionRowClass(align), "relative", className)}>
+      <button
+        type="button"
+        aria-label={`${kind} actions`}
+        aria-expanded={open}
+        onClick={() => {
+          void haptic(4);
+          setOpen((v) => !v);
+        }}
+        className="grid h-8 w-8 place-items-center rounded-full border border-border/70 bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] text-text-tertiary transition-colors hover:text-midground active:scale-95 active:bg-[color-mix(in_srgb,var(--midground)_10%,transparent)]"
+      >
+        <span aria-hidden className="-mt-1 font-mono-ui text-[1.05rem] leading-none tracking-[-0.08em]">•••</span>
+      </button>
+      {open && (
+        <div
+          role="menu"
+          className={cn(
+            "absolute bottom-9 z-30 min-w-28 overflow-hidden rounded-xl border border-border bg-[color-mix(in_srgb,var(--background-base)_92%,transparent)] p-1 shadow-xl backdrop-blur",
+            align === "right" ? "right-0" : "left-0",
+          )}
+        >
+          <MenuButton onClick={() => run(() => shareMedia(src, kind, fileName, mark))}>share</MenuButton>
+          <MenuButton onClick={() => run(() => saveMedia(src, kind, fileName, mark))}>
+            {isAppleMobile() ? "open" : "save"}
+          </MenuButton>
+        </div>
+      )}
       <ActionStatus state={state} />
     </div>
   );
 }
 
-function ActionButton({
-  ariaLabel,
-  children,
-  onClick,
-}: {
-  ariaLabel: string;
-  children: string;
-  onClick: () => void;
-}) {
+function MenuButton({ children, onClick }: { children: string; onClick: () => void }) {
   return (
     <button
       type="button"
-      aria-label={ariaLabel}
+      role="menuitem"
       onClick={onClick}
-      className="min-h-9 rounded-full border border-border/70 bg-[color-mix(in_srgb,var(--midground)_5%,transparent)] px-3 py-1 font-mono-ui text-[0.62rem] uppercase tracking-[0.14em] text-text-tertiary transition-colors hover:text-midground active:scale-95 active:bg-[color-mix(in_srgb,var(--midground)_10%,transparent)]"
+      className="block w-full rounded-lg px-3 py-2 text-left font-mono-ui text-[0.62rem] uppercase tracking-[0.14em] text-text-secondary transition-colors hover:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)] hover:text-midground"
     >
       {children}
     </button>
@@ -134,48 +124,14 @@ function ActionStatus({ state }: { state: ActionState }) {
   );
 }
 
-function actionRowClass(align: ActionAlign, className?: string): string {
-  return cn(
-    "flex flex-wrap items-center gap-1.5",
-    align === "right" ? "justify-end" : "justify-start",
-    className,
-  );
+function actionRowClass(align: ActionAlign): string {
+  return cn("flex items-center gap-1.5", align === "right" ? "justify-end" : "justify-start");
 }
 
 function flashState(next: ActionState, setState: (next: ActionState) => void) {
   if (next === "idle") return;
   setState(next);
   window.setTimeout(() => setState("idle"), 1600);
-}
-
-async function copyMessage(text: string, mark: (next: ActionState) => void) {
-  void haptic(6);
-  try {
-    await copyText(text);
-    mark("copied");
-  } catch {
-    mark("failed");
-  }
-}
-
-async function shareMessage(text: string, mark: (next: ActionState) => void) {
-  void haptic(8);
-  try {
-    const nav = shareNavigator();
-    if (nav?.share) {
-      try {
-        await nav.share({ text });
-        mark("shared");
-        return;
-      } catch (e) {
-        if (isAbort(e)) return;
-      }
-    }
-    await copyText(text);
-    mark("copied");
-  } catch {
-    mark("failed");
-  }
 }
 
 async function saveMedia(
@@ -244,7 +200,7 @@ async function shareFiles(files: File[]): Promise<"shared" | "cancelled" | "unav
   }
 }
 
-async function copyText(text: string): Promise<void> {
+export async function copyText(text: string): Promise<void> {
   if (navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(text);
