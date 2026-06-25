@@ -92,13 +92,6 @@
         "filter": [
           "**/*"
         ]
-      },
-      {
-        "from": ".next/static",
-        "to": "standalone/.next/static",
-        "filter": [
-          "**/*"
-        ]
       }
     ],
     "asarUnpack": [
