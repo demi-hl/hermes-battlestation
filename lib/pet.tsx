@@ -94,19 +94,25 @@ export function PetSprite({
   className,
   style,
   alt,
+  active = false,
 }: {
   pet: Pet;
   className?: string;
   style?: CSSProperties;
   alt?: string;
+  /** Agent is mid-turn — animate faster + brighter so you SEE it working. */
+  active?: boolean;
 }) {
   const frames = pet.enabled ? pet.frames : [];
   const [frame, setFrame] = useState(0);
 
   const delay = useMemo(() => {
     const loop = pet.loopMs && pet.loopMs > 0 ? pet.loopMs : 1100;
-    return Math.max(90, Math.round(loop / Math.max(1, frames.length || 1)));
-  }, [frames.length, pet.loopMs]);
+    const base = Math.max(90, Math.round(loop / Math.max(1, frames.length || 1)));
+    // While the agent is responding, run ~2.4x faster (floored so it stays
+    // smooth, not a strobe) — reads as an excited/working gait vs the calm idle.
+    return active ? Math.max(45, Math.round(base / 2.4)) : base;
+  }, [frames.length, pet.loopMs, active]);
 
   useEffect(() => {
     setFrame(0);
@@ -139,7 +145,11 @@ export function PetSprite({
       aria-hidden={alt ? undefined : true}
       decoding="async"
       draggable={false}
-      className={cn("hermes-pet-sprite hermes-pet-sprite--petdex object-contain", className)}
+      className={cn(
+        "hermes-pet-sprite hermes-pet-sprite--petdex object-contain",
+        active && "hermes-pet-sprite--active",
+        className,
+      )}
       style={style}
     />
   );

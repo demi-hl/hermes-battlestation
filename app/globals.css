@@ -565,8 +565,19 @@ body {
   animation-duration: 2.55s;
 }
 
+/* Agent is mid-turn: the bob speeds up so the pet visibly reacts to the agent
+   working (the frame loop ALSO speeds up in JS — this is the complementary CSS
+   layer). The glow is driven by the inline drop-shadow on the call site. */
+.hermes-pet-sprite--active {
+  animation-duration: 0.9s;
+  animation-timing-function: ease-in-out;
+}
+
 @media (prefers-reduced-motion: reduce) {
   .hermes-pet-sprite {
+    animation: none;
+  }
+  .hermes-pet-sprite--active {
     animation: none;
   }
 }

@@ -248,6 +248,7 @@ export function ContextBar() {
             >
               <PetSprite
                 pet={pet}
+                active={turnStartedAt != null}
                 className={cn("h-4 w-4 shrink-0", pet.enabled && "scale-[1.35]")}
                 style={{ filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 55%, transparent))" }}
               />
