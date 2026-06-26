@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useMemo, useState, type CSSProperties } from "react";
 import { cn } from "@/lib/utils";
 
+export type PetState = "idle" | "wave" | "run" | "failed" | "review" | "jump" | "waiting";
+
 export interface Pet {
   id: string;
   label: string;
   enabled: boolean;
   frames: string[];
+  framesByState?: Partial<Record<PetState, string[]>>;
   loopMs?: number;
   frameW?: number;
   frameH?: number;
@@ -41,6 +44,7 @@ async function fetchPet(): Promise<Pet> {
     label: data.pet.label || data.pet.id || "Pet",
     enabled: true,
     frames: data.pet.frames,
+    framesByState: data.pet.framesByState,
     loopMs: data.pet.loopMs,
     frameW: data.pet.frameW,
     frameH: data.pet.frameH,
@@ -95,6 +99,7 @@ export function PetSprite({
   style,
   alt,
   active = false,
+  state,
 }: {
   pet: Pet;
   className?: string;
@@ -102,8 +107,11 @@ export function PetSprite({
   alt?: string;
   /** Agent is mid-turn — animate faster + brighter so you SEE it working. */
   active?: boolean;
+  /** Activity row from the petdex sheet. Falls back to run while active. */
+  state?: PetState;
 }) {
-  const frames = pet.enabled ? pet.frames : [];
+  const effectiveState: PetState = state ?? (active ? "run" : "idle");
+  const frames = pet.enabled ? (pet.framesByState?.[effectiveState] ?? pet.frames) : [];
   const [frame, setFrame] = useState(0);
 
   const delay = useMemo(() => {
@@ -121,7 +129,7 @@ export function PetSprite({
       setFrame((n) => (n + 1) % frames.length);
     }, delay);
     return () => window.clearInterval(t);
-  }, [delay, frames.length, pet.id]);
+  }, [delay, frames.length, pet.id, effectiveState]);
 
   if (!frames.length) {
     return (

@@ -9,6 +9,7 @@ import type {
   ChatStreamEvent,
   ThreadsPayload,
 } from "@/lib/chat-types";
+import type { PetState } from "@/lib/pet";
 
 export interface ToolActivity {
   id: string;
@@ -72,6 +73,11 @@ let _idc = 0;
 function mkId(): string {
   _idc += 1;
   return `m${Date.now().toString(36)}_${_idc}`;
+}
+
+function flashPet(state: PetState, ms = 1400) {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent("lo-pet-state", { detail: { state, ms } }));
 }
 
 export function useChat() {
@@ -258,7 +264,7 @@ export function useChat() {
       document.removeEventListener("visibilitychange", onForeground);
       window.removeEventListener("pageshow", onForeground);
     };
-  }, [activeThreadId, threads, refreshThreads, setStatus]);
+  }, [activeThreadId, threads, refreshThreads, setStatus, setTurnStartedAt]);
 
   // Drive the bottom ContextBar from the active thread.
   const bindWorkspace = useCallback(
@@ -415,6 +421,7 @@ export function useChat() {
       setSending(true);
       setStatus("connecting");
       setTurnStartedAt(Date.now());
+      flashPet("run", 1600);
 
       const patchPending = (patch: Partial<ChatMessage>) =>
         setMessages((m) => m.map((x) => (x.id === pendingMsg.id ? { ...x, ...patch } : x)));
@@ -431,6 +438,7 @@ export function useChat() {
         });
         if (!res.ok || !res.body) {
           const errTxt = await res.text().catch(() => "");
+          flashPet("failed", 2200);
           patchPending({ pending: false, error: true, text: errTxt || "send failed", retry: retryPayload });
           return;
         }
@@ -439,6 +447,8 @@ export function useChat() {
         const decoder = new TextDecoder();
         let buf = "";
         let got = false;
+        let failed = false;
+        let toolCount = 0;
 
         for (;;) {
           const { value, done } = await reader.read();
@@ -467,6 +477,7 @@ export function useChat() {
                 ),
               );
             } else if (ev.type === "thought") {
+              flashPet("review", 1000);
               setMessages((m) =>
                 m.map((x) =>
                   x.id === pendingMsg.id
@@ -475,6 +486,12 @@ export function useChat() {
                 ),
               );
             } else if (ev.type === "tool") {
+              if (ev.phase === "start") {
+                toolCount += 1;
+                flashPet("run", 1200);
+              } else if (!ev.ok) {
+                flashPet("failed", 1600);
+              }
               setMessages((m) =>
                 m.map((x) => {
                   if (x.id !== pendingMsg.id) return x;
@@ -502,18 +519,25 @@ export function useChat() {
               setContextUsage({ used: ev.used, total: ev.total });
             } else if (ev.type === "error") {
               got = true;
+              failed = true;
+              flashPet("failed", 2200);
               patchPending({ pending: false, error: true, text: ev.error });
             }
             // "session" + "done" carry no UI text change here.
           }
         }
         if (!got) {
+          failed = true;
+          flashPet("failed", 2200);
           patchPending({ pending: false, error: true, text: "no response from agent", retry: retryPayload });
+        } else if (!failed) {
+          flashPet(toolCount > 0 ? "jump" : "wave", 2200);
         }
         // Pull fresh thread metadata (message count, new session id, usage).
         void refreshThreads();
       } catch (e) {
         if ((e as Error)?.name === "AbortError") {
+          flashPet("failed", 1600);
           patchPending({ pending: false, error: true, text: "stopped" });
         } else {
           // A thrown fetch (vs an HTTP error) means the connection dropped —
@@ -521,6 +545,7 @@ export function useChat() {
           // string is "Load failed"; show a human message + a retry tap.
           const raw = e instanceof Error ? e.message : "";
           const lost = !raw || /load failed|network|fetch|connection/i.test(raw);
+          flashPet("failed", 2200);
           patchPending({
             pending: false,
             error: true,

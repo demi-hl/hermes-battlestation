@@ -94,7 +94,7 @@ export async function GET(req: Request) {
     const end = m && m[2] ? parseInt(m[2], 10) : total - 1;
     const chunk = end - start + 1;
     const stream = createReadStream(filePath, { start, end });
-    return new Response(Readable.toWeb(stream) as ReadableStream, {
+    return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
       status: 206,
       headers: {
         "Content-Type": type,
@@ -107,7 +107,7 @@ export async function GET(req: Request) {
   }
 
   const stream = createReadStream(filePath);
-  return new Response(Readable.toWeb(stream) as ReadableStream, {
+  return new Response(Readable.toWeb(stream) as unknown as ReadableStream, {
     status: 200,
     headers: {
       "Content-Type": type,

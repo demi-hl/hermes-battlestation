@@ -1,32 +1,31 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 import { KeyboardResize } from '@capacitor/keyboard';
 
+const capServerUrl = process.env.CAP_SERVER_URL?.trim();
+const pairingPlaceholderUrl = 'https://connect.localhost.invalid';
+
 const config: CapacitorConfig = {
   appId: 'la.demi.battlestation',
   appName: 'Hermes Battlestation',
-  webDir: '.next',
+  webDir: 'ios-web',
   server: {
-    url: process.env.CAP_SERVER_URL ?? 'http://localhost:9119',
-    cleartext: false,
+    // Public/TestFlight builds use a harmless sentinel; AppDelegate treats it
+    // as no real server and shows the native Connect your Hermes screen.
+    // Private builds may set CAP_SERVER_URL to skip pairing.
+    url: capServerUrl || pairingPlaceholderUrl,
+    cleartext: (capServerUrl || pairingPlaceholderUrl).startsWith('http://'),
   },
   ios: {
-    contentInset: 'always',
+    contentInset: 'never',
     preferredContentMode: 'mobile',
     allowsLinkPreview: false,
-    limitsNavigationsToAppBoundDomains: true,
+    limitsNavigationsToAppBoundDomains: false,
   },
   plugins: {
     SplashScreen: {
-      launchShowDuration: 700,
-      backgroundColor: "#041c1c",
-      showSpinner: false,
+      launchShowDuration: 0,
     },
     Keyboard: {
-      // Overlay mode: the keyboard floats over the WKWebView WITHOUT resizing
-      // it, so the visual-viewport / keyboardWillShow JS in Providers.tsx is
-      // the single source of truth for shrinking the shell. `native` here would
-      // double-count against that manual shrink and leave a gap below the
-      // composer. Overlay = composer rides up exactly to the keyboard top.
       resize: KeyboardResize.None,
     },
   },

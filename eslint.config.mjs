@@ -11,6 +11,10 @@ const config = [
       "release/**",
       "dist/**",
       "node_modules/**",
+      // Capacitor copies the compiled Next bundle here. It is generated output,
+      // not source; linting it re-lints minified Turbopack chunks and fails on
+      // framework internals like `module` assignments.
+      "ios/App/App/public/**",
       "electron/**/*.cjs",
       "next-env.d.ts",
     ],

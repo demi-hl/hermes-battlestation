@@ -18,11 +18,14 @@ if (!fs.existsSync(PUBLIC)) {
 
 let removed = 0;
 
-// 1) nuke any node_modules dirs wholesale (server-only)
-for (const nm of findDirs(PUBLIC, "node_modules")) {
-  fs.rmSync(nm, { recursive: true, force: true });
-  removed++;
-  console.log(`[strip-ios-symlinks] removed ${path.relative(PUBLIC, nm)}`);
+// 1) nuke server-only dirs wholesale. The iOS shell loads the live remote URL,
+// so bundling Next standalone/server output just exposes source and bloats the IPA.
+for (const name of ["node_modules", "standalone", "server", "cache"]) {
+  for (const dir of findDirs(PUBLIC, name)) {
+    fs.rmSync(dir, { recursive: true, force: true });
+    removed++;
+    console.log(`[strip-ios-symlinks] removed ${path.relative(PUBLIC, dir)}`);
+  }
 }
 
 // 2) remove any remaining dangling symlinks (point to a non-existent target)

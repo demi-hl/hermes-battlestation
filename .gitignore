@@ -37,3 +37,9 @@ ios/App/App/public/
 
 # internal security audit — not for distribution
 SECURITY_AUDIT.md
+
+# fastlane artifacts
+fastlane-build/
+ios/App/fastlane/report.xml
+ios/App/fastlane/README.md
+**/*.p8

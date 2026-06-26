@@ -15,7 +15,7 @@ import { haptic } from "./haptics";
 import { usePush } from "./usePush";
 import { cn } from "@/lib/utils";
 import { profileTint } from "@/lib/profile-color";
-import { PetSprite, usePet } from "@/lib/pet";
+import { PetSprite, usePet, type Pet, type PetState } from "@/lib/pet";
 import { usePolling } from "@/components/usePolling";
 import type { FleetAgent } from "@/lib/fleet/types";
 import { AnimatePresence, motion } from "framer-motion";
@@ -55,6 +55,25 @@ export function ContextBar() {
 
   const [sheet, setSheet] = useState<"model" | "profile" | "effort" | null>(null);
   const { pet } = usePet();
+  const [petBeat, setPetBeat] = useState<PetState | null>(null);
+
+  // Chat streams fire short activity beats so the mobile/PWA shell can use the
+  // full petdex atlas (run/review/done/error), not just a faster idle loop.
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onPetState = (event: Event) => {
+      const detail = (event as CustomEvent<{ state?: PetState; ms?: number }>).detail;
+      if (!detail?.state) return;
+      setPetBeat(detail.state);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => setPetBeat(null), detail.ms ?? 1400);
+    };
+    window.addEventListener("lo-pet-state", onPetState as EventListener);
+    return () => {
+      if (timer) clearTimeout(timer);
+      window.removeEventListener("lo-pet-state", onPetState as EventListener);
+    };
+  }, []);
 
   // Live turn timer — ticks m:ss while a turn is running so you can SEE the
   // agent is thinking. Cleared (null) when idle. 1s cadence is enough; we round
@@ -123,6 +142,7 @@ export function ContextBar() {
   const pct = contextUsage
     ? Math.min(100, Math.round((contextUsage.used / contextUsage.total) * 100))
     : null;
+  const petState: PetState = petBeat ?? (turnStartedAt != null ? "run" : "idle");
 
   return (
     <>
@@ -130,7 +150,7 @@ export function ContextBar() {
       <div className="fixed bottom-[calc(40px+env(safe-area-inset-bottom)+8px)] inset-x-4 z-50 flex flex-col gap-1.5 pointer-events-none">
         <AnimatePresence>
           {notifications.map((n) => (
-            <NotifToast key={n.id} n={n} onDismiss={() => dismissNotification(n.id)} />
+            <NotifToast key={n.id} n={n} pet={pet} onDismiss={() => dismissNotification(n.id)} />
           ))}
         </AnimatePresence>
       </div>
@@ -249,6 +269,7 @@ export function ContextBar() {
               <PetSprite
                 pet={pet}
                 active={turnStartedAt != null}
+                state={petState}
                 className={cn("h-4 w-4 shrink-0", pet.enabled && "scale-[1.35]")}
                 style={{ filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 55%, transparent))" }}
               />
@@ -301,9 +322,11 @@ export function ContextBar() {
 
 function NotifToast({
   n,
+  pet,
   onDismiss,
 }: {
   n: { id: string; repo: string; branch: string; type: string; ts: number };
+  pet: Pet;
   onDismiss: () => void;
 }) {
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -315,6 +338,7 @@ function NotifToast({
 
   const icon = n.type === "started" ? "●" : n.type === "completed" ? "✓" : "✕";
   const label = n.type === "started" ? "session started" : n.type === "completed" ? "done" : "error";
+  const toastPetState: PetState = n.type === "completed" ? "jump" : n.type === "error" ? "failed" : "run";
 
   return (
     <motion.div
@@ -324,11 +348,15 @@ function NotifToast({
       transition={{ type: "spring", stiffness: 400, damping: 30 }}
       className="pointer-events-auto mx-auto flex max-w-sm items-center gap-2 rounded-lg border border-border bg-[color-mix(in_srgb,var(--background-base)_88%,transparent)] px-3 py-2 shadow-lg backdrop-blur"
     >
-      <span className={cn(
-        "h-2 w-2 shrink-0 rounded-full",
-        n.type === "started" ? "bg-[color:var(--color-info)]" :
-        n.type === "completed" ? "bg-[color:var(--color-success)]" : "bg-[color:var(--color-destructive)]"
-      )} />
+      {pet.enabled ? (
+        <PetSprite pet={pet} state={toastPetState} active={n.type === "started"} className="h-7 w-7 shrink-0 scale-125" />
+      ) : (
+        <span className={cn(
+          "grid h-5 w-5 shrink-0 place-items-center rounded-full text-[0.62rem] font-bold",
+          n.type === "started" ? "bg-[color:var(--color-info)] text-background-base" :
+          n.type === "completed" ? "bg-[color:var(--color-success)] text-background-base" : "bg-[color:var(--color-destructive)] text-background-base"
+        )}>{icon}</span>
+      )}
       <span className="font-mono-ui text-[0.65rem] text-text-secondary">
         <strong className="text-midground">{n.repo}</strong> {n.branch && <>{n.branch} — </>}{label}
       </span>

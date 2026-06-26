@@ -1,0 +1,43 @@
+default_platform(:ios)
+
+PROJECT = "Hermes Battlestation.xcodeproj"
+SCHEME  = "Hermes Battlestation"
+
+platform :ios do
+  desc "Build and upload Battlestation to TestFlight (headless, API key)"
+  lane :beta do
+    api_key = app_store_connect_api_key(
+      key_id: "48PA68UN7R",
+      issuer_id: "0bc1b4b6-507c-42b7-802b-40fa7722fea6",
+      key_filepath: File.expand_path("~/.appstoreconnect/private_keys/AuthKey_48PA68UN7R.p8"),
+      in_house: false
+    )
+
+    build = Time.now.strftime("%Y%m%d%H%M")
+    UI.message("Build number: #{build}")
+
+    build_app(
+      project: PROJECT,
+      scheme: SCHEME,
+      configuration: "Release",
+      clean: true,
+      export_method: "app-store",
+      output_directory: File.expand_path("~/fastlane-build"),
+      output_name: "HermesBattlestation.ipa",
+      xcargs: "CURRENT_PROJECT_VERSION=#{build} -allowProvisioningUpdates",
+      export_options: {
+        signingStyle: "automatic",
+        teamID: "5BV985Z9LJ",
+        manageAppVersionAndBuildNumber: false,
+        uploadSymbols: true,
+        stripSwiftSymbols: true
+      }
+    )
+
+    upload_to_testflight(
+      api_key: api_key,
+      skip_waiting_for_build_processing: true,
+      skip_submission: true
+    )
+  end
+end

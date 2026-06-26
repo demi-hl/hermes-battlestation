@@ -55,29 +55,36 @@ def active_info():
             im = image.convert("RGBA")
             rows = max(1, im.height // constants.FRAME_H)
             cols = max(1, im.width // constants.FRAME_W)
-            row = constants.state_row_index("idle", rows)
+            states = ["idle", "wave", "run", "failed", "review", "jump", "waiting"]
             try:
                 counts = render.state_frame_counts(str(pet.spritesheet))
             except Exception:
                 counts = {}
-            count = int(counts.get("idle") or constants.FRAMES_PER_STATE or 1)
-            count = max(1, min(count, cols))
-            frames = []
-            for i in range(count):
-                frame = im.crop((
-                    i * constants.FRAME_W,
-                    row * constants.FRAME_H,
-                    min((i + 1) * constants.FRAME_W, im.width),
-                    min((row + 1) * constants.FRAME_H, im.height),
-                ))
-                buf = io.BytesIO()
-                frame.save(buf, format="PNG")
-                frames.append("data:image/png;base64," + base64.standard_b64encode(buf.getvalue()).decode("ascii"))
+
+            def state_frames(state):
+                row = constants.state_row_index(state, rows)
+                count = int(counts.get(state) or constants.FRAMES_PER_STATE or 1)
+                count = max(1, min(count, cols))
+                frames = []
+                for i in range(count):
+                    frame = im.crop((
+                        i * constants.FRAME_W,
+                        row * constants.FRAME_H,
+                        min((i + 1) * constants.FRAME_W, im.width),
+                        min((row + 1) * constants.FRAME_H, im.height),
+                    ))
+                    buf = io.BytesIO()
+                    frame.save(buf, format="PNG")
+                    frames.append("data:image/png;base64," + base64.standard_b64encode(buf.getvalue()).decode("ascii"))
+                return frames
+
+            frames_by_state = {state: state_frames(state) for state in states}
         return {
             "enabled": True,
             "id": pet.slug,
             "label": pet.display_name,
-            "frames": frames,
+            "frames": frames_by_state.get("idle", []),
+            "framesByState": frames_by_state,
             "loopMs": constants.LOOP_MS,
             "frameW": constants.FRAME_W,
             "frameH": constants.FRAME_H,

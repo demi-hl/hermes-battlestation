@@ -5,10 +5,77 @@ import Capacitor
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private let pairingPlaceholderURL = "https://connect.localhost.invalid"
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        installInitialRootViewController()
         return true
+    }
+
+    private func installInitialRootViewController() {
+        if window == nil {
+            window = UIWindow(frame: UIScreen.main.bounds)
+        }
+
+        let stored = realStoredServerURL()
+        let bundled = realBundledServerURL()
+
+        // Public/App Store builds ship with no baked server URL. First launch must
+        // ask the user for THEIR Hermes URL, otherwise every install would either
+        // point at localhost or someone else's box. Private builds may still set
+        // CAP_SERVER_URL at build time and skip this setup screen.
+        if stored?.isEmpty == false || bundled?.isEmpty == false {
+            showBridge()
+        } else {
+            showServerSetup(defaultURL: "")
+        }
+    }
+
+    private func showServerSetup(defaultURL: String) {
+        let setup = ServerSetupViewController()
+        setup.defaultURL = defaultURL
+        setup.onSaved = { [weak self] in
+            self?.showBridge()
+        }
+        window?.rootViewController = setup
+        window?.makeKeyAndVisible()
+    }
+
+    private func showBridge() {
+        window?.rootViewController = HermesBridgeViewController()
+        window?.makeKeyAndVisible()
+    }
+
+    private func bundledServerURL() -> String? {
+        guard let url = Bundle.main.url(forResource: "capacitor.config", withExtension: "json"),
+              let data = try? Data(contentsOf: url),
+              let object = (try? JSONSerialization.jsonObject(with: data)) as? [String: Any],
+              let server = object["server"] as? [String: Any],
+              let serverURL = server["url"] as? String,
+              !serverURL.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            return nil
+        }
+        return serverURL
+    }
+
+    private func realBundledServerURL() -> String? {
+        let url = bundledServerURL()?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if url.isEmpty || url == pairingPlaceholderURL {
+            return nil
+        }
+        return url
+    }
+
+    private func realStoredServerURL() -> String? {
+        let raw = UserDefaults.standard.string(forKey: HermesBridgeViewController.serverURLKey)?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !raw.isEmpty,
+              let url = URL(string: raw),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host != nil else {
+            return nil
+        }
+        return raw
     }
 
     func applicationWillResignActive(_ application: UIApplication) {

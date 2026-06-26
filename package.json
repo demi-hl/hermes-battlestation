@@ -11,7 +11,7 @@
     "start": "next start",
     "lint": "eslint --max-warnings=30",
     "typecheck": "tsc --noEmit",
-    "cap:sync": "cap sync && node scripts/strip-ios-symlinks.cjs",
+    "cap:sync": "node scripts/cap-sync-ios-renamed-xcodeproj.cjs && node scripts/strip-ios-symlinks.cjs",
     "cap:open:ios": "cap open ios",
     "cap:build": "next build && cap copy && node scripts/strip-ios-symlinks.cjs",
     "electron:dev": "next build && electron .",
