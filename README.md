@@ -51,6 +51,15 @@ With no token set, the app stays loopback-only with no auth (single-machine mode
 token is set, every device must present it — unauthenticated requests get a `401` (API) or the
 **Connect** screen (pages).
 
+> The **desktop app mints this token for you** on first launch and saves it to its env file — so a
+> Mac running the `.dmg` is ready to pair a phone with no manual setup; find it under **Settings**.
+> You only need the `openssl` line above for a headless/server box with no desktop app.
+
+**Or sign in with Nous — no token to share.** If the box has a Nous OAuth client configured
+(`BATTLESTATION_OAUTH_CLIENT_ID`), the **Connect** screen shows a **Sign in with Nous** button:
+sign in with your existing Nous account instead of pasting a token. Both paths work side by side —
+the token is the fallback when OAuth isn't configured, and loopback stays open either way.
+
 **2. Make the box reachable — use [Tailscale](https://tailscale.com) (recommended).** It's a
 free private mesh VPN; your phone reaches the box directly, and the box is *never* exposed to the
 public internet — no open ports, no public URL for anyone to find or brute-force.
