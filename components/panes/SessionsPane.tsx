@@ -94,10 +94,20 @@ export function SessionsPane() {
     load();
   }, [load]);
 
-  // Re-fetch every 30 s for real-time context usage.
+  // Re-fetch every 30 s for real-time context usage. Also re-fetch the instant
+  // the app returns to foreground (iOS freezes setInterval while backgrounded).
   useEffect(() => {
     const id = setInterval(() => load(), 30_000);
-    return () => clearInterval(id);
+    const onWake = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("focus", onWake);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("focus", onWake);
+    };
   }, [load]);
 
   const fetchHistory = useCallback(
@@ -325,11 +335,21 @@ function ActiveNowSection() {
     }
   }, []);
 
-  // Same 10s cadence as the ContextBar badge so the two never drift.
+  // Same 10s cadence as the ContextBar badge so the two never drift. Also wake
+  // on foreground (iOS freezes setInterval while backgrounded).
   useEffect(() => {
     load();
     const id = setInterval(load, 10_000);
-    return () => clearInterval(id);
+    const onWake = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("focus", onWake);
+    return () => {
+      clearInterval(id);
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("focus", onWake);
+    };
   }, [load]);
 
   if (agents.length === 0) return null;

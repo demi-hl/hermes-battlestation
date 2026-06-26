@@ -247,7 +247,7 @@ function ExpandableRow({
 export function KanbanPane() {
   const { data, loading, error, updatedAt, reload } = usePolling<KanbanData>(
     "/api/kanban",
-    15_000,
+    5_000,
   );
   const [openId, setOpenId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
