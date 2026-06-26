@@ -234,10 +234,14 @@ export default function ConnectPage() {
             your existing Nous account — no token to copy. It appears when the
             box has an OAuth client configured.{" "}
             <strong className="text-text-secondary">Access token</strong>: on the
-            box running Hermes, set{" "}
-            <code className="text-text-secondary">BATTLESTATION_TOKEN</code> in
-            the app&apos;s environment. The Remote URL is that box&apos;s address
-            over Tailscale, your LAN, or a tunnel (e.g.{" "}
+            box running Hermes, run{" "}
+            <code className="text-text-secondary">npm run token</code> to print it
+            (or set{" "}
+            <code className="text-text-secondary">BATTLESTATION_TOKEN</code> in the
+            box&apos;s environment). Already signed in somewhere? Open{" "}
+            <strong className="text-text-secondary">Settings → Link a device</strong>{" "}
+            and tap <em>Copy access token</em>. The Remote URL is that box&apos;s
+            address over Tailscale, your LAN, or a tunnel (e.g.{" "}
             <code className="text-text-secondary">https://your-box:9443</code>).
             The token is set on the box only — it never lives in this app or the
             source.

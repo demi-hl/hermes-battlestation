@@ -49,7 +49,11 @@ or synced — every device reads the one backend live.
 **1. Set an access token on the box** (this is what makes it safe to reach over a network):
 
 ```bash
-# in the app's environment on the box running it:
+# easiest — prints the token, or mints + saves a strong one if none exists:
+npm run token
+# (npm run token -- --new  rotates it)
+
+# or set your own by hand:
 BATTLESTATION_TOKEN=$(openssl rand -base64 24)
 ```
 

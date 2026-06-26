@@ -20,7 +20,8 @@
     "dist:linux": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder --linux",
     "dist:mac": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder --mac",
     "dist:win": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder --win",
-    "dist:extension": "node scripts/build-extension.cjs"
+    "dist:extension": "node scripts/build-extension.cjs",
+    "token": "node scripts/token.cjs"
   },
   "dependencies": {
     "@capacitor/haptics": "^8.0.2",
