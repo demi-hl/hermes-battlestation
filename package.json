@@ -2,7 +2,7 @@
   "name": "demi-workspace",
   "version": "1.0.0",
   "private": true,
-  "description": "An alternative Hermes launcher — desktop + mobile cockpit for your local agent: chat, repos, fleet, kanban, terminal, editor.",
+  "description": "An alternative Hermes launcher \u2014 desktop + mobile cockpit for your local agent: chat, repos, fleet, kanban, terminal, editor.",
   "author": "Hermes Battlestation",
   "main": "electron/main.cjs",
   "scripts": {
@@ -19,7 +19,8 @@
     "dist": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder",
     "dist:linux": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder --linux",
     "dist:mac": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder --mac",
-    "dist:win": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder --win"
+    "dist:win": "rm -rf release && next build && node scripts/prepare-standalone.cjs && electron-builder --win",
+    "dist:extension": "node scripts/build-extension.cjs"
   },
   "dependencies": {
     "@capacitor/haptics": "^8.0.2",

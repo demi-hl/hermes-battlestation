@@ -70,8 +70,30 @@ jobs:
             release/*.exe
           if-no-files-found: ignore
 
+  extension:
+    # MV3 browser extension — the fourth delivery target. OS-agnostic thin
+    # side-panel shell; no Next build, just stamp + zip. Attached to the same
+    # release as the desktop installers.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Package extension
+        run: npm run dist:extension
+
+      - name: Collect extension
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-extension
+          path: release/hermes-battlestation-extension-*.zip
+          if-no-files-found: error
+
   release:
-    needs: build
+    needs: [build, extension]
     runs-on: ubuntu-latest
     if: startsWith(github.ref, 'refs/tags/')
     steps:
