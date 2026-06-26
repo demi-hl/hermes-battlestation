@@ -54,10 +54,20 @@ export function usePolling<T>(url: string, intervalMs = 30_000): State<T> {
     const ctrl = new AbortController();
     load(ctrl.signal);
     const id = setInterval(() => load(), intervalMs);
+    // iOS/Safari freezes setInterval while the WebView is backgrounded, so a
+    // returning user can stare at stale data until a hard reload. Re-fetch the
+    // instant the tab/app becomes visible or regains focus.
+    const onWake = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    document.addEventListener("visibilitychange", onWake);
+    window.addEventListener("focus", onWake);
     return () => {
       mounted.current = false;
       ctrl.abort();
       clearInterval(id);
+      document.removeEventListener("visibilitychange", onWake);
+      window.removeEventListener("focus", onWake);
     };
   }, [load, intervalMs]);
 
