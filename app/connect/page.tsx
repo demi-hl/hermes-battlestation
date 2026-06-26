@@ -130,25 +130,6 @@ export default function ConnectPage() {
 
         <label className="flex flex-col gap-1">
           <span className="font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
-            Remote URL
-          </span>
-          <input
-            type="url"
-            inputMode="url"
-            autoCapitalize="none"
-            autoCorrect="off"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://your-box:9443  (Tailscale, LAN, or tunnel)"
-            className="rounded-lg border border-border bg-transparent px-3 py-2 font-mono-ui text-[0.8rem] text-text-primary outline-none focus:border-midground"
-          />
-          <span className="font-mono-ui text-[0.58rem] text-text-tertiary">
-            Leave blank if you opened this app directly from your box.
-          </span>
-        </label>
-
-        <label className="flex flex-col gap-1">
-          <span className="font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
             Access token
           </span>
           <input
@@ -160,6 +141,31 @@ export default function ConnectPage() {
             className="rounded-lg border border-border bg-transparent px-3 py-2 font-mono-ui text-[0.8rem] text-text-primary outline-none focus:border-midground"
           />
         </label>
+
+        <details className="flex flex-col gap-1">
+          <summary className="cursor-pointer select-none font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
+            Advanced · connect to a different box
+          </summary>
+          <label className="mt-2 flex flex-col gap-1">
+            <span className="font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
+              Remote URL
+            </span>
+            <input
+              type="url"
+              inputMode="url"
+              autoCapitalize="none"
+              autoCorrect="off"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              placeholder="https://your-box:9443  (Tailscale, LAN, or tunnel)"
+              className="rounded-lg border border-border bg-transparent px-3 py-2 font-mono-ui text-[0.8rem] text-text-primary outline-none focus:border-midground"
+            />
+            <span className="font-mono-ui text-[0.58rem] text-text-tertiary">
+              Leave blank to use this box. Only set this to point the app at a
+              different Hermes box you run.
+            </span>
+          </label>
+        </details>
 
         {msg && (
           <p className="font-mono-ui text-[0.68rem] text-[color:var(--color-destructive)]">
