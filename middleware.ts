@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  OAUTH_COOKIE,
+  getSessionSecret,
+  verifySession,
+} from "@/lib/oauth/session";
 
 // ── Battlestation access gate ────────────────────────────────────────────────
 // The app is a thin client that loads in full from the box running Hermes.
@@ -9,13 +14,27 @@ import type { NextRequest } from "next/server";
 // BATTLESTATION_TOKEN on the box and every request must carry it. Without this,
 // exposing the backend would leak sessions/keys to anyone who finds the URL.
 //
-// Token is accepted (in priority order) via:
-//   - Authorization: Bearer <token>     (API clients)
-//   - bs_token cookie                    (browser, set once via /connect)
-//   - ?token=<token> query               (first-load deep link → cookie)
-// Never a NEXT_PUBLIC_* var — the token is server-side truth only.
+// Auth is satisfied by EITHER of two paths (additive — both always work):
+//   1. The shared access token (BATTLESTATION_TOKEN), presented via:
+//        - Authorization: Bearer ***     (API clients)
+//        - bs_token cookie                    (browser, set once via /connect)
+//        - ?token=<token> query               (first-load deep link → cookie)
+//   2. A Nous OAuth session (bs_oauth cookie), minted by the OAuth callback
+//      after the tester signs in with their Nous account. Validated here with a
+//      cheap HMAC check (no network) — the same symmetric shape as bs_token.
+// Never a NEXT_PUBLIC_* var — both credentials are server-side truth only.
 
 const TOKEN = process.env.BATTLESTATION_TOKEN ?? "";
+
+// OAuth is available when an OAuth client id is configured (env credential,
+// shape agent:{instance_id}). Accept the Battlestation-namespaced var or the
+// stock Hermes one so a box already wired for the stock dashboard can reuse it.
+const OAUTH_ENABLED =
+  (
+    process.env.BATTLESTATION_OAUTH_CLIENT_ID ||
+    process.env.HERMES_DASHBOARD_OAUTH_CLIENT_ID ||
+    ""
+  ).trim() !== "";
 
 // Cookie lifetime in days (F12) — default 30, override via env. Matches the
 // /api/auth route's COOKIE_MAX_AGE.
@@ -24,7 +43,8 @@ const SESSION_DAYS = Math.max(
   parseInt(process.env.BATTLESTATION_SESSION_DAYS ?? "30", 10) || 30,
 );
 
-// Paths reachable WITHOUT a token: the connect screen, the auth handler, a
+// Paths reachable WITHOUT a token: the connect screen, the auth handlers
+// (including the OAuth start/callback round trip under /api/auth/oauth), a
 // health probe, and the static/asset/PWA files the login page needs. Matched
 // with a segment boundary (isPublicPath) so e.g. /api/healthz is NOT public.
 // /_next/ is intentionally omitted — the matcher already excludes the static
@@ -32,7 +52,7 @@ const SESSION_DAYS = Math.max(
 // /_next/data through the gate.
 const PUBLIC_PREFIXES = [
   "/connect",
-  "/api/auth",
+  "/api/auth", // covers /api/auth + /api/auth/oauth/{start,callback}
   "/api/health",
   "/icons",
   "/favicon.ico",
@@ -72,6 +92,20 @@ function presentedToken(req: NextRequest): string {
   return "";
 }
 
+// True when the request carries a valid Nous OAuth session cookie. The HMAC is
+// verified with the same secret the callback signed it with (derived from
+// BATTLESTATION_SESSION_SECRET, falling back to BATTLESTATION_TOKEN); returns
+// false when no secret is configured (loopback-open dev) or the cookie is
+// absent/invalid/expired.
+async function hasValidOAuthSession(req: NextRequest): Promise<boolean> {
+  const secret = getSessionSecret();
+  if (!secret) return false;
+  const cookie = req.cookies.get(OAUTH_COOKIE)?.value;
+  if (!cookie) return false;
+  const session = await verifySession(cookie, secret);
+  return session !== null;
+}
+
 // Explicit opt-in to run with NO token on a non-loopback interface. Without it,
 // a tokenless deployment that's reachable remotely fails closed (F2).
 const ALLOW_INSECURE = process.env.BATTLESTATION_ALLOW_INSECURE === "1";
@@ -96,37 +130,46 @@ function isPublicPath(pathname: string): boolean {
   );
 }
 
-export function middleware(req: NextRequest) {
+export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
 
-  // No token configured.
+  // No shared token configured.
   if (!TOKEN) {
-    // Loopback (single-machine dev) is fine. A remote request with no token set
-    // is a misconfiguration — fail closed unless explicitly allowed.
+    // Loopback (single-machine dev) is fine — UNCHANGED behavior, loopback
+    // stays open regardless of whether OAuth is configured (protects the local
+    // desktop app from suddenly demanding a login).
     if (isLoopback(req) || ALLOW_INSECURE) return NextResponse.next();
-    if (pathname.startsWith("/api/")) {
-      return NextResponse.json(
-        {
-          error: "server has no access token set",
-          detail:
-            "Set BATTLESTATION_TOKEN to allow remote access, or BATTLESTATION_ALLOW_INSECURE=1 to override.",
-        },
-        { status: 503 },
+    // Remote with no token AND no OAuth configured: no auth mechanism exists at
+    // all — fail closed (UNCHANGED).
+    if (!OAUTH_ENABLED) {
+      if (pathname.startsWith("/api/")) {
+        return NextResponse.json(
+          {
+            error: "server has no access token set",
+            detail:
+              "Set BATTLESTATION_TOKEN to allow remote access, or BATTLESTATION_ALLOW_INSECURE=1 to override.",
+          },
+          { status: 503 },
+        );
+      }
+      return new NextResponse(
+        "This Hermes Battlestation has no access token set, so remote access is disabled. " +
+          "Set BATTLESTATION_TOKEN on the box (or BATTLESTATION_ALLOW_INSECURE=1 to override).",
+        { status: 503, headers: { "content-type": "text/plain" } },
       );
     }
-    return new NextResponse(
-      "This Hermes Battlestation has no access token set, so remote access is disabled. " +
-        "Set BATTLESTATION_TOKEN on the box (or BATTLESTATION_ALLOW_INSECURE=1 to override).",
-      { status: 503, headers: { "content-type": "text/plain" } },
-    );
+    // Remote with no token but OAuth IS configured: fall through to the gate so
+    // a valid Nous OAuth session is accepted (OAuth-only deployment).
   }
 
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
+  // Path 1: shared access token (bearer / cookie / deep link). Guarded on TOKEN
+  // so an empty TOKEN can never match an empty presented value.
   const presented = presentedToken(req);
-  if (presented && safeEqual(presented, TOKEN)) {
+  if (TOKEN && presented && safeEqual(presented, TOKEN)) {
     // A valid ?token= deep link promotes to a cookie so later requests pass.
     if (req.nextUrl.searchParams.get("token")) {
       const url = req.nextUrl.clone();
@@ -144,6 +187,11 @@ export function middleware(req: NextRequest) {
       });
       return res;
     }
+    return NextResponse.next();
+  }
+
+  // Path 2: Nous OAuth session cookie (additive).
+  if (await hasValidOAuthSession(req)) {
     return NextResponse.next();
   }
 
