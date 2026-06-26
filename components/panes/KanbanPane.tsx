@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence, useMotionValue, useTransform } from "framer-motion";
-import { usePolling } from "@/components/usePolling";
+import { usePolling, useEventStream } from "@/components/usePolling";
 import { relativeTime } from "@/lib/format";
 import { haptic } from "@/components/shell/haptics";
 import { KanbanIcon } from "@/components/shell/icons";
@@ -249,6 +249,10 @@ export function KanbanPane() {
     "/api/kanban",
     5_000,
   );
+  // Real-time fast path: the server pushes a "changed" event the instant the
+  // board DB moves; reload() pulls fresh data immediately. The 5s poll above is
+  // the fallback and is untouched, so the board still works if SSE drops.
+  useEventStream("/api/kanban/stream", reload);
   const [openId, setOpenId] = useState<string | null>(null);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [showForm, setShowForm] = useState(false);
