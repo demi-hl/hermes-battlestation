@@ -53,13 +53,19 @@ async function fetchPet(): Promise<Pet> {
 
 export function usePet(): {
   pet: Pet;
+  resolved: boolean;
   reloadPet: () => Promise<void>;
   setPetId: (id: string) => Promise<void>;
 } {
   const [pet, setPet] = useState<Pet>(DEFAULT_PET);
+  // False until the first fetch settles. The green-dot default and the pet
+  // sprite are BOTH gated on this so we never flash the dot before the pet
+  // loads in (the "bright green dot then it becomes the pet" artifact).
+  const [resolved, setResolved] = useState(false);
 
   const reloadPet = useCallback(async () => {
     setPet(await fetchPet());
+    setResolved(true);
   }, []);
 
   useEffect(() => {
@@ -90,7 +96,7 @@ export function usePet(): {
     [],
   );
 
-  return { pet, reloadPet, setPetId };
+  return { pet, resolved, reloadPet, setPetId };
 }
 
 export function PetSprite({

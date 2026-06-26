@@ -54,7 +54,7 @@ export function ContextBar() {
   } = useWorkspace();
 
   const [sheet, setSheet] = useState<"model" | "profile" | "effort" | null>(null);
-  const { pet } = usePet();
+  const { pet, resolved: petResolved } = usePet();
   const [petBeat, setPetBeat] = useState<PetState | null>(null);
 
   // Chat streams fire short activity beats so the mobile/PWA shell can use the
@@ -260,19 +260,24 @@ export function ContextBar() {
             </button>
 
             {/* App-session timer — sits NEXT TO the profile. Its leading marker
-                is the chosen PET sprite (replaces the status dot), or a steady
-                green dot when no pet is selected. Pick the pet in Settings. */}
+                is the chosen PET sprite, or a steady green dot when no pet is
+                selected. Hold the marker blank until the pet state resolves so
+                we never flash the green dot before the sprite loads in. */}
             <span
               className="flex shrink-0 items-center gap-1.5 font-mono-ui tabular text-[0.62rem] text-text-tertiary"
               title={pet.enabled ? `${pet.label} · app session uptime` : "app session uptime"}
             >
-              <PetSprite
-                pet={pet}
-                active={turnStartedAt != null}
-                state={petState}
-                className={cn("h-4 w-4 shrink-0", pet.enabled && "scale-[1.35]")}
-                style={{ filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 55%, transparent))" }}
-              />
+              {petResolved ? (
+                <PetSprite
+                  pet={pet}
+                  active={turnStartedAt != null}
+                  state={petState}
+                  className={cn("h-4 w-4 shrink-0", pet.enabled && "scale-[1.35]")}
+                  style={{ filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 55%, transparent))" }}
+                />
+              ) : (
+                <span aria-hidden className="h-4 w-4 shrink-0" />
+              )}
               {sessionLabel}
             </span>
 
