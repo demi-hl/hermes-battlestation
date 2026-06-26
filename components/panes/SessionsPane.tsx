@@ -779,7 +779,7 @@ function ProfileSessions({ profile, search, resumable = false }: { profile: stri
   return (
     <div className="px-2 pt-1">
       <p className="px-1 pb-2 font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
-        {resumable ? `${profile} profile · tap to view · live threads resume` : `read-only · ${profile} profile history`}
+        {resumable ? `${profile} profile · tap to preview · open, archive, or delete` : `read-only · ${profile} profile history`}
       </p>
       {filtered.length === 0 ? (
         <p className="px-3 py-10 text-center text-sm text-text-tertiary">
@@ -798,6 +798,9 @@ function ProfileSessions({ profile, search, resumable = false }: { profile: stri
                 haptic(6);
                 setOpenId((cur) => (cur === s.id ? null : s.id));
               }}
+              onRemoved={(id) =>
+                setSessions((prev) => (prev ? prev.filter((x) => x.id !== id) : prev))
+              }
             />
           ))}
         </ul>
@@ -814,16 +817,20 @@ function ProfileSessionRow({
   session,
   open,
   onToggle,
+  onRemoved,
   resumable = false,
 }: {
   profile: string;
   session: ProfileSession;
   open: boolean;
   onToggle: () => void;
+  onRemoved?: (id: string) => void;
   resumable?: boolean;
 }) {
   const [history, setHistory] = useState<ChatMessage[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
 
   useEffect(() => {
     if (!open || history !== null) return;
@@ -843,19 +850,35 @@ function ProfileSessionRow({
   }, [open, history, profile, session.id]);
 
   const title = session.title?.trim() || "untitled session";
+
+  const act = async (kind: "archive" | "delete") => {
+    if (busy) return;
+    haptic(kind === "delete" ? 12 : 8);
+    setBusy(true);
+    try {
+      const res = await fetch(`/api/sessions/${encodeURIComponent(session.id)}`, {
+        method: kind === "delete" ? "DELETE" : "PATCH",
+        headers: kind === "archive" ? { "Content-Type": "application/json" } : undefined,
+        body: kind === "archive" ? JSON.stringify({ archived: true }) : undefined,
+      });
+      if (res.ok) {
+        onRemoved?.(session.id);
+      } else {
+        haptic([8, 6, 12]);
+        setBusy(false);
+      }
+    } catch {
+      haptic([8, 6, 12]);
+      setBusy(false);
+    }
+  };
+
   return (
     <li>
       <button
         type="button"
-        onClick={() => {
-          haptic(6);
-          window.dispatchEvent(
-            new CustomEvent("lo-read-session", {
-              detail: { profile, id: session.id, title },
-            }),
-          );
-        }}
-        aria-expanded={false}
+        onClick={onToggle}
+        aria-expanded={open}
         className="flex w-full items-center gap-2.5 rounded-[var(--radius-md)] px-2.5 py-2.5 text-left transition-colors active:bg-[color-mix(in_srgb,var(--midground)_5%,transparent)]"
       >
         <span className="grid h-7 w-7 shrink-0 place-items-center rounded-[var(--radius-sm)] border border-border text-text-tertiary">
@@ -949,6 +972,57 @@ function ProfileSessionRow({
               ) : (
                 <p className="py-1 text-[0.72rem] text-text-tertiary">No messages.</p>
               )}
+
+              {/* Actions: open full transcript / archive / delete */}
+              <div className="mt-2.5 flex items-center gap-2 border-t border-border/60 pt-2.5">
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    haptic([6, 4, 8]);
+                    window.dispatchEvent(
+                      new CustomEvent("lo-read-session", {
+                        detail: { profile, id: session.id, title },
+                      }),
+                    );
+                  }}
+                  className="flex flex-1 items-center justify-center gap-1 rounded-[var(--radius-md)] border border-border py-1.5 text-[0.74rem] font-medium text-midground transition-colors active:scale-[0.98] disabled:opacity-40"
+                >
+                  Open
+                  <ChevronRightIcon width={12} height={12} />
+                </button>
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => act("archive")}
+                  className="rounded-[var(--radius-md)] border border-border px-3 py-1.5 text-[0.74rem] text-text-tertiary transition-colors active:text-midground disabled:opacity-40"
+                >
+                  Archive
+                </button>
+                {confirmDelete ? (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => act("delete")}
+                    className="rounded-[var(--radius-md)] border border-[color-mix(in_srgb,var(--color-destructive)_50%,transparent)] bg-[color-mix(in_srgb,var(--color-destructive)_14%,transparent)] px-3 py-1.5 text-[0.74rem] font-medium text-[color:var(--color-destructive)] disabled:opacity-40"
+                  >
+                    Confirm?
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      haptic(8);
+                      setConfirmDelete(true);
+                      window.setTimeout(() => setConfirmDelete(false), 3000);
+                    }}
+                    className="rounded-[var(--radius-md)] border border-border px-3 py-1.5 text-[0.74rem] text-text-tertiary transition-colors active:text-[color:var(--color-destructive)] disabled:opacity-40"
+                  >
+                    Delete
+                  </button>
+                )}
+              </div>
             </div>
           </motion.div>
         )}
