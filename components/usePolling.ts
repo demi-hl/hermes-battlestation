@@ -73,3 +73,35 @@ export function usePolling<T>(url: string, intervalMs = 30_000): State<T> {
 
   return { data, error, loading, updatedAt, reload: () => load(undefined, true) };
 }
+
+// Optional SSE companion to usePolling. Opens an EventSource and fires `onEvent`
+// for each named server event (default "changed"), so a pane can refresh the
+// instant the server pushes instead of on the next poll tick. Purely additive:
+// usePolling's interval keeps running untouched, so if the browser lacks
+// EventSource or the stream errors, the poll still carries the pane. The
+// connection is opened once per url and torn down on unmount; EventSource
+// auto-reconnects on transient drops, and any gap is covered by the poll.
+export function useEventStream(
+  url: string,
+  onEvent: () => void,
+  eventName = "changed",
+): void {
+  const cb = useRef(onEvent);
+  cb.current = onEvent;
+
+  useEffect(() => {
+    if (typeof window === "undefined" || typeof EventSource === "undefined") return;
+    let es: EventSource | null = null;
+    try {
+      es = new EventSource(url); // same-origin → bs_token cookie rides along
+    } catch {
+      return; // no stream available — poll fallback carries the pane
+    }
+    const handler = () => cb.current();
+    es.addEventListener(eventName, handler);
+    return () => {
+      es?.removeEventListener(eventName, handler);
+      es?.close();
+    };
+  }, [url, eventName]);
+}
