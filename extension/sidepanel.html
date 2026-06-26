@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hermes Battlestation</title>
+    <style>
+      :root { color-scheme: dark; }
+      html, body { margin: 0; height: 100%; background: #0a0a0b; color: #e7e7ea;
+        font: 14px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif; }
+      #frame { border: 0; width: 100%; height: 100%; display: block; }
+      #setup { display: none; height: 100%; box-sizing: border-box; padding: 28px 22px;
+        flex-direction: column; gap: 14px; align-items: flex-start; }
+      #setup.show { display: flex; }
+      #frame.show { display: block; }
+      h1 { font-size: 16px; margin: 0; letter-spacing: -0.01em; }
+      p { margin: 0; color: #a1a1aa; }
+      a.btn { margin-top: 6px; display: inline-block; padding: 9px 14px; border-radius: 10px;
+        background: #6d5efc; color: #fff; text-decoration: none; font-weight: 600; }
+      code { background: #18181b; padding: 1px 6px; border-radius: 6px; }
+      .err { color: #f87171; }
+    </style>
+  </head>
+  <body>
+    <div id="setup">
+      <h1>Hermes Battlestation</h1>
+      <p id="msg">Not configured yet. Point the extension at your box.</p>
+      <a class="btn" id="open-options" href="#">Open settings →</a>
+    </div>
+    <iframe id="frame" referrerpolicy="origin"
+      sandbox="allow-same-origin allow-scripts allow-forms allow-popups allow-modals allow-downloads"></iframe>
+    <script src="panel.js"></script>
+  </body>
+</html>

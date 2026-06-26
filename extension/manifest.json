@@ -1,0 +1,40 @@
+{
+  "manifest_version": 3,
+  "name": "Hermes Battlestation",
+  "short_name": "Battlestation",
+  "version": "1.0.0",
+  "description": "Your Hermes Battlestation control center in a browser side panel.",
+  "icons": {
+    "16": "icons/icon-16.png",
+    "48": "icons/icon-48.png",
+    "128": "icons/icon-128.png"
+  },
+  "action": {
+    "default_title": "Open Hermes Battlestation",
+    "default_icon": {
+      "16": "icons/icon-16.png",
+      "48": "icons/icon-48.png",
+      "128": "icons/icon-128.png"
+    }
+  },
+  "side_panel": {
+    "default_path": "sidepanel.html"
+  },
+  "options_ui": {
+    "page": "options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "sw.js"
+  },
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "declarativeNetRequest"
+  ],
+  "host_permissions": [
+    "https://*/*",
+    "http://localhost/*",
+    "http://127.0.0.1/*"
+  ]
+}

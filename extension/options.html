@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hermes Battlestation — Settings</title>
+    <style>
+      :root { color-scheme: dark; }
+      body { margin: 0; min-height: 100vh; background: #0a0a0b; color: #e7e7ea;
+        font: 14px/1.6 -apple-system, BlinkMacSystemFont, "Segoe UI", system-ui, sans-serif;
+        display: flex; justify-content: center; }
+      main { width: 100%; max-width: 460px; padding: 48px 24px; box-sizing: border-box; }
+      h1 { font-size: 20px; letter-spacing: -0.01em; margin: 0 0 4px; }
+      p.sub { margin: 0 0 28px; color: #a1a1aa; }
+      label { display: block; font-weight: 600; margin: 18px 0 6px; }
+      .hint { font-weight: 400; color: #71717a; font-size: 12.5px; }
+      input { width: 100%; box-sizing: border-box; padding: 10px 12px; border-radius: 10px;
+        border: 1px solid #27272a; background: #131316; color: #e7e7ea; font-size: 14px; }
+      input:focus { outline: none; border-color: #6d5efc; }
+      button { margin-top: 26px; padding: 11px 18px; border: 0; border-radius: 10px;
+        background: #6d5efc; color: #fff; font-weight: 600; font-size: 14px; cursor: pointer; }
+      button:active { transform: translateY(1px); }
+      #status { margin-top: 14px; min-height: 20px; font-size: 13px; }
+      #status.ok { color: #34d399; }
+      #status.err { color: #f87171; }
+      code { background: #18181b; padding: 1px 6px; border-radius: 6px; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Hermes Battlestation</h1>
+      <p class="sub">Point the side panel at your box. The token is stored in your browser
+        profile only and sent as an <code>Authorization</code> header — never in a URL.</p>
+
+      <label for="url">Box URL
+        <span class="hint">— your Hermes Battlestation box URL (Tailscale, tunnel, or public)</span>
+      </label>
+      <input id="url" type="url" placeholder="https://your-box.ts.net" autocomplete="off" />
+
+      <label for="token">Access token
+        <span class="hint">— the box's <code>BATTLESTATION_TOKEN</code></span>
+      </label>
+      <input id="token" type="password" placeholder="paste token" autocomplete="off" />
+
+      <button id="save">Save &amp; test</button>
+      <div id="status"></div>
+    </main>
+    <script src="options.js"></script>
+  </body>
+</html>
