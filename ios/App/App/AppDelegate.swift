@@ -6,6 +6,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
     private let pairingPlaceholderURL = "https://connect.localhost.invalid"
+    // Pre-filled on the setup screen so testers can just tap Connect instead of
+    // typing/pasting. Public Funnel URL — reachable off the tailnet.
+    private let defaultPublicURL = "https://battlestation.demi.la"
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         installInitialRootViewController()
@@ -27,7 +30,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         if stored?.isEmpty == false || bundled?.isEmpty == false {
             showBridge()
         } else {
-            showServerSetup(defaultURL: "")
+            showServerSetup(defaultURL: defaultPublicURL)
         }
     }
 
@@ -106,6 +109,13 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
+        // The error page's "Change URL / Retry" button navigates to battlestation://setup
+        // to bounce the user back to the pairing screen when a remote load failed.
+        if url.scheme?.lowercased() == "battlestation", url.host?.lowercased() == "setup" {
+            let current = UserDefaults.standard.string(forKey: HermesBridgeViewController.serverURLKey) ?? ""
+            showServerSetup(defaultURL: current)
+            return true
+        }
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }
 

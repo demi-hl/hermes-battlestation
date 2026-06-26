@@ -14,19 +14,24 @@ class ServerSetupViewController: UIViewController {
     private let connectButton = UIButton(type: .system)
     private let errorLabel = UILabel()
 
+    // Nous brand type with graceful fallback to system if the font failed to load.
+    private static func nous(_ name: String, _ size: CGFloat, _ weight: UIFont.Weight = .regular) -> UIFont {
+        UIFont(name: name, size: size) ?? .systemFont(ofSize: size, weight: weight)
+    }
+
     override func viewDidLoad() {
         super.viewDidLoad()
         view.backgroundColor = UIColor(red: 0.016, green: 0.110, blue: 0.110, alpha: 1) // #041c1c
 
         let title = UILabel()
         title.text = "Connect your Hermes"
-        title.font = .systemFont(ofSize: 24, weight: .bold)
-        title.textColor = .white
+        title.font = Self.nous("Mondwest-Regular", 30, .bold)
+        title.textColor = UIColor(red: 0.592, green: 0.988, blue: 0.894, alpha: 1) // #97FCE4
         title.textAlignment = .center
 
         let subtitle = UILabel()
         subtitle.text = "Point this app at the Battlestation server running on your own Hermes box."
-        subtitle.font = .systemFont(ofSize: 14)
+        subtitle.font = Self.nous("Collapse-Regular", 15)
         subtitle.textColor = UIColor(white: 0.7, alpha: 1)
         subtitle.textAlignment = .center
         subtitle.numberOfLines = 0
@@ -48,21 +53,21 @@ class ServerSetupViewController: UIViewController {
         styleInput(tokenField)
 
         connectButton.setTitle("Connect", for: .normal)
-        connectButton.titleLabel?.font = .systemFont(ofSize: 17, weight: .semibold)
+        connectButton.titleLabel?.font = Self.nous("Collapse-Bold", 18, .semibold)
         connectButton.setTitleColor(UIColor(red: 0.016, green: 0.110, blue: 0.110, alpha: 1), for: .normal)
         connectButton.backgroundColor = UIColor(red: 0.592, green: 0.988, blue: 0.894, alpha: 1) // #97FCE4
         connectButton.layer.cornerRadius = 10
         connectButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
         connectButton.addTarget(self, action: #selector(save), for: .touchUpInside)
 
-        errorLabel.font = .systemFont(ofSize: 13)
+        errorLabel.font = Self.nous("Collapse-Regular", 13)
         errorLabel.textColor = UIColor(red: 1, green: 0.45, blue: 0.45, alpha: 1)
         errorLabel.textAlignment = .center
         errorLabel.numberOfLines = 0
 
         let help = UILabel()
         help.text = "Remote URL = the HTTPS/Tailscale Serve URL for your Hermes box. Token = BATTLESTATION_TOKEN from that box. The token is passed once and stored only as that server's cookie."
-        help.font = .systemFont(ofSize: 12)
+        help.font = Self.nous("Collapse-Regular", 12)
         help.textColor = UIColor(white: 0.58, alpha: 1)
         help.textAlignment = .center
         help.numberOfLines = 0
@@ -82,6 +87,7 @@ class ServerSetupViewController: UIViewController {
 
     private func styleInput(_ field: UITextField) {
         field.textColor = .white
+        field.font = Self.nous("Collapse-Regular", 16)
         field.backgroundColor = UIColor(white: 1, alpha: 0.08)
         field.layer.cornerRadius = 10
         field.setLeftPaddingPoints(12)

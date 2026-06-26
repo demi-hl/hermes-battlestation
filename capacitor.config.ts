@@ -2,18 +2,19 @@ import type { CapacitorConfig } from '@capacitor/cli';
 import { KeyboardResize } from '@capacitor/keyboard';
 
 const capServerUrl = process.env.CAP_SERVER_URL?.trim();
-const pairingPlaceholderUrl = 'https://connect.localhost.invalid';
+// Public/TestFlight builds boot straight to the branded web /connect page
+// (Nous-coded URL + token entry). No redundant native pairing screen.
+const defaultServerUrl = 'https://battlestation.demi.la';
 
 const config: CapacitorConfig = {
   appId: 'la.demi.battlestation',
   appName: 'Hermes Battlestation',
   webDir: 'ios-web',
   server: {
-    // Public/TestFlight builds use a harmless sentinel; AppDelegate treats it
-    // as no real server and shows the native Connect your Hermes screen.
-    // Private builds may set CAP_SERVER_URL to skip pairing.
-    url: capServerUrl || pairingPlaceholderUrl,
-    cleartext: (capServerUrl || pairingPlaceholderUrl).startsWith('http://'),
+    url: capServerUrl || defaultServerUrl,
+    cleartext: (capServerUrl || defaultServerUrl).startsWith('http://'),
+    // On a failed remote load show a branded error page instead of black.
+    errorPath: 'error.html',
   },
   ios: {
     contentInset: 'never',

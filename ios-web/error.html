@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="viewport-fit=cover,width=device-width,initial-scale=1"/>
+<title>Can't reach your Hermes</title>
+<style>
+  html,body{height:100%;margin:0;background:#041c1c;color:#e7f8ef;
+    font:16px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
+    -webkit-font-smoothing:antialiased}
+  main{min-height:100%;display:grid;place-items:center;text-align:center;
+    padding:28px;box-sizing:border-box}
+  h1{color:#ff7373;font-size:26px;margin:0 0 14px}
+  p{color:#9db9ae;line-height:1.5;margin:0 0 26px;max-width:340px}
+  button{appearance:none;border:0;border-radius:10px;height:50px;width:100%;
+    max-width:320px;background:#97FCE4;color:#041c1c;font-size:17px;
+    font-weight:600;letter-spacing:.2px}
+  button:active{opacity:.85}
+</style>
+</head>
+<body>
+<main>
+  <div>
+    <h1>Can't reach your Hermes</h1>
+    <p>The server URL didn't load. Check it's correct and your Hermes box is reachable (on the same Tailscale network if it's a <code>.ts.net</code> URL).</p>
+    <button onclick="location.href='battlestation://setup'">Change URL / Retry</button>
+  </div>
+</main>
+</body>
+</html>

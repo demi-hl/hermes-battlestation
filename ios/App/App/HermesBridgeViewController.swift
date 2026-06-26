@@ -4,9 +4,9 @@ import Capacitor
 // Custom bridge VC: lets each install point the webview at its OWN Hermes
 // backend at runtime, instead of a URL baked into the public app.
 //
-// Capacitor owns the URL (descriptor.serverURL), so the native bridge — keyboard
-// resize, haptics, push registration — is still injected onto the remote origin.
-// A plain JS redirect would lose that bridge; this does not.
+// Capacitor owns the URL (descriptor.serverURL) AND the navigation delegate
+// (keyboard resize, haptics, push, JS bridge). We do NOT touch the delegate —
+// a failed load surfaces via Capacitor's native errorPath (ios-web/error.html).
 //
 // Read order: UserDefaults("hermes_server_url") -> capacitor.config server.url.
 // If the setup screen captured a token, it is appended once as ?token=... and

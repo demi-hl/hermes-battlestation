@@ -39,6 +39,13 @@ const PUBLIC_PREFIXES = [
   "/manifest.webmanifest",
   "/sw.js",
   "/nous-logo.svg",
+  "/nous-icon.svg",
+  "/fonts",
+  "/filler-bg0.webp",
+  "/icon-192.png",
+  "/icon-512.png",
+  "/icon-512-maskable.png",
+  "/apple-touch-icon.png",
 ];
 
 // Length-blind constant-ish compare for the Edge runtime (no node:crypto sync
