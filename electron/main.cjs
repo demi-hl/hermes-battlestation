@@ -14,6 +14,7 @@ let win = null;
 
 const fs = require("node:fs");
 const os = require("node:os");
+const crypto = require("node:crypto");
 
 // User config dir (matches lib/app-config.ts): XDG on Linux, ~/Library on mac,
 // %APPDATA% on win. The personal env file lives OUTSIDE the bundle so a shipped
@@ -66,6 +67,48 @@ function loadUserEnv() {
   // wins over a stale config-dir copy on the dev box.
   for (const f of candidates) Object.assign(merged, parseEnvFile(f));
   return merged;
+}
+
+// First-run token autogen. A downloaded DMG ships with no token configured, so
+// the loopback server would have no shared secret to pair a phone against. On
+// first launch (local-server mode only) we mint a strong token, persist it to
+// the user env file with 0600 perms, and let loadUserEnv() pick it up so it's
+// injected into the child server's env — zero manual setup. Precedence is
+// preserved: a real BATTLESTATION_TOKEN in process.env OR already present in the
+// env file always wins and is never overwritten. Never hardcoded, never logged.
+function ensureToken() {
+  if ((process.env.BATTLESTATION_TOKEN || "").trim()) return; // real env wins
+  const existing = loadUserEnv();
+  if ((existing.BATTLESTATION_TOKEN || "").trim()) return; // already provisioned
+  let token;
+  try {
+    token = crypto.randomBytes(18).toString("base64url");
+  } catch {
+    return; // crypto unavailable — fall back to open loopback, don't crash
+  }
+  const dir = userConfigDir();
+  const file = path.join(dir, "battlestation.env");
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+    let prior = "";
+    try {
+      prior = fs.readFileSync(file, "utf8");
+    } catch {
+      // file does not exist yet — fine
+    }
+    const sep = prior && !prior.endsWith("\n") ? "\n" : "";
+    const block =
+      `${sep}# Auto-generated on first launch — loopback API token.\n` +
+      `# Copy it from Settings to pair your phone. Delete to regenerate.\n` +
+      `BATTLESTATION_TOKEN=${token}\n`;
+    fs.appendFileSync(file, block, { mode: 0o600 });
+    fs.chmodSync(file, 0o600);
+  } catch (e) {
+    // Persisting failed (read-only home, perms) — log without the token value.
+    process.stderr.write(
+      `[token] could not persist first-run token: ${e && e.message ? e.message : e}\n`,
+    );
+  }
 }
 
 // In a packaged app the standalone server is unpacked next to resources.
@@ -124,6 +167,7 @@ async function startServer() {
   const port = await freePort();
   const entry = serverEntry();
   const cwd = path.dirname(entry);
+  ensureToken(); // first-run: mint+persist a loopback token if none exists yet
   const userEnv = loadUserEnv();
   serverProc = spawn(process.execPath, [entry], {
     cwd,
