@@ -447,22 +447,33 @@ function CheckIconInline() {
 function LinkSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [qr, setQr] = useState<string | null>(null);
   const [url, setUrl] = useState<string>("");
+  const [token, setToken] = useState<string>("");
   const [hasToken, setHasToken] = useState(true);
+  const [copied, setCopied] = useState<"token" | "link" | null>(null);
   const [err, setErr] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setQr(null);
     setErr(false);
+    setCopied(null);
     fetch("/api/link", { cache: "no-store" })
       .then((r) => (r.ok ? r.json() : Promise.reject()))
-      .then((d: { qr: string; url: string; hasToken: boolean }) => {
+      .then((d: { qr: string; url: string; token: string; hasToken: boolean }) => {
         setQr(d.qr);
         setUrl(d.url);
+        setToken(d.token ?? "");
         setHasToken(d.hasToken);
       })
       .catch(() => setErr(true));
   }, [open]);
+
+  const copy = (text: string, which: "token" | "link") => {
+    if (!text) return;
+    void navigator.clipboard?.writeText(text);
+    setCopied(which);
+    window.setTimeout(() => setCopied(null), 1600);
+  };
 
   return (
     <Sheet open={open} onClose={onClose} title="Link a device">
@@ -497,15 +508,35 @@ function LinkSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
           </p>
         )}
 
-        {url && (
-          <p className="break-all font-mono-ui text-[0.6rem] text-text-quaternary">
-            {url.replace(/token=[^&]+/, "token=•••")}
-          </p>
+        {hasToken && token && (
+          <div className="flex w-full flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => copy(token, "token")}
+              className="flex w-full items-center justify-between gap-2 rounded-[var(--radius-lg)] border border-border px-3 py-2 text-[0.78rem] transition-colors hover:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+            >
+              <span className="text-text-tertiary">Copy access token</span>
+              <span className="font-mono-ui text-[0.7rem] text-text-secondary">
+                {copied === "token" ? "copied ✓" : "tap to copy"}
+              </span>
+            </button>
+            <button
+              type="button"
+              onClick={() => copy(url, "link")}
+              className="flex w-full items-center justify-between gap-2 rounded-[var(--radius-lg)] border border-border px-3 py-2 text-[0.78rem] transition-colors hover:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+            >
+              <span className="text-text-tertiary">Copy login link</span>
+              <span className="font-mono-ui text-[0.7rem] text-text-secondary">
+                {copied === "link" ? "copied ✓" : "tap to copy"}
+              </span>
+            </button>
+            <p className="text-[0.66rem] text-text-quaternary">
+              Paste the token into the app&apos;s Connect screen, or open the link
+              on a device that can reach this box. Both carry full access — share
+              only with your own devices.
+            </p>
+          </div>
         )}
-
-        <p className="text-[0.68rem] text-text-quaternary">
-          A QR carries full access — only scan it on devices you own.
-        </p>
       </div>
     </Sheet>
   );

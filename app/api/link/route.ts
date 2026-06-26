@@ -44,5 +44,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: "qr generation failed" }, { status: 500 });
   }
 
-  return NextResponse.json({ url, qr, hasToken: Boolean(token), origin });
+  // token is returned so Settings can offer a one-tap "Copy token" (for pasting
+  // into the native app's token field) alongside the QR. No new exposure: the
+  // url already embeds it and this route is behind the auth gate.
+  return NextResponse.json({ url, token, qr, hasToken: Boolean(token), origin });
 }

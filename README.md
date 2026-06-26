@@ -36,6 +36,12 @@ and `~/.hermes` live. Point any device at that box and you get the *same* profil
 mirrored everywhere (the way a mail app shows the same inbox on every device). Nothing is copied
 or synced — every device reads the one backend live.
 
+> **Already use the stock `hermes dashboard`?** There's nothing to migrate. Battlestation reads the
+> exact same `~/.hermes` (sessions, config, API keys) — your existing agent and history are just
+> *there* the moment it opens. It's a richer 25-pane cockpit over the same backend, not a separate
+> app to move into. (Note: the stock dashboard and Battlestation are different UIs — the mobile app
+> pairs with Battlestation, not the stock dashboard.)
+
 > **The agent is god-mode** — terminal, fleet control, your billing, every session. Treat reaching
 > it like SSH access, not a website. That's why the recommended path keeps it off the public
 > internet entirely.
@@ -91,9 +97,17 @@ Remote URL blank — you opened the box directly). Enter it once; you're in. Or 
 
 ### Link a device (no typing)
 
-Already signed in on one device? Open **Settings → Link a device** — it shows a QR that encodes
-your box URL + token. Scan it with a new phone (camera app) and it opens the web app already logged
-in. Same model as WhatsApp Web: the device you're already on mints the QR for the new one.
+Already signed in on one device (or running the desktop app)? Open
+**Settings → Link a device** — it shows a QR plus one-tap **Copy access token** /
+**Copy login link** buttons. Three ways to use it:
+
+- **Scan the QR** with a new phone's camera → opens the app already signed in.
+- **Copy token** → paste into the app's Connect screen on the new device.
+- **Copy login link** → open it on any device that can reach the box.
+
+Same model as WhatsApp Web: the device you're already on hands credentials to the
+new one. The desktop app (which auto-mints a token on first launch) is the easiest
+place to grab the token to pair your first phone.
 
 > The very first device can't use the QR (there'd be no signed-in device to show it) — type the
 > token once on the Connect screen, or have the box owner hand you a QR out-of-band. A QR carries
