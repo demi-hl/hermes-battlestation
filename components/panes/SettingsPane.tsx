@@ -503,8 +503,16 @@ function LinkSheet({ open, onClose }: { open: boolean; onClose: () => void }) {
 
         {!hasToken && (
           <p className="text-[0.72rem] text-[color:var(--warning,#fbbf24)]">
-            No access token set on this box — the QR links in without auth. Set
-            BATTLESTATION_TOKEN before sharing.
+            No access token set on this box — the QR links in without auth. To
+            set one, run{" "}
+            <code className="rounded bg-[color-mix(in_srgb,var(--midground)_10%,transparent)] px-1 font-mono-ui">
+              npm run token
+            </code>{" "}
+            in the box&apos;s terminal (or set{" "}
+            <code className="rounded bg-[color-mix(in_srgb,var(--midground)_10%,transparent)] px-1 font-mono-ui">
+              BATTLESTATION_TOKEN
+            </code>
+            ), then restart the server.
           </p>
         )}
 
