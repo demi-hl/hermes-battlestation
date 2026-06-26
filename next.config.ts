@@ -29,7 +29,27 @@ const nextConfig: NextConfig = {
   // /_next/static assets keep their immutable long cache (safe — filenames
   // change per build).
   async headers() {
+    // Security headers applied to EVERY response (defense-in-depth on top of the
+    // token/OAuth gate in middleware.ts). NOTE: intentionally NO X-Frame-Options
+    // / restrictive frame-ancestors — the browser extension frames this app in a
+    // cross-origin side-panel iframe and the iOS WKWebView loads it as the top
+    // document; a DENY/SAMEORIGIN frame rule would break the extension target.
+    const securityHeaders = [
+      // Force HTTPS for a year incl. subdomains (the box is served over TLS via
+      // nginx/tunnel). Harmless on loopback (browsers ignore HSTS on localhost).
+      { key: "Strict-Transport-Security", value: "max-age=31536000; includeSubDomains" },
+      // Stop MIME sniffing — a JSON/api response can't be coerced into script.
+      { key: "X-Content-Type-Options", value: "nosniff" },
+      // Don't leak the box URL (which may embed a ?token=) to third-party sites.
+      { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
+      // Drop ambient device access the cockpit never uses.
+      { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=(), interest-cohort=()" },
+    ];
     return [
+      {
+        source: "/:path*",
+        headers: securityHeaders,
+      },
       {
         source: "/",
         headers: [
