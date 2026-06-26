@@ -4,7 +4,6 @@
 // ever touches this page's DOM or the frame URL.
 
 const KEYS = { url: "boxUrl", token: "boxToken" };
-const DEFAULT_URL = "https://battlestation.demi.la";
 
 const $frame = document.getElementById("frame");
 const $setup = document.getElementById("setup");
@@ -42,7 +41,7 @@ async function boot() {
 
   if (!url) {
     showSetup(
-      `No box configured. Open settings and set your URL (default ${DEFAULT_URL}) and access token.`,
+      "No box configured. Open settings and set your Hermes box URL + access token.",
       false,
     );
     return;

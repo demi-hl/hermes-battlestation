@@ -3,7 +3,7 @@
 // pass/fail feedback instead of discovering it in the panel.
 
 const KEYS = { url: "boxUrl", token: "boxToken" };
-const DEFAULT_URL = "https://battlestation.demi.la";
+const DEFAULT_URL = "";
 
 const $url = document.getElementById("url");
 const $token = document.getElementById("token");
