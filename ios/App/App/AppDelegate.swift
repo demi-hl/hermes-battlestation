@@ -6,9 +6,11 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
     private let pairingPlaceholderURL = "https://connect.localhost.invalid"
-    // Pre-filled on the setup screen so testers can just tap Connect instead of
-    // typing/pasting. Public Funnel URL — reachable off the tailnet.
-    private let defaultPublicURL = "https://battlestation.demi.la"
+    // No personal URL in public source. A private build can bake its own box via
+    // CAP_SERVER_URL (capacitor.config.ts) — that boots straight to the bridge and
+    // skips this screen entirely. When empty, the setup field shows a generic
+    // placeholder ("https://your-box.ts.net") so each user enters THEIR own box.
+    private let defaultPublicURL = ""
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         installInitialRootViewController()
