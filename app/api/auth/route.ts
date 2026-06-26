@@ -109,8 +109,10 @@ export async function POST(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  // Log out — clear the cookie.
+  // Log out — clear both login cookies (token + OAuth session) so the same
+  // logout works regardless of which path the user came in through.
   const res = NextResponse.json({ ok: true });
   res.cookies.set("bs_token", "", { path: "/", maxAge: 0 });
+  res.cookies.set("bs_oauth", "", { path: "/", maxAge: 0 });
   return res;
 }
