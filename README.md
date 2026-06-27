@@ -8,6 +8,33 @@ Nothing is sent to a third party.
 > One Next.js codebase ships two ways: a downloadable **desktop app** (Electron, boots its own local
 > server) and a **mobile app** (Capacitor, reachable over Tailscale).
 
+## Have a Hermes agent? Just tell it.
+
+The fastest way in: paste this to your own Hermes and it does the whole install + Tailscale + pairing.
+
+```
+Install Hermes Battlestation and make it reachable from my phone over Tailscale.
+
+1. Clone git@github.com:demi-hl/hermes-battlestation.git (or git pull if I
+   already have it), cd into it, run npm install.
+2. Make sure Tailscale is running on this box: tailscale up
+3. Run: npm run serve:vps
+   (it builds, mints an access token, installs a reboot-proof service,
+   fronts it with tailscale serve for real TLS, and prints a QR + login link)
+4. Show me the QR code and login link so I can open it on my phone.
+
+Notes for you, the agent:
+- Need Node 18+ and Tailscale installed on this box first.
+- For tokenless pairing on a private tailnet, run: npm run serve:vps -- --trust-tailnet
+- Do NOT use --funnel unless I explicitly want this on the public internet
+  (Battlestation is god-mode: shell, secrets, fleet — treat it like SSH).
+- My phone must be on the SAME Tailscale account to scan the QR.
+```
+
+Two things only you can do (your agent can't): sign into **Tailscale** once (`tailscale up` opens a
+browser login; put the Tailscale app on your phone, same account), and have **Node 18+** on the box.
+Everything else the one command handles — see [Fastest path](#fastest-path--one-command-headless-box--vps) below.
+
 ## Download
 
 Grab the installer for your OS from the [Releases](../../releases) page:
