@@ -80,28 +80,35 @@ export function Providers({ children }: { children: ReactNode }) {
     // WKWebView on keyboard open, so this is the only reliable signal in the
     // iOS app. Dynamic import so the web/PWA build (no native plugin) is fine.
     let baseline = fullHeight();
-    void import("@capacitor/keyboard")
-      .then(({ Keyboard }) => {
-        nativeKeyboard = true;
-        const onShow = Keyboard.addListener("keyboardWillShow", (info) => {
-          baseline = fullHeight();
-          setKeyboardInset(info.keyboardHeight);
-          // Shrink the pinned app to the space above the keyboard so the
-          // composer (anchored to the bottom of the app) rides up with it.
-          // top stays 0 — never offset, so the shell can't drift upward.
-          pinToViewport(baseline - info.keyboardHeight, 0);
-        });
-        const onHide = Keyboard.addListener("keyboardWillHide", () => {
-          setKeyboardInset(0);
-          pinToViewport(fullHeight(), 0);
-        });
-        // addListener returns a Promise<PluginListenerHandle> in Capacitor 8.
-        cleanups.push(() => void onShow.then((h) => h.remove()));
-        cleanups.push(() => void onHide.then((h) => h.remove()));
-      })
-      .catch(() => {
-        /* not in the native app — visualViewport path below covers PWA/web */
+    void (async () => {
+      // Only the real native app has a working Keyboard plugin. On web/PWA the
+      // plugin import still resolves (web stub), so guarding on the platform is
+      // what keeps us off the native path — otherwise addListener logs
+      // "Keyboard plugin is not implemented on web" AND nativeKeyboard flips
+      // true, disabling the visualViewport path below (breaking PWA keyboard
+      // tracking). Mirror the isNativePlatform() guard used in nativePush.ts.
+      const core = await import("@capacitor/core");
+      if (!core.Capacitor?.isNativePlatform?.()) return; // browser/PWA → vv path below
+      const { Keyboard } = await import("@capacitor/keyboard");
+      nativeKeyboard = true;
+      const onShow = Keyboard.addListener("keyboardWillShow", (info) => {
+        baseline = fullHeight();
+        setKeyboardInset(info.keyboardHeight);
+        // Shrink the pinned app to the space above the keyboard so the
+        // composer (anchored to the bottom of the app) rides up with it.
+        // top stays 0 — never offset, so the shell can't drift upward.
+        pinToViewport(baseline - info.keyboardHeight, 0);
       });
+      const onHide = Keyboard.addListener("keyboardWillHide", () => {
+        setKeyboardInset(0);
+        pinToViewport(fullHeight(), 0);
+      });
+      // addListener returns a Promise<PluginListenerHandle> in Capacitor 8.
+      cleanups.push(() => void onShow.then((h) => h.remove()));
+      cleanups.push(() => void onHide.then((h) => h.remove()));
+    })().catch(() => {
+      /* not in the native app — visualViewport path below covers PWA/web */
+    });
 
     // Web/PWA path: visualViewport tracks the keyboard in mobile Safari. We
     // follow BOTH resize (height shrinks) and scroll (Safari shifts the visual
