@@ -46,6 +46,33 @@ or synced — every device reads the one backend live.
 > it like SSH access, not a website. That's why the recommended path keeps it off the public
 > internet entirely.
 
+### Fastest path — one command (headless box / VPS)
+
+On the box, from the repo:
+
+```bash
+npm run serve:vps
+```
+
+That single command: builds the standalone server if needed, mints an access token if you don't
+have one, installs a **reboot-proof** `systemd --user` service on `127.0.0.1:9119`, fronts it with
+`tailscale serve` (real TLS, tailnet-only), then prints a **QR code + one-tap login link**. Scan
+the QR with a phone on the same tailnet — you're in. No manual token copy, no nginx/caddy/certbot.
+
+```bash
+npm run serve:vps -- --funnel          # expose publicly via Tailscale Funnel (off-tailnet devices)
+npm run serve:vps -- --trust-tailnet   # tokenless: trust any tailnet peer (private tailnet only)
+npm run serve:vps -- --no-ts           # LAN-only, skip Tailscale
+npm run pair                           # reprint the QR + link anytime
+```
+
+> `--trust-tailnet` drops the token entirely and trusts the verified Tailscale identity of whoever's
+> on your tailnet. It is **off by default**, refuses to run with `--funnel` (Funnel is public), and
+> only honors a real `Tailscale-User-Login` from a tailnet IP. Use it only on a tailnet you control.
+
+The rest of this section explains the same steps done by hand — reach for it if you're not using
+the one-command path.
+
 **1. Set an access token on the box** (this is what makes it safe to reach over a network):
 
 ```bash
