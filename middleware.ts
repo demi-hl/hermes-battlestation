@@ -110,6 +110,61 @@ async function hasValidOAuthSession(req: NextRequest): Promise<boolean> {
 // a tokenless deployment that's reachable remotely fails closed (F2).
 const ALLOW_INSECURE = process.env.BATTLESTATION_ALLOW_INSECURE === "1";
 
+// ── Path 0: trusted tailnet identity (opt-in, tokenless) ─────────────────────
+// When `tailscale serve` fronts a LOOPBACK-BOUND server it terminates TLS and
+// injects a verified `Tailscale-User-Login` header for the authenticated tailnet
+// peer (and strips any client-supplied copy). On a private tailnet that peer IS
+// the operator, so we can let them in with no token. OFF by default; fails safe
+// three independent ways:
+//   1. BATTLESTATION_TRUST_TAILNET=1 must be explicitly set.
+//   2. DISABLED whenever Funnel is on (BATTLESTATION_FUNNEL=1) — Funnel serves
+//      the PUBLIC internet, which carries no tailnet identity.
+//   3. The request must carry a non-empty Tailscale-User-Login AND have arrived
+//      from a tailnet IP (X-Forwarded-For in 100.64.0.0/10 or the tailscale IPv6
+//      ULA) — so public / forged traffic can't slip through.
+// SECURITY REQUIREMENT: the server MUST bind to loopback (127.0.0.1) so the only
+// ingress is the tailscale proxy; serve-vps.sh enforces this. On a 0.0.0.0 bind
+// a direct client could forge these headers — do not enable without loopback.
+const TRUST_TAILNET = process.env.BATTLESTATION_TRUST_TAILNET === "1";
+const FUNNEL_ENABLED = process.env.BATTLESTATION_FUNNEL === "1";
+// Optional allowlist of tailnet logins; when set, ONLY these are trusted.
+const TAILNET_ALLOW = (process.env.BATTLESTATION_TAILNET_ALLOW ?? "")
+  .split(",")
+  .map((s) => s.trim().toLowerCase())
+  .filter(Boolean);
+
+if (TRUST_TAILNET && FUNNEL_ENABLED) {
+  // Loud once-at-load refusal — the combination is a footgun.
+  console.error(
+    "[battlestation] BATTLESTATION_TRUST_TAILNET is set but Funnel is enabled — " +
+      "tokenless tailnet trust is DISABLED (Funnel exposes the public internet, " +
+      "which has no tailnet identity). Use tailnet-only `tailscale serve`.",
+  );
+}
+
+// IPv4 CGNAT 100.64.0.0/10 or tailscale IPv6 ULA fd7a:115c:a1e0::/48.
+function isTailnetIp(ip: string): boolean {
+  const v = ip.trim().toLowerCase();
+  const m = v.match(/^(\d{1,3})\.(\d{1,3})\./);
+  if (m) {
+    const a = Number(m[1]);
+    const b = Number(m[2]);
+    if (a === 100 && b >= 64 && b <= 127) return true;
+  }
+  if (v.startsWith("fd7a:115c:a1e0")) return true;
+  return false;
+}
+
+function tailnetTrusted(req: NextRequest): boolean {
+  if (!TRUST_TAILNET || FUNNEL_ENABLED) return false;
+  const login = (req.headers.get("tailscale-user-login") ?? "").trim().toLowerCase();
+  if (!login) return false;
+  const xff = (req.headers.get("x-forwarded-for") ?? "").split(",")[0].trim();
+  if (!xff || !isTailnetIp(xff)) return false;
+  if (TAILNET_ALLOW.length > 0 && !TAILNET_ALLOW.includes(login)) return false;
+  return true;
+}
+
 // Is the request coming from the local machine? Loopback Host or no Host.
 function isLoopback(req: NextRequest): boolean {
   const host = (req.headers.get("host") ?? "").split(":")[0].toLowerCase();
@@ -132,6 +187,13 @@ function isPublicPath(pathname: string): boolean {
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;
+
+  // Path 0: trusted tailnet identity (tokenless, opt-in). Short-circuits before
+  // the token/OAuth gate so a private tailnet needs no token at all. Hard-gated
+  // + funnel-refusing + tailnet-IP-checked (see tailnetTrusted).
+  if (tailnetTrusted(req)) {
+    return NextResponse.next();
+  }
 
   // No shared token configured.
   if (!TOKEN) {
