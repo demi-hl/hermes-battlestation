@@ -52,6 +52,7 @@ const SESSION_DAYS = Math.max(
 // /_next/data through the gate.
 const PUBLIC_PREFIXES = [
   "/connect",
+  "/start", // pre-auth onboarding fork (have-server / have-box / new-to-hermes)
   "/api/auth", // covers /api/auth + /api/auth/oauth/{start,callback}
   "/api/health",
   "/icons",
@@ -257,17 +258,20 @@ export async function middleware(req: NextRequest) {
     return NextResponse.next();
   }
 
-  // Unauthenticated: API → 401 JSON; pages → the connect screen.
+  // Unauthenticated: API → 401 JSON; pages → the pre-auth onboarding fork.
+  // /start is the first-open destination for a brand-new user with no server
+  // configured — it forks into "I have a server" (→ /connect), "I have a box but
+  // no Battlestation" (setup commands), and "new to Hermes" (install path).
   if (pathname.startsWith("/api/")) {
     return NextResponse.json(
       { error: "unauthorized", detail: "missing or invalid battlestation token" },
       { status: 401 },
     );
   }
-  const connect = req.nextUrl.clone();
-  connect.pathname = "/connect";
-  connect.search = "";
-  return NextResponse.redirect(connect);
+  const start = req.nextUrl.clone();
+  start.pathname = "/start";
+  start.search = "";
+  return NextResponse.redirect(start);
 }
 
 export const config = {
