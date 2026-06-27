@@ -90,19 +90,6 @@ export function ContextBar() {
   const elapsedLabel =
     elapsed != null ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}` : null;
 
-  // App-session timer — persistent uptime since the app opened (ticks every 1s),
-  // shown with a steady green dot. Distinct from the per-turn `elapsed` above.
-  const [sessionStart] = useState(() => Date.now());
-  const [sessionNow, setSessionNow] = useState(() => Date.now());
-  useEffect(() => {
-    const t = setInterval(() => setSessionNow(Date.now()), 1000);
-    return () => clearInterval(t);
-  }, []);
-  const sessSecs = Math.max(0, Math.floor((sessionNow - sessionStart) / 1000));
-  const sessionLabel =
-    sessSecs >= 3600
-      ? `${Math.floor(sessSecs / 3600)}:${String(Math.floor((sessSecs % 3600) / 60)).padStart(2, "0")}:${String(sessSecs % 60).padStart(2, "0")}`
-      : `${Math.floor(sessSecs / 60)}:${String(sessSecs % 60).padStart(2, "0")}`;
 
   // Live active-agent count — same source + lanes as the desktop status bar
   // (working + spawned). Surfaced as a tappable "# N" badge that jumps to the
@@ -259,13 +246,20 @@ export function ContextBar() {
               <ChevronUpDownIcon width={10} height={10} className="text-text-tertiary" />
             </button>
 
-            {/* App-session timer — sits NEXT TO the profile. Its leading marker
-                is the chosen PET sprite, or a steady green dot when no pet is
-                selected. Hold the marker blank until the pet state resolves so
-                we never flash the green dot before the sprite loads in. */}
+            {/* Pet marker — the sprite sits next to the profile and is ALWAYS
+                shown (quiet when idle). The running timer + green glow appear
+                ONLY while an agent turn is in flight (turnStartedAt != null):
+                the label counts the live agent runtime (`elapsedLabel`) and the
+                sprite gets its success drop-shadow. Idle = sprite only, no
+                clock, no glow. Hold the marker blank until the sprite resolves
+                so we never flash a bare dot before it loads in. */}
             <span
               className="flex shrink-0 items-center gap-1.5 font-mono-ui tabular text-[0.62rem] text-text-tertiary"
-              title={pet.enabled ? `${pet.label} · app session uptime` : "app session uptime"}
+              title={
+                turnStartedAt != null
+                  ? pet.enabled ? `${pet.label} · agent working` : "agent working"
+                  : pet.enabled ? pet.label : "idle"
+              }
             >
               {petResolved ? (
                 <PetSprite
@@ -273,12 +267,18 @@ export function ContextBar() {
                   active={turnStartedAt != null}
                   state={petState}
                   className={cn("h-4 w-4 shrink-0", pet.enabled && "scale-[1.35]")}
-                  style={{ filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 55%, transparent))" }}
+                  style={
+                    turnStartedAt != null
+                      ? { filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 55%, transparent))" }
+                      : undefined
+                  }
                 />
               ) : (
                 <span aria-hidden className="h-4 w-4 shrink-0" />
               )}
-              {sessionLabel}
+              {elapsedLabel && (
+                <span className="text-[color:var(--color-success)]">{elapsedLabel}</span>
+              )}
             </span>
 
             <div className="min-w-0 flex-1" />
