@@ -220,6 +220,37 @@ Config (all optional — the Setup screen writes these, or use env / `.env.local
 The same server is wrapped by Capacitor for iOS. Point the native shell at your tailnet host via
 `CAP_SERVER_URL` and `npm run cap:build`.
 
+## Troubleshooting
+
+**macOS: "Hermes Battlestation is damaged and can't be opened" / the `.dmg` won't open.**
+The installers are **unsigned**, so macOS quarantines them and reports a misleading "damaged" error.
+It is not corrupt. Either right-click the app/dmg → **Open** (instead of double-click), or strip the
+quarantine flag from a terminal:
+
+```bash
+xattr -cr ~/Downloads/Hermes-Battlestation-*.dmg     # then open it
+# or, after dragging the app to /Applications:
+xattr -cr "/Applications/Hermes Battlestation.app"
+```
+
+**"Processor mismatch" / the app won't run on this machine (Intel Mac, Raspberry Pi, any ARM box).**
+The prebuilt installers are **architecture-specific**: the macOS `.dmg` is **Apple Silicon (arm64)**
+and the Linux `.AppImage`/`.deb` are **x64**. They will not run on a mismatched CPU (an Intel Mac, an
+ARM SBC like a Raspberry Pi, etc.).
+
+You don't need the packaged desktop app. Battlestation's server is **plain Node — it runs on any
+architecture**. Run it directly on the box (this is the recommended path for a Pi / headless server /
+the machine where Hermes already lives):
+
+```bash
+git clone https://github.com/demi-hl/hermes-battlestation && cd hermes-battlestation
+npm install
+npm run serve:vps      # builds, mints a token, installs the service, tailscale serve, prints a QR
+```
+
+Then open the printed link (or scan the QR) from any device on your tailnet — Mac, phone, anything.
+No DMG, no AppImage, no arch matching. See [Fastest path](#fastest-path--one-command-headless-box--vps).
+
 ## License
 
 MIT
