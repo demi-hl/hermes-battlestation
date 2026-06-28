@@ -35,7 +35,13 @@ platform :ios do
       development: false,
       output_path: File.expand_path("~/fastlane-certs")
     )
-    sigh(
+
+    # sigh returns the profile UUID directly; also stored in SIGH_UUID lane context.
+    # We pass it into xcargs + export_options so xcodebuild knows which profile
+    # to use in manual signing mode (without PROVISIONING_PROFILE_SPECIFIER /
+    # PROVISIONING_PROFILE, xcodebuild errors "requires a provisioning profile"
+    # even though the .mobileprovision is installed in the system).
+    profile_uuid = sigh(
       app_identifier: APP_ID,
       platform: "ios",
       output_path: File.expand_path("~/fastlane-certs")
@@ -53,16 +59,20 @@ platform :ios do
       # automatic signing wins at the embedded-framework re-sign step and picks
       # the "Apple Development" cert instead of the Distribution cert that
       # cert/sigh just downloaded — which TestFlight rejects. Forcing the
-      # identity + style + team here makes xcodebuild use the AppStore identity
-      # for the app AND its embedded frameworks (Capacitor/Cordova).
+      # identity + style + team + profile UUID here makes xcodebuild use the
+      # AppStore identity for the app AND its embedded frameworks (Capacitor/Cordova).
       xcargs: "CURRENT_PROJECT_VERSION=#{build} " \
               "CODE_SIGN_STYLE=Manual " \
               "CODE_SIGN_IDENTITY=\"Apple Distribution\" " \
               "DEVELOPMENT_TEAM=#{TEAM_ID} " \
+              "PROVISIONING_PROFILE=\"#{profile_uuid}\" " \
               "-allowProvisioningUpdates",
       export_options: {
         signingStyle: "manual",
         teamID: TEAM_ID,
+        provisioningProfiles: {
+          APP_ID => profile_uuid
+        },
         manageAppVersionAndBuildNumber: false,
         uploadSymbols: true,
         stripSwiftSymbols: true
