@@ -129,8 +129,20 @@ export const DEFAULT_PROFILES: AgentProfile[] = [
   { id: "fast", label: "Fast", model: "claude-haiku-4-5", provider: "anthropic" },
 ];
 
-function modelById(models: ModelOption[], id: string): ModelOption {
-  return models.find((m) => m.id === id) ?? models[0];
+/** Pretty short label for a model id, client mirror of the /api/models helper:
+ *  "claude-opus-4-8" -> "Opus 4.8", "x-ai/grok-4.3" -> "Grok 4.3". */
+function modelLabel(id: string): string {
+  const tail = id.includes("/") ? id.slice(id.lastIndexOf("/") + 1) : id;
+  let s = tail
+    .replace(/^claude-/, "")
+    .replace(/^gpt-/, "GPT ")
+    .replace(/^grok-/, "Grok ")
+    .replace(/^gemini-/, "Gemini ")
+    .replace(/^deepseek-/, "DeepSeek ")
+    .replace(/^o(\d)/, "o$1");
+  s = s.replace(/(\d)-(\d)/g, "$1.$2").replace(/-/g, " ");
+  s = s.replace(/\b([a-z])/g, (m) => m.toUpperCase());
+  return s.trim();
 }
 
 function loadAvatars(): Record<string, RepoAvatar> {
@@ -347,7 +359,19 @@ export function WorkspaceProvider({ children }: { children: ReactNode }) {
     }
   }, [active, activeSessions, addSession, addNotification]);
 
-  const model = useMemo(() => modelById(models, modelId), [models, modelId]);
+  // The bar's model follows the active profile's configured model. Synthesize
+  // the option when the profile's model isn't in the picker list so model.id +
+  // provider stay TRUE to the profile (never silently clobbered to models[0],
+  // which would send the wrong per-turn override and resolve the wrong window).
+  const model = useMemo<ModelOption>(() => {
+    const found = models.find((m) => m.id === modelId);
+    if (found) return found;
+    return {
+      id: modelId,
+      label: modelLabel(modelId),
+      provider: activeProfile?.provider ?? PROVIDER,
+    };
+  }, [models, modelId, activeProfile]);
 
   const value = useMemo<WorkspaceContextValue>(
     () => ({

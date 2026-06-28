@@ -11,7 +11,7 @@ type Block = { type: "code" | "prose"; content: string; lang?: string };
 export function Markdown({ text, pending = false }: { text: string; pending?: boolean }) {
   const blocks = splitFences(text);
   return (
-    <div className="hermes-md space-y-2.5 text-[0.92rem] leading-relaxed text-text-primary">
+    <div className="hermes-md font-mono-ui space-y-2.5 text-[0.92rem] leading-relaxed text-text-primary">
       {blocks.map((b, i) =>
         b.type === "code" ? (
           <CodeBlock key={i} lang={b.lang} content={b.content} />

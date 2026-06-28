@@ -15,6 +15,7 @@ import { haptic } from "./haptics";
 import { usePush } from "./usePush";
 import { cn } from "@/lib/utils";
 import { profileTint } from "@/lib/profile-color";
+import { contextWindowFor } from "@/lib/model-windows";
 import { PetSprite, usePet, type Pet, type PetState } from "@/lib/pet";
 import { usePolling } from "@/components/usePolling";
 import type { FleetAgent } from "@/lib/fleet/types";
@@ -147,9 +148,9 @@ export function ContextBar() {
   }, []);
   useEffect(() => { loadEffort(); }, [loadEffort]);
 
-  const pct = contextUsage
-    ? Math.min(100, Math.round((contextUsage.used / contextUsage.total) * 100))
-    : null;
+  const ctxTotal = contextUsage?.total ?? contextWindowFor(model.id);
+  const ctxUsed = contextUsage?.used ?? 0;
+  const pct = ctxTotal > 0 ? Math.min(100, Math.round((ctxUsed / ctxTotal) * 100)) : 0;
   const petState: PetState = petBeat ?? (effectiveTurnStart != null ? "run" : "idle");
 
   return (
@@ -252,14 +253,17 @@ export function ContextBar() {
               <ChevronUpDownIcon width={10} height={10} className="text-text-tertiary" />
             </button>
 
-            {/* Pet marker — the sprite sits next to the profile and is ALWAYS
-                shown (quiet when idle). The running timer + green glow appear
-                ONLY while an agent turn is in flight (effectiveTurnStart != null
-                — an in-app chat turn OR a gateway turn from Telegram/CLI/cron):
-                the label counts the live agent runtime (`elapsedLabel`) and the
-                sprite gets its success drop-shadow. Idle = sprite only, no
-                clock, no glow. Hold the marker blank until the sprite resolves
-                so we never flash a bare dot before it loads in. */}
+            <div className="min-w-0 flex-1" />
+
+            {/* Pet marker — sits on the RIGHT, away from the profile chip (so no
+                timer renders next to `default`). ALWAYS shown (quiet when idle).
+                The running timer + green glow appear ONLY while an agent turn is
+                in flight (effectiveTurnStart != null — an in-app chat turn OR a
+                gateway turn from Telegram/CLI/cron): the label counts the live
+                agent runtime (`elapsedLabel`) and the sprite gets its success
+                drop-shadow. Idle = sprite only, no clock, no glow. Hold the
+                marker blank until the sprite resolves so we never flash a bare
+                dot before it loads in. */}
             <span
               className="flex shrink-0 items-center gap-1.5 font-mono-ui tabular text-[0.62rem] text-text-tertiary"
               title={
@@ -288,23 +292,17 @@ export function ContextBar() {
               )}
             </span>
 
-            <div className="min-w-0 flex-1" />
-
-            {/* Context meter + compress — dropped below so the tree name has the
-                full top row. */}
-            {pct !== null && (
-              <>
-                <button
-                  type="button"
-                  onClick={compress}
-                  title="Compress context (Ctrl+Shift+C)"
-                  className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[0.65rem] text-text-tertiary transition-colors hover:text-midground active:scale-90"
-                >
-                  <CompressIcon width={13} height={13} />
-                </button>
-                <ContextMeter pct={pct} used={contextUsage!.used} total={contextUsage!.total} />
-              </>
-            )}
+            {/* Context meter + compress — always shown (every model has a
+                window; live usage fills `used` once a turn reports). */}
+            <button
+              type="button"
+              onClick={compress}
+              title="Compress context (Ctrl+Shift+C)"
+              className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[0.65rem] text-text-tertiary transition-colors hover:text-midground active:scale-90"
+            >
+              <CompressIcon width={13} height={13} />
+            </button>
+            <ContextMeter pct={pct} used={ctxUsed} total={ctxTotal} />
 
             {/* Sessions — arrows + live count; tap to open the Sessions list. */}
             <button

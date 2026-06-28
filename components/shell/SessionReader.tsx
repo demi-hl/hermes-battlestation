@@ -44,6 +44,7 @@ export function SessionReader() {
   const [meta, setMeta] = useState<{ profile: string; id: string } | null>(null);
   const [msgs, setMsgs] = useState<Msg[] | null>(null);
   const [loading, setLoading] = useState(false);
+  const [, setNowTick] = useState(0);
   const [sending, setSending] = useState(false);
   const [queued, setQueued] = useState<{ id: string; text: string; images?: { data: string; mime: string }[] }[]>([]);
   const fallbackAttemptedRef = useRef(false);
@@ -129,6 +130,50 @@ export function SessionReader() {
       live = false;
     };
   }, [open, meta, msgs, title]);
+
+  // LIVE TAIL — watch ANY session work in real time (telegram/cron/CLI/default),
+  // not just turns we drive. The session store is SQLite written by the gateway
+  // process, so we poll the read-only transcript while the reader is open and we
+  // are NOT locally driving a turn (a local `runTurn` stream owns msgs state).
+  // Refresh cadence is cheap (indexed read); MessageList only auto-follows when
+  // the user is parked at the bottom, so a scrolled-up reader isn't yanked.
+  const lastChangeRef = useRef(0);
+  const lastSigRef = useRef("");
+  useEffect(() => {
+    if (!open || !meta || sending || msgs === null) return;
+    let live = true;
+    const poll = async () => {
+      try {
+        const r = await fetch(
+          `/api/sessions/transcript?profile=${encodeURIComponent(meta.profile)}&id=${encodeURIComponent(meta.id)}`,
+          { cache: "no-store" },
+        );
+        const j = (await r.json()) as { messages?: Msg[] };
+        if (!live) return;
+        const next = j.messages ?? [];
+        const sig = `${next.length}:${next[next.length - 1]?.text?.length ?? 0}`;
+        if (sig !== lastSigRef.current) {
+          lastSigRef.current = sig;
+          lastChangeRef.current = Date.now();
+          setMsgs(next);
+        } else {
+          // Force a re-render so the "live" pulse can decay when idle.
+          setNowTick((t) => t + 1);
+        }
+      } catch {
+        /* transient — keep polling */
+      }
+    };
+    const id = setInterval(poll, 2500);
+    return () => {
+      live = false;
+      clearInterval(id);
+    };
+  }, [open, meta, sending, msgs]);
+
+  // "live" = transcript changed within the last 8s (the session is actively
+  // writing). Decays on its own via the poll-driven tick.
+  const isLive = open && !sending && Date.now() - lastChangeRef.current < 8000;
 
   // Auto-scroll to bottom as messages grow / stream.
   useEffect(() => {
@@ -300,7 +345,13 @@ export function SessionReader() {
             </button>
             <div className="flex min-w-0 flex-1 flex-col">
               <span className="truncate font-mondwest text-display text-[0.9rem] tracking-wide text-midground">{title}</span>
-              <span className="font-mono-ui text-[0.62rem] uppercase tracking-wider text-text-tertiary">
+              <span className="flex items-center gap-1.5 font-mono-ui text-[0.62rem] uppercase tracking-wider text-text-tertiary">
+                {isLive && (
+                  <span className="flex items-center gap-1 text-[color:var(--color-success)]">
+                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[color:var(--color-success)]" />
+                    live
+                  </span>
+                )}
                 {meta?.profile} · {msgs ? `${msgs.length} messages` : "loading"}
               </span>
             </div>
