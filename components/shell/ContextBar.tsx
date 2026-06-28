@@ -10,7 +10,7 @@ import {
 import type { AgentProfile } from "@/lib/workspace-types";
 import { Sheet } from "./Sheet";
 import { RepoAvatarBadge } from "./repo-avatar";
-import { ChevronUpDownIcon, CheckIcon, BranchIcon, CompressIcon } from "./icons";
+import { ChevronUpDownIcon, CheckIcon, BranchIcon } from "./icons";
 import { haptic } from "./haptics";
 import { usePush } from "./usePush";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ export function ContextBar() {
   const {
     active, model, contextUsage, status,
     profiles, activeProfile, setActiveProfile,
-    notifications, dismissNotification, compress, repoAvatars,
+    notifications, dismissNotification, repoAvatars,
     turnStartedAt,
   } = useWorkspace();
 
@@ -292,16 +292,8 @@ export function ContextBar() {
               )}
             </span>
 
-            {/* Context meter + compress — always shown (every model has a
-                window; live usage fills `used` once a turn reports). */}
-            <button
-              type="button"
-              onClick={compress}
-              title="Compress context (Ctrl+Shift+C)"
-              className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[0.65rem] text-text-tertiary transition-colors hover:text-midground active:scale-90"
-            >
-              <CompressIcon width={13} height={13} />
-            </button>
+            {/* Context meter — always shown (every model has a window; live
+                usage fills `used` once a turn reports). */}
             <ContextMeter pct={pct} used={ctxUsed} total={ctxTotal} />
 
             {/* Sessions — arrows + live count; tap to open the Sessions list. */}
