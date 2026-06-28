@@ -267,7 +267,7 @@ class ServerSetupViewController: UIViewController {
     // MARK: - Branch bodies
     private func buildHaveServer() {
         let blurb = UILabel()
-        blurb.text = "Head to Connect and enter your box's URL (its Tailscale Serve / HTTPS address) and access token."
+        blurb.text = "Great, head to Connect and enter your box's URL (its Tailscale Serve / HTTPS address) and access token. Already signed in elsewhere? Use Sign in with Nous there instead."
         blurb.font = body(12); blurb.textColor = textSecondary; blurb.numberOfLines = 0
         cardBody.addArrangedSubview(blurb)
 
@@ -280,6 +280,17 @@ class ServerSetupViewController: UIViewController {
         scanHelp.text = "Opens the camera in-app. Point at the QR from `npm run pair`. Connects instantly, nothing to type."
         scanHelp.font = body(11); scanHelp.textColor = textTertiary; scanHelp.numberOfLines = 0
         cardBody.addArrangedSubview(scanHelp)
+
+        let connectTitle = UILabel()
+        connectTitle.text = "Connect to your Hermes"
+        connectTitle.font = serif(20)
+        connectTitle.textColor = textPrimary
+        connectTitle.numberOfLines = 0
+        cardBody.addArrangedSubview(connectTitle)
+        let connectBlurb = UILabel()
+        connectBlurb.text = "Sign in with your Nous account, or use the box's access token. Same profiles and sessions, mirrored across every device."
+        connectBlurb.font = body(12); connectBlurb.textColor = textTertiary; connectBlurb.numberOfLines = 0
+        cardBody.addArrangedSubview(connectBlurb)
 
         cardBody.addArrangedSubview(sectionTag("FASTEST · PASTE YOUR PAIRING LINK"))
         pairField.placeholder = "https://your-box.ts.net/?token=…"
