@@ -12,6 +12,9 @@ next-env.d.ts
 /release/
 /dist/
 
+# kanban per-task worktrees (workers check out here; never the live tree)
+/.worktrees/
+
 # misc
 .DS_Store
 *.pem
