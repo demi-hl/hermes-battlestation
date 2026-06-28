@@ -72,7 +72,17 @@ class ServerSetupViewController: UIViewController {
         help.textAlignment = .center
         help.numberOfLines = 0
 
-        let stack = UIStackView(arrangedSubviews: [title, subtitle, urlField, tokenField, connectButton, errorLabel, help])
+        // Escape hatch for people who don't have a box/agent yet: open the
+        // public install + setup guide so they can stand up a fresh Hermes
+        // agent, then come back and connect. Without this the BYO first-launch
+        // screen is a dead end (it only asks for a URL+token they don't have).
+        let setupButton = UIButton(type: .system)
+        setupButton.setTitle("New to Hermes?  Set up your own agent →", for: .normal)
+        setupButton.titleLabel?.font = Self.nous("Collapse-Regular", 14)
+        setupButton.setTitleColor(UIColor(red: 0.592, green: 0.988, blue: 0.894, alpha: 1), for: .normal)
+        setupButton.addTarget(self, action: #selector(openSetupGuide), for: .touchUpInside)
+
+        let stack = UIStackView(arrangedSubviews: [title, subtitle, urlField, tokenField, connectButton, errorLabel, help, setupButton])
         stack.axis = .vertical
         stack.spacing = 16
         stack.translatesAutoresizingMaskIntoConstraints = false
@@ -132,6 +142,14 @@ class ServerSetupViewController: UIViewController {
 
     deinit {
         NotificationCenter.default.removeObserver(self)
+    }
+
+    @objc private func openSetupGuide() {
+        // Public install + setup guide. Walks a newcomer through installing the
+        // Hermes Agent CLI, creating a Nous account, and standing up a
+        // Battlestation server (which mints the token + prints a pairing link).
+        guard let url = URL(string: "https://hermes-agent.nousresearch.com/docs") else { return }
+        UIApplication.shared.open(url)
     }
 
     private func styleInput(_ field: UITextField) {

@@ -368,6 +368,13 @@ export default function ConnectPage() {
             source.
           </p>
         </details>
+
+        <a
+          href="/start"
+          className="text-center font-mono-ui text-[0.66rem] text-midground transition-opacity hover:opacity-80"
+        >
+          New to Hermes? Set up your own agent →
+        </a>
       </form>
     </main>
   );
