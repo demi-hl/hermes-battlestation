@@ -76,13 +76,62 @@ class ServerSetupViewController: UIViewController {
         stack.axis = .vertical
         stack.spacing = 16
         stack.translatesAutoresizingMaskIntoConstraints = false
-        view.addSubview(stack)
+
+        // Scroll container so the keyboard can't bury the fields (mirrors the
+        // web /connect keyboard-safe behavior). Stack is centered when it fits,
+        // scrollable when the keyboard shrinks the visible area.
+        let scroll = UIScrollView()
+        scroll.translatesAutoresizingMaskIntoConstraints = false
+        scroll.keyboardDismissMode = .interactive
+        scroll.alwaysBounceVertical = true
+        view.addSubview(scroll)
+        scroll.addSubview(stack)
+
+        let content = scroll.contentLayoutGuide
+        let frame = scroll.frameLayoutGuide
+        let centerY = stack.centerYAnchor.constraint(equalTo: scroll.centerYAnchor)
+        centerY.priority = .defaultLow
 
         NSLayoutConstraint.activate([
-            stack.centerYAnchor.constraint(equalTo: view.centerYAnchor),
-            stack.leadingAnchor.constraint(equalTo: view.leadingAnchor, constant: 28),
-            stack.trailingAnchor.constraint(equalTo: view.trailingAnchor, constant: -28),
+            scroll.topAnchor.constraint(equalTo: view.topAnchor),
+            scroll.bottomAnchor.constraint(equalTo: view.bottomAnchor),
+            scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
+            scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
+
+            stack.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor, constant: 24),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -24),
+            stack.leadingAnchor.constraint(equalTo: frame.leadingAnchor, constant: 28),
+            stack.trailingAnchor.constraint(equalTo: frame.trailingAnchor, constant: -28),
+            stack.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
+            centerY,
         ])
+
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(keyboardChanged(_:)),
+            name: UIResponder.keyboardWillChangeFrameNotification, object: nil)
+        NotificationCenter.default.addObserver(
+            self, selector: #selector(keyboardHidden(_:)),
+            name: UIResponder.keyboardWillHideNotification, object: nil)
+        self.scrollView = scroll
+    }
+
+    private weak var scrollView: UIScrollView?
+
+    @objc private func keyboardChanged(_ note: Notification) {
+        guard let scroll = scrollView,
+              let frame = note.userInfo?[UIResponder.keyboardFrameEndUserInfoKey] as? CGRect else { return }
+        let overlap = max(0, scroll.bounds.maxY - scroll.convert(frame, from: nil).minY)
+        scroll.contentInset.bottom = overlap
+        scroll.verticalScrollIndicatorInsets.bottom = overlap
+    }
+
+    @objc private func keyboardHidden(_ note: Notification) {
+        scrollView?.contentInset.bottom = 0
+        scrollView?.verticalScrollIndicatorInsets.bottom = 0
+    }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
     }
 
     private func styleInput(_ field: UITextField) {

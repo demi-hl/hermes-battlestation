@@ -1,10 +1,9 @@
 import { NextResponse } from "next/server";
 import { run } from "@/lib/exec";
+import { HERMES_BIN, INSTALL_INFO } from "@/lib/onboarding";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
-
-const HERMES_BIN = process.env.HERMES_BIN ?? "hermes";
 
 /**
  * Onboarding detection for the "Get Hermes" pane. Reports whether the Hermes
@@ -45,14 +44,6 @@ export async function GET() {
     version,
     loggedIn,
     providers,
-    install: {
-      unix: "curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash",
-      skipBrowser:
-        "curl -fsSL https://raw.githubusercontent.com/NousResearch/hermes-agent/main/scripts/install.sh | bash -s -- --skip-browser",
-      setup: `${HERMES_BIN} setup`,
-      docs: "https://hermes-agent.nousresearch.com/docs",
-      repo: "https://github.com/NousResearch/hermes-agent",
-      signup: "https://portal.nousresearch.com",
-    },
+    install: INSTALL_INFO,
   });
 }
