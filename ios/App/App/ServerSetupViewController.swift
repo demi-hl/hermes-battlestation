@@ -270,6 +270,16 @@ class ServerSetupViewController: UIViewController {
         blurb.font = body(12); blurb.textColor = textSecondary; blurb.numberOfLines = 0
         cardBody.addArrangedSubview(blurb)
 
+        let scanBtn = UIButton(type: .system)
+        styleFilled(scanBtn, title: "⧉  Scan QR")
+        scanBtn.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        scanBtn.addTarget(self, action: #selector(openScanner), for: .touchUpInside)
+        cardBody.addArrangedSubview(scanBtn)
+        let scanHelp = UILabel()
+        scanHelp.text = "Opens the camera in-app. Point at the QR from `npm run pair` — connects instantly, nothing to type."
+        scanHelp.font = body(11); scanHelp.textColor = textTertiary; scanHelp.numberOfLines = 0
+        cardBody.addArrangedSubview(scanHelp)
+
         cardBody.addArrangedSubview(sectionTag("FASTEST · PASTE YOUR PAIRING LINK"))
         pairField.placeholder = "https://your-box.ts.net/?token=…"
         configURLField(pairField); styleInput(pairField)
@@ -523,6 +533,14 @@ class ServerSetupViewController: UIViewController {
     private func parsePairingLink(_ raw: String) -> (url: String, token: String)? {
         let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.isEmpty { return nil }
+        // battlestation://connect?url=<base>&token=<token> — what the QR encodes.
+        if let comps = URLComponents(string: s), comps.scheme?.lowercased() == "battlestation",
+           comps.host?.lowercased() == "connect" {
+            let rawURL = comps.queryItems?.first(where: { $0.name == "url" })?.value ?? ""
+            let token = (comps.queryItems?.first(where: { $0.name == "token" })?.value ?? "")
+                .trimmingCharacters(in: .whitespacesAndNewlines)
+            if let base = normalizedURL(rawURL) { return (base, token) }
+        }
         if let comps = URLComponents(string: s), let scheme = comps.scheme?.lowercased(),
            ["http", "https"].contains(scheme), let host = comps.host,
            let token = comps.queryItems?.first(where: { $0.name == "token" })?.value, !token.isEmpty {
@@ -532,6 +550,21 @@ class ServerSetupViewController: UIViewController {
         if !s.contains(" "), !s.lowercased().hasPrefix("http") { return ("", s) }
         return nil
     }
+    @objc private func openScanner() {
+        let scanner = QRScannerViewController()
+        scanner.modalPresentationStyle = .fullScreen
+        scanner.onScan = { [weak self] code in self?.handleScanned(code) }
+        present(scanner, animated: true)
+    }
+
+    private func handleScanned(_ code: String) {
+        guard let parsed = parsePairingLink(code), !parsed.url.isEmpty else {
+            errorLabel.text = "That QR isn't a Battlestation pairing code."
+            return
+        }
+        persist(url: parsed.url, token: parsed.token)
+    }
+
     @objc private func pasteAndConnect() {
         guard let parsed = parsePairingLink(pairField.text ?? "") else {
             errorLabel.text = "That doesn't look like a pairing link — paste the link from `npm run pair`."

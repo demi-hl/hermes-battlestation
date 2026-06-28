@@ -19,6 +19,7 @@
 		5A41F0A12D00000100BDA001 /* HermesBridgeViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A41F0A02D00000100BDA001 /* HermesBridgeViewController.swift */; };
 		5A41F0A32D00000100BDA001 /* ServerSetupViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A41F0A22D00000100BDA001 /* ServerSetupViewController.swift */; };
 		5A41F0A52D00000100BDA001 /* TokenStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A41F0A42D00000100BDA001 /* TokenStore.swift */; };
+		5A41F0B02D000001BDA0AA01 /* QRScannerViewController.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5A41F0B12D000001BDA0AA02 /* QRScannerViewController.swift */; };
 		9D0011A0050BF1A2D92C26B8 /* Collapse-Regular.ttf in Resources */ = {isa = PBXBuildFile; fileRef = DABA5268F51A44CDBFD318A9 /* Collapse-Regular.ttf */; };
 		DE7A15E722CCCD2CA872C6FB /* Collapse-Bold.ttf in Resources */ = {isa = PBXBuildFile; fileRef = EA92B0382600E4D35942EC48 /* Collapse-Bold.ttf */; };
 /* End PBXBuildFile section */
@@ -36,6 +37,7 @@
 		5A41F0A02D00000100BDA001 /* HermesBridgeViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = HermesBridgeViewController.swift; sourceTree = "<group>"; };
 		5A41F0A22D00000100BDA001 /* ServerSetupViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ServerSetupViewController.swift; sourceTree = "<group>"; };
 		5A41F0A42D00000100BDA001 /* TokenStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = TokenStore.swift; sourceTree = "<group>"; };
+		5A41F0B12D000001BDA0AA02 /* QRScannerViewController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = QRScannerViewController.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		A318083C1448E970BFFFB683 /* Mondwest-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "Mondwest-Regular.ttf"; path = "Fonts/Mondwest-Regular.ttf"; sourceTree = "<group>"; };
 		DABA5268F51A44CDBFD318A9 /* Collapse-Regular.ttf */ = {isa = PBXFileReference; includeInIndex = 1; name = "Collapse-Regular.ttf"; path = "Fonts/Collapse-Regular.ttf"; sourceTree = "<group>"; };
@@ -79,6 +81,7 @@
 				5A41F0A02D00000100BDA001 /* HermesBridgeViewController.swift */,
 				5A41F0A22D00000100BDA001 /* ServerSetupViewController.swift */,
 				5A41F0A42D00000100BDA001 /* TokenStore.swift */,
+				5A41F0B12D000001BDA0AA02 /* QRScannerViewController.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -204,6 +207,7 @@
 				5A41F0A12D00000100BDA001 /* HermesBridgeViewController.swift in Sources */,
 				5A41F0A32D00000100BDA001 /* ServerSetupViewController.swift in Sources */,
 				5A41F0A52D00000100BDA001 /* TokenStore.swift in Sources */,
+				5A41F0B02D000001BDA0AA01 /* QRScannerViewController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
