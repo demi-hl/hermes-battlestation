@@ -48,8 +48,9 @@ class ServerSetupViewController: UIViewController {
         UIFont(name: name, size: size) ?? .systemFont(ofSize: size, weight: weight)
     }
     private func mondwest(_ s: CGFloat) -> UIFont { Self.nous("Mondwest-Regular", s, .bold) }
-    private func body(_ s: CGFloat) -> UIFont { Self.nous("Collapse-Regular", s) }
-    private func bodyBold(_ s: CGFloat) -> UIFont { Self.nous("Collapse-Bold", s, .semibold) }
+    private func body(_ s: CGFloat) -> UIFont { .monospacedSystemFont(ofSize: s, weight: .regular) }
+    private func bodyBold(_ s: CGFloat) -> UIFont { .monospacedSystemFont(ofSize: s, weight: .semibold) }
+    private func serif(_ s: CGFloat) -> UIFont { Self.nous("Mondwest-Regular", s, .bold) }
 
     // MARK: - Lifecycle
     override func viewDidLoad() {
@@ -373,7 +374,7 @@ class ServerSetupViewController: UIViewController {
         b.layer.cornerRadius = 16
         b.layer.borderWidth = 1
         b.layer.borderColor = (selected ? peach : border).cgColor
-        let t = UILabel(); t.text = title; t.font = bodyBold(14); t.textColor = textPrimary; t.numberOfLines = 0
+        let t = UILabel(); t.text = title; t.font = serif(17); t.textColor = textPrimary; t.numberOfLines = 0
         let s = UILabel(); s.text = blurb; s.font = body(11); s.textColor = textTertiary; s.numberOfLines = 0
         let textStack = UIStackView(arrangedSubviews: [t, s])
         textStack.axis = .vertical; textStack.spacing = 4
@@ -402,7 +403,7 @@ class ServerSetupViewController: UIViewController {
         case .haveBox:    title = "I have a box, but no Battlestation yet"; blurb = "Stand up the server on a machine you control, then pair this app."
         case .newToHermes:title = "I'm new to Hermes"; blurb = "Install the Hermes Agent CLI and create your Nous account first."
         }
-        let t = UILabel(); t.text = title; t.font = bodyBold(14); t.textColor = textPrimary; t.numberOfLines = 0
+        let t = UILabel(); t.text = title; t.font = serif(17); t.textColor = textPrimary; t.numberOfLines = 0
         let s = UILabel(); s.text = blurb; s.font = body(11); s.textColor = textTertiary; s.numberOfLines = 0
         let v = UIStackView(arrangedSubviews: [t, s])
         v.axis = .vertical; v.spacing = 3
@@ -485,7 +486,7 @@ class ServerSetupViewController: UIViewController {
     // MARK: - Button styling
     private func styleFilled(_ b: UIButton, title: String) {
         b.setTitle(title, for: .normal)
-        b.titleLabel?.font = bodyBold(15)
+        b.titleLabel?.font = serif(16)
         b.setTitleColor(bg, for: .normal)
         b.backgroundColor = peach
         b.layer.cornerRadius = 22
@@ -493,7 +494,7 @@ class ServerSetupViewController: UIViewController {
     }
     private func styleGhostFilled(_ b: UIButton, title: String) {
         b.setTitle(title, for: .normal)
-        b.titleLabel?.font = bodyBold(15)
+        b.titleLabel?.font = serif(16)
         b.setTitleColor(peach, for: .normal)
         b.layer.cornerRadius = 10
         b.layer.borderWidth = 1
