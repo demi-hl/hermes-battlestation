@@ -25,8 +25,23 @@ class HermesBridgeViewController: CAPBridgeViewController {
         let descriptor = super.instanceDescriptor()
         if let stored = UserDefaults.standard.string(forKey: Self.serverURLKey),
            !stored.isEmpty,
-           URL(string: stored) != nil {
+           let storedURL = URL(string: stored) {
             descriptor.serverURL = Self.urlWithToken(stored)
+            // CRITICAL: the server swaps ?token=… for an httpOnly cookie via a 307
+            // redirect to the CLEAN URL. Capacitor's nav handler only keeps a redirect
+            // in-webview when its host is allowed OR it prefixes serverURL — and the
+            // tokenized serverURL is LONGER than the clean redirect target, so the
+            // prefix test fails and Capacitor punts the load to the system browser
+            // (Chrome) leaving a blank app. Whitelisting the box's host keeps the
+            // whole auth round-trip inside the webview. Without this EVERY remote box
+            // blanks on first load.
+            if let host = storedURL.host, !host.isEmpty {
+                var hosts = descriptor.allowedNavigationHostnames
+                if !hosts.contains(host) {
+                    hosts.append(host)
+                    descriptor.allowedNavigationHostnames = hosts
+                }
+            }
         }
         return descriptor
     }
