@@ -21,9 +21,32 @@ const LS_URL = "bs_remote_url";
 export default function ConnectPage() {
   const [url, setUrl] = useState("");
   const [token, setToken] = useState("");
+  const [pairLink, setPairLink] = useState("");
   const [status, setStatus] = useState<"idle" | "checking" | "error">("idle");
   const [msg, setMsg] = useState<string | null>(null);
   const [oauthAvailable, setOauthAvailable] = useState(false);
+
+  useEffect(() => {
+    // Keyboard-safe height. Capacitor runs with KeyboardResize.None so the
+    // WKWebView never shrinks when the keyboard opens — dvh stays full-height
+    // and a justify-center form sits pinned behind the keyboard. Track the
+    // real visible height via visualViewport and drive the container off it so
+    // the form recenters in the space above the keyboard.
+    const vv = window.visualViewport;
+    if (vv) {
+      const sync = () => {
+        document.documentElement.style.setProperty("--app-vh", `${vv.height}px`);
+      };
+      sync();
+      vv.addEventListener("resize", sync);
+      vv.addEventListener("scroll", sync);
+      return () => {
+        vv.removeEventListener("resize", sync);
+        vv.removeEventListener("scroll", sync);
+        document.documentElement.style.removeProperty("--app-vh");
+      };
+    }
+  }, []);
 
   useEffect(() => {
     // Pre-fill the last URL used on this device.
@@ -63,6 +86,45 @@ export default function ConnectPage() {
     return u;
   }
 
+  // Parse a pairing deep-link (what `npm run pair` prints / its QR encodes:
+  // `https://box/?token=…`) into its URL + token. Returns null if there's no
+  // token to extract. Falls back to treating a bare non-URL string as a raw
+  // token so pasting just the token still works.
+  function parsePairingLink(raw: string): { url: string; token: string } | null {
+    const s = raw.trim();
+    if (!s) return null;
+    try {
+      const u = new URL(s);
+      const tok = u.searchParams.get("token");
+      if (!tok) return null;
+      return { url: `${u.protocol}//${u.host}`, token: tok };
+    } catch {
+      // Not a URL — if it has no scheme/space, treat it as a bare token.
+      if (!/\s/.test(s) && !/^https?:/i.test(s)) return { url: "", token: s };
+      return null;
+    }
+  }
+
+  function applyPairingLink(raw: string) {
+    const parsed = parsePairingLink(raw);
+    if (!parsed) {
+      setStatus("error");
+      setMsg("that doesn't look like a pairing link — paste the link from `npm run pair`");
+      return;
+    }
+    if (parsed.url) setUrl(parsed.url);
+    setToken(parsed.token);
+    setStatus("idle");
+    setMsg(null);
+    void doConnect(parsed.url || url, parsed.token);
+  }
+
+  // Keep the focused field visible once the keyboard animation settles.
+  function scrollIntoView(e: React.FocusEvent<HTMLInputElement>) {
+    const el = e.currentTarget;
+    setTimeout(() => el.scrollIntoView({ block: "center", behavior: "smooth" }), 250);
+  }
+
   function signInWithNous() {
     // Full-page navigation (NOT fetch) — the start route 302s to the Nous
     // Portal, which a fetch would follow opaquely. Same-origin only; the
@@ -72,7 +134,12 @@ export default function ConnectPage() {
 
   async function connect(e: React.FormEvent) {
     e.preventDefault();
-    if (!token.trim()) {
+    await doConnect(url, token);
+  }
+
+  async function doConnect(rawUrl: string, rawToken: string) {
+    const tok = rawToken.trim();
+    if (!tok) {
       setStatus("error");
       setMsg("token is required");
       return;
@@ -80,7 +147,7 @@ export default function ConnectPage() {
     setStatus("checking");
     setMsg(null);
 
-    const target = normalizeUrl(url);
+    const target = normalizeUrl(rawUrl);
     const here = window.location.origin;
 
     // Different box → hand off the whole app to that URL with the token.
@@ -99,7 +166,7 @@ export default function ConnectPage() {
         setMsg(`couldn't reach ${target} — check the URL and that the box is reachable`);
         return;
       }
-      window.location.href = `${target}/?token=${encodeURIComponent(token.trim())}`;
+      window.location.href = `${target}/?token=${encodeURIComponent(tok)}`;
       return;
     }
 
@@ -108,7 +175,7 @@ export default function ConnectPage() {
       const res = await fetch("/api/auth", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ token: token.trim() }),
+        body: JSON.stringify({ token: tok }),
       });
       const j = (await res.json()) as { ok?: boolean; error?: string };
       if (res.ok && j.ok) {
@@ -131,7 +198,13 @@ export default function ConnectPage() {
   }
 
   return (
-    <main className="relative flex min-h-dvh w-full flex-col items-center justify-center px-5">
+    <main
+      className="relative flex w-full flex-col items-center justify-center overflow-y-auto px-5 py-8"
+      style={{
+        height: "var(--app-vh, 100dvh)",
+        paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
+      }}
+    >
       <div className="mb-6 flex items-center gap-2.5">
         <img src="/nous-logo.svg" alt="Nous" className="h-7 w-7" />
         <span className="font-mondwest text-lg tracking-[0.2em] text-text-primary">
@@ -172,6 +245,52 @@ export default function ConnectPage() {
           </>
         )}
 
+        <div className="flex flex-col gap-1.5 rounded-xl border border-midground/40 bg-[color-mix(in_srgb,var(--midground)_6%,transparent)] p-3">
+          <span className="font-mono-ui text-[0.6rem] uppercase tracking-wider text-midground">
+            Fastest · paste your pairing link
+          </span>
+          <input
+            type="text"
+            inputMode="url"
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            value={pairLink}
+            onChange={(e) => setPairLink(e.target.value)}
+            onFocus={scrollIntoView}
+            onPaste={(e) => {
+              const text = e.clipboardData.getData("text");
+              if (text && /token=/.test(text)) {
+                e.preventDefault();
+                setPairLink(text);
+                applyPairingLink(text);
+              }
+            }}
+            placeholder="https://your-box.ts.net/?token=…"
+            className="rounded-lg border border-border bg-transparent px-3 py-2 font-mono-ui text-[0.8rem] text-text-primary outline-none focus:border-midground"
+          />
+          <button
+            type="button"
+            onClick={() => applyPairingLink(pairLink)}
+            disabled={status === "checking" || !pairLink.trim()}
+            className="mt-0.5 rounded-full bg-midground px-4 py-2 text-[0.8rem] font-medium text-background-base transition-opacity hover:opacity-90 disabled:opacity-40"
+          >
+            {status === "checking" ? "Connecting…" : "Paste & connect"}
+          </button>
+          <span className="font-mono-ui text-[0.58rem] leading-snug text-text-tertiary">
+            On your box run <code className="text-text-secondary">npm run pair</code> and paste
+            the link it prints — carries the URL and token together, no typing.
+          </span>
+        </div>
+
+        <div className="flex items-center gap-3">
+          <span className="h-px flex-1 bg-border" />
+          <span className="font-mono-ui text-[0.58rem] uppercase tracking-wider text-text-tertiary">
+            or enter manually
+          </span>
+          <span className="h-px flex-1 bg-border" />
+        </div>
+
         <label className="flex flex-col gap-1">
           <span className="font-mono-ui text-[0.6rem] uppercase tracking-wider text-text-tertiary">
             Access token
@@ -181,6 +300,7 @@ export default function ConnectPage() {
             autoFocus={!oauthAvailable}
             value={token}
             onChange={(e) => setToken(e.target.value)}
+            onFocus={scrollIntoView}
             placeholder="your BATTLESTATION_TOKEN"
             className="rounded-lg border border-border bg-transparent px-3 py-2 font-mono-ui text-[0.8rem] text-text-primary outline-none focus:border-midground"
           />
@@ -201,6 +321,7 @@ export default function ConnectPage() {
               autoCorrect="off"
               value={url}
               onChange={(e) => setUrl(e.target.value)}
+              onFocus={scrollIntoView}
               placeholder="https://your-box:9443  (Tailscale, LAN, or tunnel)"
               className="rounded-lg border border-border bg-transparent px-3 py-2 font-mono-ui text-[0.8rem] text-text-primary outline-none focus:border-midground"
             />
