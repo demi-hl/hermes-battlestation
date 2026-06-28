@@ -220,6 +220,20 @@ Config (all optional — the Setup screen writes these, or use env / `.env.local
 The same server is wrapped by Capacitor for iOS. Point the native shell at your tailnet host via
 `CAP_SERVER_URL` and `npm run cap:build`.
 
+### Native onboarding (iOS)
+
+The public build ships with no baked server URL, so first launch opens a self-contained native
+setup wizard (no Safari, no Chrome handoff). It is a fixed single screen, not a scroller:
+
+1. **Paste a pairing link** from `npm run pair` on your box, or **scan its QR in-app** (built-in
+   camera scanner, never the system Camera app). Both carry your box URL plus a token.
+2. The app stores the URL in `UserDefaults` and the token in the Keychain, then boots straight to
+   your dashboard over the tailnet.
+
+The token always lives on the server. The box mints it; the app only consumes it. Nothing personal
+is baked into the public binary. After the first pair, the app is sticky: every later launch skips
+onboarding and loads your dashboard directly.
+
 ## Troubleshooting
 
 **macOS: "Hermes Battlestation is damaged and can't be opened" / the `.dmg` won't open.**
