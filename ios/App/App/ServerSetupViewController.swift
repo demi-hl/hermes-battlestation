@@ -67,15 +67,33 @@ class ServerSetupViewController: UIViewController {
     private func buildChrome() {
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.keyboardDismissMode = .interactive
-        scroll.alwaysBounceVertical = true
+        // Onboarding is a fixed screen, not a scroller. Don't rubber-band when the
+        // content fits (it always does on phone-sized screens). Scrolling only
+        // engages as overflow safety (tiny screen + keyboard up).
+        scroll.alwaysBounceVertical = false
+        scroll.bounces = false
         view.addSubview(scroll)
 
-        // BATTLESTATION wordmark
-        let brand = UILabel()
-        brand.attributedText = NSAttributedString(
+        // Nous logo + BATTLESTATION wordmark (matches web /start header)
+        let brandLabel = UILabel()
+        brandLabel.attributedText = NSAttributedString(
             string: "BATTLESTATION",
             attributes: [.kern: 3.6, .font: mondwest(17), .foregroundColor: textPrimary])
-        brand.textAlignment = .center
+        let brand: UIView
+        if let logo = UIImage(named: "NousLogo") {
+            let iv = UIImageView(image: logo)
+            iv.contentMode = .scaleAspectFit
+            iv.heightAnchor.constraint(equalToConstant: 22).isActive = true
+            iv.widthAnchor.constraint(equalToConstant: 22 * logo.size.width / max(logo.size.height, 1)).isActive = true
+            let row = UIStackView(arrangedSubviews: [iv, brandLabel])
+            row.axis = .horizontal; row.spacing = 9; row.alignment = .center
+            let centerWrap = UIStackView(arrangedSubviews: [UIView(), row, UIView()])
+            centerWrap.axis = .horizontal; centerWrap.distribution = .equalCentering
+            brand = centerWrap
+        } else {
+            brandLabel.textAlignment = .center
+            brand = brandLabel
+        }
 
         // Progress card
         let prog = UIStackView()
