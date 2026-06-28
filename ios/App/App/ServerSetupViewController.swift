@@ -1,18 +1,24 @@
 import UIKit
 
-// First-launch screen to capture the user's own Hermes backend URL.
-// Shown for public/TestFlight builds when no backend URL is stored and no
-// CAP_SERVER_URL was baked into capacitor.config.json. The access token is
-// optional and sent once as ?token=...; it is never persisted by the native app.
+// First-launch NATIVE onboarding. No website is ever loaded here — the webview
+// (HermesBridge) is only shown AFTER pairing completes. Mirrors the web /connect
+// layout/brand: Mondwest BATTLESTATION wordmark, a paste-your-pairing-link path
+// (fastest), then manual URL + access token. The access token is persisted to the
+// Keychain (TokenStore) so the connection is sticky across launches.
 class ServerSetupViewController: UIViewController {
 
     var defaultURL: String = ""
     var onSaved: (() -> Void)?
 
+    private let pairField = UITextField()
     private let urlField = UITextField()
     private let tokenField = UITextField()
     private let connectButton = UIButton(type: .system)
+    private let pairButton = UIButton(type: .system)
     private let errorLabel = UILabel()
+
+    private let teal = UIColor(red: 0.016, green: 0.110, blue: 0.110, alpha: 1)   // #041c1c
+    private let mint = UIColor(red: 0.592, green: 0.988, blue: 0.894, alpha: 1)   // #97FCE4
 
     // Nous brand type with graceful fallback to system if the font failed to load.
     private static func nous(_ name: String, _ size: CGFloat, _ weight: UIFont.Weight = .regular) -> UIFont {
@@ -21,31 +27,67 @@ class ServerSetupViewController: UIViewController {
 
     override func viewDidLoad() {
         super.viewDidLoad()
-        view.backgroundColor = UIColor(red: 0.016, green: 0.110, blue: 0.110, alpha: 1) // #041c1c
+        view.backgroundColor = teal
+
+        // ── Brand header: BATTLESTATION wordmark (matches web /connect) ──────────
+        let brand = UILabel()
+        brand.attributedText = NSAttributedString(
+            string: "BATTLESTATION",
+            attributes: [.kern: 4.0,
+                         .font: Self.nous("Mondwest-Regular", 18, .bold),
+                         .foregroundColor: mint])
+        brand.textAlignment = .center
 
         let title = UILabel()
-        title.text = "Connect your Hermes"
-        title.font = Self.nous("Mondwest-Regular", 30, .bold)
-        title.textColor = UIColor(red: 0.592, green: 0.988, blue: 0.894, alpha: 1) // #97FCE4
+        title.text = "Connect to your Hermes"
+        title.font = Self.nous("Mondwest-Regular", 28, .bold)
+        title.textColor = .white
         title.textAlignment = .center
+        title.numberOfLines = 0
 
         let subtitle = UILabel()
-        subtitle.text = "Point this app at the Battlestation server running on your own Hermes box."
-        subtitle.font = Self.nous("Collapse-Regular", 15)
+        subtitle.text = "Same profiles and sessions, mirrored across every device."
+        subtitle.font = Self.nous("Collapse-Regular", 14)
         subtitle.textColor = UIColor(white: 0.7, alpha: 1)
         subtitle.textAlignment = .center
         subtitle.numberOfLines = 0
 
+        // ── Fastest path: paste pairing link ────────────────────────────────────
+        let pairTag = sectionLabel("FASTEST · PASTE YOUR PAIRING LINK", color: mint)
+        pairField.placeholder = "https://your-box.ts.net/?token=…"
+        pairField.autocapitalizationType = .none
+        pairField.autocorrectionType = .no
+        pairField.spellCheckingType = .no
+        pairField.keyboardType = .URL
+        styleInput(pairField)
+
+        pairButton.setTitle("Paste & connect", for: .normal)
+        pairButton.titleLabel?.font = Self.nous("Collapse-Bold", 17, .semibold)
+        pairButton.setTitleColor(teal, for: .normal)
+        pairButton.backgroundColor = mint
+        pairButton.layer.cornerRadius = 10
+        pairButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
+        pairButton.addTarget(self, action: #selector(pasteAndConnect), for: .touchUpInside)
+
+        let pairHelp = UILabel()
+        pairHelp.text = "On your box run `npm run pair` and paste the link it prints — carries the URL and token together, no typing."
+        pairHelp.font = Self.nous("Collapse-Regular", 12)
+        pairHelp.textColor = UIColor(white: 0.55, alpha: 1)
+        pairHelp.numberOfLines = 0
+
+        // ── Manual path ─────────────────────────────────────────────────────────
+        let manualTag = sectionLabel("OR ENTER MANUALLY", color: UIColor(white: 0.55, alpha: 1))
+
         let existing = UserDefaults.standard.string(forKey: HermesBridgeViewController.serverURLKey)
         urlField.text = (existing?.isEmpty == false) ? existing : defaultURL
-        urlField.placeholder = "https://your-box.ts.net"
+        urlField.placeholder = "https://your-box:9443"
         urlField.autocapitalizationType = .none
         urlField.autocorrectionType = .no
         urlField.keyboardType = .URL
         urlField.textContentType = .URL
         styleInput(urlField)
 
-        tokenField.placeholder = "Access token (optional)"
+        tokenField.placeholder = "Access token"
         tokenField.autocapitalizationType = .none
         tokenField.autocorrectionType = .no
         tokenField.textContentType = .password
@@ -53,9 +95,10 @@ class ServerSetupViewController: UIViewController {
         styleInput(tokenField)
 
         connectButton.setTitle("Connect", for: .normal)
-        connectButton.titleLabel?.font = Self.nous("Collapse-Bold", 18, .semibold)
-        connectButton.setTitleColor(UIColor(red: 0.016, green: 0.110, blue: 0.110, alpha: 1), for: .normal)
-        connectButton.backgroundColor = UIColor(red: 0.592, green: 0.988, blue: 0.894, alpha: 1) // #97FCE4
+        connectButton.titleLabel?.font = Self.nous("Collapse-Bold", 17, .semibold)
+        connectButton.setTitleColor(mint, for: .normal)
+        connectButton.layer.borderColor = mint.cgColor
+        connectButton.layer.borderWidth = 1
         connectButton.layer.cornerRadius = 10
         connectButton.heightAnchor.constraint(equalToConstant: 48).isActive = true
         connectButton.addTarget(self, action: #selector(save), for: .touchUpInside)
@@ -65,31 +108,28 @@ class ServerSetupViewController: UIViewController {
         errorLabel.textAlignment = .center
         errorLabel.numberOfLines = 0
 
-        let help = UILabel()
-        help.text = "Remote URL = the HTTPS/Tailscale Serve URL for your Hermes box. Token = BATTLESTATION_TOKEN from that box. The token is passed once and stored only as that server's cookie."
-        help.font = Self.nous("Collapse-Regular", 12)
-        help.textColor = UIColor(white: 0.58, alpha: 1)
-        help.textAlignment = .center
-        help.numberOfLines = 0
-
-        // Escape hatch for people who don't have a box/agent yet: open the
-        // public install + setup guide so they can stand up a fresh Hermes
-        // agent, then come back and connect. Without this the BYO first-launch
-        // screen is a dead end (it only asks for a URL+token they don't have).
         let setupButton = UIButton(type: .system)
         setupButton.setTitle("New to Hermes?  Set up your own agent →", for: .normal)
         setupButton.titleLabel?.font = Self.nous("Collapse-Regular", 14)
-        setupButton.setTitleColor(UIColor(red: 0.592, green: 0.988, blue: 0.894, alpha: 1), for: .normal)
+        setupButton.setTitleColor(mint, for: .normal)
         setupButton.addTarget(self, action: #selector(openSetupGuide), for: .touchUpInside)
 
-        let stack = UIStackView(arrangedSubviews: [title, subtitle, urlField, tokenField, connectButton, errorLabel, help, setupButton])
+        let spacerA = UIView(); spacerA.heightAnchor.constraint(equalToConstant: 4).isActive = true
+        let spacerB = UIView(); spacerB.heightAnchor.constraint(equalToConstant: 4).isActive = true
+
+        let stack = UIStackView(arrangedSubviews: [
+            brand, title, subtitle,
+            spacerA, pairTag, pairField, pairButton, pairHelp,
+            spacerB, manualTag, urlField, tokenField, connectButton,
+            errorLabel, setupButton,
+        ])
         stack.axis = .vertical
-        stack.spacing = 16
+        stack.spacing = 12
+        stack.setCustomSpacing(20, after: subtitle)
+        stack.setCustomSpacing(18, after: pairHelp)
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        // Scroll container so the keyboard can't bury the fields (mirrors the
-        // web /connect keyboard-safe behavior). Stack is centered when it fits,
-        // scrollable when the keyboard shrinks the visible area.
+        // Scroll container so the keyboard can't bury the fields.
         let scroll = UIScrollView()
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.keyboardDismissMode = .interactive
@@ -108,8 +148,8 @@ class ServerSetupViewController: UIViewController {
             scroll.leadingAnchor.constraint(equalTo: view.leadingAnchor),
             scroll.trailingAnchor.constraint(equalTo: view.trailingAnchor),
 
-            stack.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor, constant: 24),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -24),
+            stack.topAnchor.constraint(greaterThanOrEqualTo: content.topAnchor, constant: 28),
+            stack.bottomAnchor.constraint(lessThanOrEqualTo: content.bottomAnchor, constant: -28),
             stack.leadingAnchor.constraint(equalTo: frame.leadingAnchor, constant: 28),
             stack.trailingAnchor.constraint(equalTo: frame.trailingAnchor, constant: -28),
             stack.centerXAnchor.constraint(equalTo: scroll.centerXAnchor),
@@ -126,6 +166,16 @@ class ServerSetupViewController: UIViewController {
     }
 
     private weak var scrollView: UIScrollView?
+
+    private func sectionLabel(_ text: String, color: UIColor) -> UILabel {
+        let l = UILabel()
+        l.attributedText = NSAttributedString(
+            string: text,
+            attributes: [.kern: 1.2,
+                         .font: Self.nous("Collapse-Regular", 11),
+                         .foregroundColor: color])
+        return l
+    }
 
     @objc private func keyboardChanged(_ note: Notification) {
         guard let scroll = scrollView,
@@ -145,9 +195,6 @@ class ServerSetupViewController: UIViewController {
     }
 
     @objc private func openSetupGuide() {
-        // Public install + setup guide. Walks a newcomer through installing the
-        // Hermes Agent CLI, creating a Nous account, and standing up a
-        // Battlestation server (which mints the token + prints a pairing link).
         guard let url = URL(string: "https://hermes-agent.nousresearch.com/docs") else { return }
         UIApplication.shared.open(url)
     }
@@ -179,22 +226,59 @@ class ServerSetupViewController: UIViewController {
         return value
     }
 
+    // Parse a pairing link (`https://box/?token=…`, what `npm run pair` prints /
+    // its QR encodes) into a clean URL + token. Mirrors the web parsePairingLink.
+    private func parsePairingLink(_ raw: String) -> (url: String, token: String)? {
+        let s = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if s.isEmpty { return nil }
+        if let comps = URLComponents(string: s),
+           let scheme = comps.scheme?.lowercased(),
+           ["http", "https"].contains(scheme),
+           let host = comps.host,
+           let token = comps.queryItems?.first(where: { $0.name == "token" })?.value,
+           !token.isEmpty {
+            let port = comps.port.map { ":\($0)" } ?? ""
+            return ("\(scheme)://\(host)\(port)", token)
+        }
+        // Not a URL — a bare scheme-less, space-free string is treated as a token.
+        if !s.contains(" "), !s.lowercased().hasPrefix("http") {
+            return ("", s)
+        }
+        return nil
+    }
+
+    @objc private func pasteAndConnect() {
+        guard let parsed = parsePairingLink(pairField.text ?? "") else {
+            errorLabel.text = "That doesn't look like a pairing link — paste the link from `npm run pair`."
+            return
+        }
+        // A bare token with no URL falls back to the manual URL field.
+        let base = !parsed.url.isEmpty ? parsed.url : normalizedURL(urlField.text ?? "")
+        guard let url = base, !url.isEmpty else {
+            errorLabel.text = "Add your box URL above, then paste the token."
+            return
+        }
+        persist(url: url, token: parsed.token)
+    }
+
     @objc private func save() {
         guard let url = normalizedURL(urlField.text ?? "") else {
             errorLabel.text = "Enter your Hermes server URL, e.g. https://your-box.ts.net"
             return
         }
-        UserDefaults.standard.set(url, forKey: HermesBridgeViewController.serverURLKey)
+        persist(url: url, token: (tokenField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines))
+    }
 
-        // Persist the token in the Keychain so it self-heals across launches /
-        // cookie loss (TokenStore). Empty token clears any stored credential.
-        let token = (tokenField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+    // Store URL (UserDefaults) + token (Keychain) and boot the bridge. An empty
+    // token clears the stored credential; a non-empty one is persisted so the
+    // connection self-heals (sticky) across launches.
+    private func persist(url: String, token: String) {
+        UserDefaults.standard.set(url, forKey: HermesBridgeViewController.serverURLKey)
         if !token.isEmpty {
             TokenStore.save(token)
         } else {
             TokenStore.delete()
         }
-        // Clear the legacy one-shot key so it can't shadow the Keychain token.
         UserDefaults.standard.removeObject(forKey: HermesBridgeViewController.pendingTokenKey)
         onSaved?()
     }
