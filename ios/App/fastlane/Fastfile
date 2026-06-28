@@ -65,12 +65,13 @@ platform :ios do
       keychain_password:    CI_KEYCHAIN_PASSWORD
     )
 
+    keychain_db = File.expand_path("~/Library/Keychains/#{CI_KEYCHAIN_NAME}.keychain-db")
     sh("security set-key-partition-list " \
        "-S apple-tool:,apple:,codesign: " \
        "-s -k #{CI_KEYCHAIN_PASSWORD} " \
        "-D 'Apple Distribution: Chris Gervais (#{TEAM_ID})' " \
        "-t private " \
-       "~/Library/Keychains/#{CI_KEYCHAIN_NAME}.keychain-db")
+       "#{keychain_db}")
 
     # --- Step 3: Archive + export IPA ---
     build_app(
