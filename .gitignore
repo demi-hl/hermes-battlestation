@@ -46,3 +46,6 @@ fastlane-build/
 ios/App/fastlane/report.xml
 ios/App/fastlane/README.md
 **/*.p8
+ios/App/App.xcodeproj/
+ios/App/CapApp-SPM/build/
+*.bak-prip
