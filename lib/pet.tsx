@@ -138,16 +138,21 @@ export function PetSprite({
   }, [delay, frames.length, pet.id, effectiveState]);
 
   if (!frames.length) {
+    // No pet configured → plain status dot. Keep the incoming sizing as the
+    // layout FOOTPRINT (so the row doesn't shift vs the sprite) but always draw
+    // a small 6px dot centered inside it — otherwise an h-4 w-4 sprite class
+    // would blow the dot up to 16px (clsx doesn't merge conflicting sizes).
     return (
-      <span
-        aria-hidden
-        className={cn("h-1.5 w-1.5 rounded-full", className)}
-        style={{
-          background: "var(--color-success)",
-          boxShadow: "0 0 5px var(--color-success)",
-          ...style,
-        }}
-      />
+      <span aria-hidden className={cn("inline-flex items-center justify-center", className)}>
+        <span
+          className="h-1.5 w-1.5 rounded-full"
+          style={{
+            background: "var(--color-success)",
+            boxShadow: "0 0 5px var(--color-success)",
+            ...style,
+          }}
+        />
+      </span>
     );
   }
 
