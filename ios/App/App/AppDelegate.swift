@@ -111,14 +111,58 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
-        // The error page's "Change URL / Retry" button navigates to battlestation://setup
-        // to bounce the user back to the pairing screen when a remote load failed.
-        if url.scheme?.lowercased() == "battlestation", url.host?.lowercased() == "setup" {
-            let current = UserDefaults.standard.string(forKey: HermesBridgeViewController.serverURLKey) ?? ""
-            showServerSetup(defaultURL: current)
-            return true
+        if url.scheme?.lowercased() == "battlestation" {
+            switch url.host?.lowercased() {
+            // battlestation://setup — bounce back to the pairing screen (used by the
+            // error page's "Change URL / Retry" button).
+            case "setup":
+                let current = UserDefaults.standard.string(forKey: HermesBridgeViewController.serverURLKey) ?? ""
+                showServerSetup(defaultURL: current)
+                return true
+            // battlestation://connect?url=…&token=… — the pairing link from the QR /
+            // "open the app directly" CTA. Store the URL + token (same path as the
+            // setup screen's Connect button) and boot straight to the bridge.
+            case "connect":
+                let items = URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems ?? []
+                let rawURL = items.first(where: { $0.name == "url" })?.value ?? ""
+                let token = (items.first(where: { $0.name == "token" })?.value ?? "")
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                guard let serverURL = normalizedServerURL(rawURL) else {
+                    // Malformed/empty url — drop the user on setup with whatever we got
+                    // so the deep link is never a dead end.
+                    showServerSetup(defaultURL: rawURL)
+                    return true
+                }
+                UserDefaults.standard.set(serverURL, forKey: HermesBridgeViewController.serverURLKey)
+                if token.isEmpty {
+                    TokenStore.delete()
+                } else {
+                    TokenStore.save(token)
+                }
+                UserDefaults.standard.removeObject(forKey: HermesBridgeViewController.pendingTokenKey)
+                showBridge()
+                return true
+            default:
+                break
+            }
         }
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
+    }
+
+    // Normalize a pairing-link URL the same way ServerSetupViewController does:
+    // add https:// when scheme-less, strip trailing slashes, require http(s) + host.
+    private func normalizedServerURL(_ raw: String) -> String? {
+        var value = raw.trimmingCharacters(in: .whitespacesAndNewlines)
+        if value.isEmpty { return nil }
+        if !value.contains("://") { value = "https://" + value }
+        while value.hasSuffix("/") { value.removeLast() }
+        guard let url = URL(string: value),
+              let scheme = url.scheme?.lowercased(),
+              ["http", "https"].contains(scheme),
+              url.host != nil else {
+            return nil
+        }
+        return value
     }
 
     func application(_ application: UIApplication, continue userActivity: NSUserActivity, restorationHandler: @escaping ([UIUserActivityRestoring]?) -> Void) -> Bool {
