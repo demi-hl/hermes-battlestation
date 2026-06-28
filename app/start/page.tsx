@@ -1,6 +1,14 @@
 "use client";
 
-import { useState, type SVGProps } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type ReactNode,
+  type SVGProps,
+} from "react";
+import { ConnectForm } from "@/components/connect/ConnectForm";
+import { useVisualViewportHeight } from "@/components/connect/useVisualViewportHeight";
 import { CodeBlock } from "@/components/start/CodeBlock";
 import { INSTALL_INFO, SERVER_SETUP } from "@/lib/onboarding";
 
@@ -73,10 +81,13 @@ const ExternalIcon = (p: P) => (
 );
 
 type Choice = "have-server" | "have-box" | "new";
+type WizardStep = 1 | 2 | 3;
+
+const TOTAL_STEPS = 3;
 
 const CHOICES: {
   id: Choice;
-  icon: (p: P) => React.ReactNode;
+  icon: (p: P) => ReactNode;
   title: string;
   blurb: string;
 }[] = [
@@ -100,7 +111,7 @@ const CHOICES: {
   },
 ];
 
-function StepLabel({ n, children }: { n: number; children: React.ReactNode }) {
+function StepLabel({ n, children }: { n: number; children: ReactNode }) {
   return (
     <div className="flex items-center gap-2">
       <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full border border-border font-mono-ui text-[0.6rem] tabular text-text-secondary">
@@ -127,76 +138,201 @@ function ExternalLink({ href, label }: { href: string; label: string }) {
   );
 }
 
-export default function StartPage() {
-  const [open, setOpen] = useState<Choice | null>(null);
+function WizardProgress({ step }: { step: WizardStep }) {
+  const labels = ["Choose", "Guide", "Next"];
 
   return (
-    <main className="relative flex min-h-dvh w-full flex-col items-center px-5 py-12">
-      <div className="mb-7 flex items-center gap-2.5">
+    <div className="mb-5 flex w-full flex-col gap-2 rounded-2xl border border-border bg-[color-mix(in_srgb,var(--background-base)_56%,transparent)] p-3 backdrop-blur-sm">
+      <div className="flex items-center justify-between gap-3 font-mono-ui text-[0.64rem] uppercase tracking-wider text-text-tertiary">
+        <span>
+          Step {step} of {TOTAL_STEPS}
+        </span>
+        <span>{labels[step - 1]}</span>
+      </div>
+      <div className="grid grid-cols-3 gap-2" aria-hidden>
+        {labels.map((label, i) => {
+          const current = i + 1 <= step;
+          return (
+            <span
+              key={label}
+              className={`h-1.5 rounded-full transition-colors ${
+                current ? "bg-midground" : "bg-border"
+              }`}
+            />
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+function ChoiceButton({
+  item,
+  selected,
+  onSelect,
+}: {
+  item: (typeof CHOICES)[number];
+  selected: boolean;
+  onSelect: () => void;
+}) {
+  const Icon = item.icon;
+
+  return (
+    <button
+      type="button"
+      aria-pressed={selected}
+      onClick={onSelect}
+      className={`flex w-full items-center gap-3 rounded-2xl border px-4 py-3.5 text-left transition-colors active:scale-[0.99] ${
+        selected
+          ? "border-midground bg-[color-mix(in_srgb,var(--midground)_12%,transparent)]"
+          : "border-border bg-[color-mix(in_srgb,var(--background-base)_72%,transparent)] hover:bg-[color-mix(in_srgb,var(--midground)_4%,transparent)]"
+      }`}
+    >
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border text-midground">
+        <Icon />
+      </span>
+      <span className="min-w-0 flex-1">
+        <span className="block text-[0.88rem] font-medium text-text-primary">
+          {item.title}
+        </span>
+        <span className="mt-1 block font-mono-ui text-[0.68rem] leading-snug text-text-tertiary">
+          {item.blurb}
+        </span>
+      </span>
+    </button>
+  );
+}
+
+function StartPageControls({
+  choice,
+  onBack,
+  onNext,
+  onRestart,
+  step,
+}: {
+  choice: Choice | null;
+  onBack: () => void;
+  onNext: () => void;
+  onRestart: () => void;
+  step: WizardStep;
+}) {
+  return (
+    <div className="mt-5 flex w-full items-center justify-between gap-3">
+      <button
+        type="button"
+        onClick={step === 3 ? onRestart : onBack}
+        disabled={step === 1}
+        className={`rounded-full border border-border px-4 py-2 text-[0.78rem] font-medium text-text-secondary transition-opacity disabled:pointer-events-none disabled:opacity-0 ${
+          step === 3 ? "font-mono-ui" : ""
+        }`}
+      >
+        {step === 3 ? "Choose another path" : "Back"}
+      </button>
+
+      {step < 3 && (
+        <button
+          type="button"
+          onClick={onNext}
+          disabled={step === 1 && !choice}
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-midground px-4 py-2.5 text-[0.82rem] font-medium text-background-base transition-opacity hover:opacity-90 disabled:opacity-40"
+        >
+          Continue
+          <ChevronIcon />
+        </button>
+      )}
+    </div>
+  );
+}
+
+export default function StartPage() {
+  const [choice, setChoice] = useState<Choice | null>(null);
+  const [step, setStep] = useState<WizardStep>(1);
+  const mainRef = useRef<HTMLElement>(null);
+
+  useVisualViewportHeight();
+
+  useEffect(() => {
+    mainRef.current?.scrollTo({ top: 0 });
+  }, [choice, step]);
+
+  const goNext = () => {
+    if (step === 1 && choice) setStep(2);
+    if (step === 2) setStep(3);
+  };
+
+  const goBack = () => {
+    if (step === 2) setStep(1);
+    if (step === 3) setStep(2);
+  };
+
+  const restart = () => {
+    setChoice(null);
+    setStep(1);
+  };
+
+  return (
+    <main
+      ref={mainRef}
+      className="relative flex w-full flex-col items-center overflow-y-auto px-5 py-8"
+      style={{
+        height: "var(--app-vh, 100dvh)",
+        paddingTop: "max(2rem, env(safe-area-inset-top))",
+        paddingBottom: "max(2rem, env(safe-area-inset-bottom))",
+      }}
+    >
+      <div className="mb-6 flex items-center gap-2.5">
         <img src="/nous-logo.svg" alt="Nous" className="h-7 w-7" />
         <span className="font-mondwest text-lg tracking-[0.2em] text-text-primary">
           BATTLESTATION
         </span>
       </div>
 
-      <div className="flex w-full max-w-md flex-col gap-2">
-        <h1 className="font-mondwest text-xl tracking-wide text-text-primary">
-          Welcome to Hermes Battlestation
-        </h1>
-        <p className="font-mono-ui text-[0.72rem] leading-relaxed text-text-tertiary">
-          A cockpit for your own Hermes agent. The app is a thin client — it
-          loads from a Battlestation server running on a box you control. Pick
-          where you are and we&apos;ll take it from there.
-        </p>
-      </div>
+      <section className="flex w-full max-w-lg flex-1 flex-col">
+        <WizardProgress step={step} />
 
-      <div className="mt-6 flex w-full max-w-md flex-col gap-3">
-        {CHOICES.map((c) => {
-          const isOpen = open === c.id;
-          return (
-            <div
-              key={c.id}
-              className="overflow-hidden rounded-2xl border border-border bg-[color-mix(in_srgb,var(--background-base)_72%,transparent)] backdrop-blur-sm"
-            >
-              <button
-                type="button"
-                aria-expanded={isOpen}
-                onClick={() => setOpen(isOpen ? null : c.id)}
-                className="flex w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-[color-mix(in_srgb,var(--midground)_4%,transparent)]"
-              >
-                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-border text-midground">
-                  <c.icon />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[0.84rem] font-medium text-text-primary">
-                    {c.title}
-                  </span>
-                  <span className="mt-0.5 block font-mono-ui text-[0.64rem] leading-snug text-text-tertiary">
-                    {c.blurb}
-                  </span>
-                </span>
-                <span
-                  className={`shrink-0 text-text-tertiary transition-transform ${
-                    isOpen ? "rotate-90" : ""
-                  }`}
-                >
-                  <ChevronIcon />
-                </span>
-              </button>
+        <div className="flex min-h-0 flex-1 flex-col rounded-3xl border border-border bg-[color-mix(in_srgb,var(--background-base)_64%,transparent)] p-4 shadow-[0_8px_40px_-12px_rgba(0,0,0,0.6)] backdrop-blur-sm sm:p-5">
+          <div className="flex flex-col gap-2">
+            <h1 className="font-mondwest text-xl tracking-wide text-text-primary">
+              Welcome to Hermes Battlestation
+            </h1>
+            <p className="font-mono-ui text-[0.72rem] leading-relaxed text-text-tertiary">
+              A cockpit for your own Hermes agent. The app is a thin client — it
+              loads from a Battlestation server running on a box you control. Pick
+              where you are and we&apos;ll take it from there.
+            </p>
+          </div>
 
-              {isOpen && (
-                <div className="border-t border-border px-4 py-4">
-                  {c.id === "have-server" && <HaveServer />}
-                  {c.id === "have-box" && <HaveBox />}
-                  {c.id === "new" && <NewToHermes />}
-                </div>
-              )}
+          {step === 1 && (
+            <div className="mt-5 flex flex-col gap-3">
+              <h2 className="text-[0.98rem] font-medium text-text-primary">
+                Do you already have a Hermes agent / Battlestation box?
+              </h2>
+              {CHOICES.map((item) => (
+                <ChoiceButton
+                  key={item.id}
+                  item={item}
+                  selected={choice === item.id}
+                  onSelect={() => setChoice(item.id)}
+                />
+              ))}
             </div>
-          );
-        })}
-      </div>
+          )}
 
-      <p className="mt-8 max-w-md text-center font-mono-ui text-[0.6rem] leading-relaxed text-text-tertiary">
+          {step === 2 && choice && <BranchStep choice={choice} />}
+
+          {step === 3 && choice && <FinalStep choice={choice} />}
+        </div>
+
+        <StartPageControls
+          choice={choice}
+          onBack={goBack}
+          onNext={goNext}
+          onRestart={restart}
+          step={step}
+        />
+      </section>
+
+      <p className="mt-6 max-w-lg text-center font-mono-ui text-[0.62rem] leading-relaxed text-text-tertiary">
         The access token always lives on the server — the box mints it, this app
         only consumes it. Nothing personal is baked into the public build.
       </p>
@@ -204,23 +340,112 @@ export default function StartPage() {
   );
 }
 
+function BranchStep({ choice }: { choice: Choice }) {
+  const selected = CHOICES.find((item) => item.id === choice) ?? CHOICES[0];
+  const Icon = selected.icon;
+
+  return (
+    <div className="mt-5 flex flex-col gap-4">
+      <div className="flex items-center gap-3 border-b border-border pb-4">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-border text-midground">
+          <Icon />
+        </span>
+        <div className="min-w-0">
+          <h2 className="text-[0.94rem] font-medium text-text-primary">
+            {selected.title}
+          </h2>
+          <p className="mt-0.5 font-mono-ui text-[0.66rem] leading-snug text-text-tertiary">
+            {selected.blurb}
+          </p>
+        </div>
+      </div>
+
+      {choice === "have-server" && <HaveServer />}
+      {choice === "have-box" && <HaveBox />}
+      {choice === "new" && <NewToHermes />}
+    </div>
+  );
+}
+
+function FinalStep({ choice }: { choice: Choice }) {
+  if (choice === "have-server") {
+    return (
+      <div className="mt-5 flex flex-col gap-4">
+        <h2 className="text-[0.98rem] font-medium text-text-primary">
+          You&apos;re ready to connect
+        </h2>
+        <p className="font-mono-ui text-[0.7rem] leading-relaxed text-text-secondary">
+          If the Connect form accepted your token, Battlestation will take you to
+          the dashboard. If you still need to retry, open Connect and paste the
+          URL + token from the box.
+        </p>
+        <a
+          href="/connect"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-midground px-4 py-2.5 text-[0.82rem] font-medium text-background-base transition-opacity hover:opacity-90"
+        >
+          Open Connect
+          <ChevronIcon />
+        </a>
+      </div>
+    );
+  }
+
+  if (choice === "have-box") {
+    return (
+      <div className="mt-5 flex flex-col gap-4">
+        <h2 className="text-[0.98rem] font-medium text-text-primary">
+          Here&apos;s your next step
+        </h2>
+        <p className="font-mono-ui text-[0.7rem] leading-relaxed text-text-secondary">
+          Finish the box setup, run <code className="text-text-primary">npm run pair</code>{" "}
+          or <code className="text-text-primary">npm run token</code>, then connect this
+          app with the URL + token the box prints.
+        </p>
+        <a
+          href="/connect"
+          className="inline-flex items-center justify-center gap-2 rounded-full bg-midground px-4 py-2.5 text-[0.82rem] font-medium text-background-base transition-opacity hover:opacity-90"
+        >
+          Connect when ready
+          <ChevronIcon />
+        </a>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mt-5 flex flex-col gap-4">
+      <h2 className="text-[0.98rem] font-medium text-text-primary">
+        Here&apos;s your next step
+      </h2>
+      <p className="font-mono-ui text-[0.7rem] leading-relaxed text-text-secondary">
+        Install the Hermes Agent CLI, create your Nous account, and run setup.
+        Then come back to this wizard and choose the box setup path.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <ExternalLink href={INSTALL_INFO.docs} label="Documentation" />
+        <ExternalLink href={INSTALL_INFO.repo} label="GitHub" />
+      </div>
+    </div>
+  );
+}
+
 /* ── State 1: already has a running server ───────────────────────────────── */
 function HaveServer() {
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex flex-col gap-4">
       <p className="font-mono-ui text-[0.7rem] leading-relaxed text-text-secondary">
         Great — head to Connect and enter your box&apos;s URL (its Tailscale
         Serve / HTTPS address) and access token. Already signed in elsewhere?
         Use <span className="text-text-primary">Sign in with Nous</span> there
         instead.
       </p>
-      <a
-        href="/connect"
-        className="inline-flex items-center justify-center gap-2 rounded-full bg-midground px-4 py-2.5 text-[0.82rem] font-medium text-background-base transition-opacity hover:opacity-90"
-      >
-        Connect to my server
-        <ChevronIcon />
-      </a>
+      <ConnectForm
+        autoFocusToken={false}
+        className="max-w-none border-midground/35 bg-[color-mix(in_srgb,var(--background-base)_48%,transparent)] p-4 shadow-none"
+        redirectIfAuthenticated={false}
+        remoteUrlMode="inline"
+        showStartLink={false}
+      />
       <p className="font-mono-ui text-[0.62rem] leading-relaxed text-text-tertiary">
         Don&apos;t have the token handy? On the box, run{" "}
         <code className="text-text-secondary">npm run token</code> to print it,
