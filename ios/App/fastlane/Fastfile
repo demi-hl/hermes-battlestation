@@ -65,11 +65,14 @@ platform :ios do
       keychain_password:    CI_KEYCHAIN_PASSWORD
     )
 
-    keychain_db = File.expand_path("~/Library/Keychains/#{CI_KEYCHAIN_NAME}.keychain-db")
+    # Get the actual keychain path fastlane created (avoids .keychain vs .keychain-db guesswork)
+    keychain_db = Actions.lane_context[SharedValues::KEYCHAIN_PATH]
+    UI.message("CI keychain path: #{keychain_db}")
+    sh("ls -la #{keychain_db} 2>&1 || echo 'FILE NOT FOUND'")
     sh("security set-key-partition-list " \
        "-S apple-tool:,apple:,codesign: " \
        "-s -k #{CI_KEYCHAIN_PASSWORD} " \
-       "-D 'Apple Distribution: Chris Gervais (#{TEAM_ID})' " \
+       "-D \'Apple Distribution: Chris Gervais (#{TEAM_ID})\' " \
        "-t private " \
        "#{keychain_db}")
 
