@@ -67,11 +67,16 @@ class ServerSetupViewController: UIViewController {
     private func buildChrome() {
         scroll.translatesAutoresizingMaskIntoConstraints = false
         scroll.keyboardDismissMode = .interactive
-        // Onboarding is a fixed screen, not a scroller. Don't rubber-band when the
-        // content fits (it always does on phone-sized screens). Scrolling only
-        // engages as overflow safety (tiny screen + keyboard up).
+        // Onboarding sits as a fixed screen when its content fits (no idle
+        // rubber-band), but must still scroll when content genuinely overflows
+        // (connect step with the keyboard up, or shorter devices) so nothing is
+        // ever unreachable.
         scroll.alwaysBounceVertical = false
-        scroll.bounces = false
+        scroll.bounces = true
+        scroll.showsVerticalScrollIndicator = false
+        // Apply top+bottom safe-area insets so the wordmark clears the notch and
+        // the footer never tucks under the home indicator on any device.
+        scroll.contentInsetAdjustmentBehavior = .always
         view.addSubview(scroll)
 
         // Nous logo + BATTLESTATION wordmark (matches web /start header)
