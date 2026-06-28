@@ -249,21 +249,6 @@ export function ContextBar() {
               <span className="font-mono-ui text-[0.66rem] text-midground">
                 {activeProfile?.label ?? "default"}
               </span>
-              {elapsedLabel && (
-                <span
-                  className="flex items-center gap-1 font-mono-ui tabular text-[0.62rem] text-[color:var(--color-success)]"
-                  title="agent is thinking"
-                >
-                  <motion.span
-                    aria-hidden
-                    animate={{ opacity: [1, 0.3, 1] }}
-                    transition={{ duration: 1.1, repeat: Infinity, ease: "easeInOut" }}
-                    className="h-1 w-1 rounded-full"
-                    style={{ background: "var(--color-success)" }}
-                  />
-                  {elapsedLabel}
-                </span>
-              )}
               <ChevronUpDownIcon width={10} height={10} className="text-text-tertiary" />
             </button>
 
@@ -317,7 +302,7 @@ export function ContextBar() {
                 >
                   <CompressIcon width={13} height={13} />
                 </button>
-                <ContextMeter pct={pct} />
+                <ContextMeter pct={pct} used={contextUsage!.used} total={contextUsage!.total} />
               </>
             )}
 
@@ -423,16 +408,28 @@ function StatusDot({ status }: { status: AgentStatus }) {
   );
 }
 
-function ContextMeter({ pct }: { pct: number }) {
+function fmtTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(1)}k`;
+  return String(n);
+}
+
+function ContextMeter({ pct, used, total }: { pct: number; used: number; total: number }) {
   return (
-    <span className="flex shrink-0 items-center gap-1.5" title={`context ${pct}%`}>
+    <span
+      className="flex shrink-0 items-center gap-1.5 font-mono-ui tabular text-[0.66rem] text-text-tertiary"
+      title={`${used} / ${total} tokens · context ${pct}%`}
+    >
+      <span>
+        {fmtTokens(used)}/{fmtTokens(total)}
+      </span>
       <span className="relative h-1.5 w-12 overflow-hidden rounded-full bg-[color-mix(in_srgb,var(--midground)_14%,transparent)]">
         <span
           className="absolute inset-y-0 left-0 rounded-full bg-midground"
           style={{ width: `${pct}%` }}
         />
       </span>
-      <span className="font-mono-ui tabular text-[0.66rem] text-text-tertiary">{pct}%</span>
+      <span>{pct}%</span>
     </span>
   );
 }
