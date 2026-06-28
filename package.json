@@ -23,6 +23,7 @@
     "dist:extension": "node scripts/build-extension.cjs",
     "token": "node scripts/token.cjs",
     "pair": "node scripts/pair-qr.cjs",
+    "onboard": "bash scripts/onboard.sh",
     "serve:vps": "bash scripts/serve-vps.sh"
   },
   "dependencies": {
