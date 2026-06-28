@@ -75,18 +75,39 @@ export function ContextBar() {
     };
   }, []);
 
+  // Gateway turn fallback — `turnStartedAt` only fires for turns driven through
+  // the app's OWN chat box (useChat). When you drive Hermes from Telegram/CLI
+  // and watch the app as a dashboard, that signal never fires. Poll the gateway
+  // busy flag (active_agents > 0, true for every entry point) and synthesize a
+  // start on the false→true edge, so the timer + glow light up for external
+  // turns too. Honest by construction: we clock from when the app first OBSERVES
+  // the turn, never a fabricated start time.
+  const gatewayTurn = usePolling<{ busy: boolean }>("/api/gateway/turn", 2000);
+  const gatewayBusy = gatewayTurn.data?.busy === true;
+  const [gatewayTurnStart, setGatewayTurnStart] = useState<number | null>(null);
+  useEffect(() => {
+    setGatewayTurnStart((prev) => {
+      if (gatewayBusy) return prev ?? Date.now(); // false→true edge anchors start
+      return null; // turn ended → clear
+    });
+  }, [gatewayBusy]);
+
+  // Effective turn start: an in-app turn wins (exact start), else the
+  // gateway-observed start. Drives the timer, glow, and pet run pose alike.
+  const effectiveTurnStart = turnStartedAt ?? gatewayTurnStart;
+
   // Live turn timer — ticks m:ss while a turn is running so you can SEE the
   // agent is thinking. Cleared (null) when idle. 1s cadence is enough; we round
   // down so it reads like a stopwatch.
   const [nowMs, setNowMs] = useState<number>(() => Date.now());
   useEffect(() => {
-    if (turnStartedAt == null) return;
+    if (effectiveTurnStart == null) return;
     setNowMs(Date.now());
     const t = setInterval(() => setNowMs(Date.now()), 1000);
     return () => clearInterval(t);
-  }, [turnStartedAt]);
+  }, [effectiveTurnStart]);
   const elapsed =
-    turnStartedAt != null ? Math.max(0, Math.floor((nowMs - turnStartedAt) / 1000)) : null;
+    effectiveTurnStart != null ? Math.max(0, Math.floor((nowMs - effectiveTurnStart) / 1000)) : null;
   const elapsedLabel =
     elapsed != null ? `${Math.floor(elapsed / 60)}:${String(elapsed % 60).padStart(2, "0")}` : null;
 
@@ -102,7 +123,7 @@ export function ContextBar() {
   // cadence) returns data:[] on its own timeout and drops long turns past the
   // 120s message-freshness window — both read "0 sessions" while this turn's
   // timer is visibly running. Floor at 1 whenever a turn is in flight.
-  const sessionCount = Math.max(fleetSessions, turnStartedAt != null ? 1 : 0);
+  const sessionCount = Math.max(fleetSessions, effectiveTurnStart != null ? 1 : 0);
   const goSessions = useCallback(() => {
     haptic(8);
     window.dispatchEvent(new CustomEvent("lo-nav", { detail: { tab: "sessions" } }));
@@ -129,7 +150,7 @@ export function ContextBar() {
   const pct = contextUsage
     ? Math.min(100, Math.round((contextUsage.used / contextUsage.total) * 100))
     : null;
-  const petState: PetState = petBeat ?? (turnStartedAt != null ? "run" : "idle");
+  const petState: PetState = petBeat ?? (effectiveTurnStart != null ? "run" : "idle");
 
   return (
     <>
@@ -248,7 +269,8 @@ export function ContextBar() {
 
             {/* Pet marker — the sprite sits next to the profile and is ALWAYS
                 shown (quiet when idle). The running timer + green glow appear
-                ONLY while an agent turn is in flight (turnStartedAt != null):
+                ONLY while an agent turn is in flight (effectiveTurnStart != null
+                — an in-app chat turn OR a gateway turn from Telegram/CLI/cron):
                 the label counts the live agent runtime (`elapsedLabel`) and the
                 sprite gets its success drop-shadow. Idle = sprite only, no
                 clock, no glow. Hold the marker blank until the sprite resolves
@@ -256,7 +278,7 @@ export function ContextBar() {
             <span
               className="flex shrink-0 items-center gap-1.5 font-mono-ui tabular text-[0.62rem] text-text-tertiary"
               title={
-                turnStartedAt != null
+                effectiveTurnStart != null
                   ? pet.enabled ? `${pet.label} · agent working` : "agent working"
                   : pet.enabled ? pet.label : "idle"
               }
@@ -264,11 +286,11 @@ export function ContextBar() {
               {petResolved ? (
                 <PetSprite
                   pet={pet}
-                  active={turnStartedAt != null}
+                  active={effectiveTurnStart != null}
                   state={petState}
                   className={cn("h-4 w-4 shrink-0", pet.enabled && "scale-[1.35]")}
                   style={
-                    turnStartedAt != null
+                    effectiveTurnStart != null
                       ? { filter: "drop-shadow(0 0 4px color-mix(in srgb, var(--color-success) 55%, transparent))" }
                       : undefined
                   }
