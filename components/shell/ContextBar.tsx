@@ -10,7 +10,7 @@ import {
 import type { AgentProfile } from "@/lib/workspace-types";
 import { Sheet } from "./Sheet";
 import { RepoAvatarBadge } from "./repo-avatar";
-import { ChevronUpDownIcon, CheckIcon, BranchIcon } from "./icons";
+import { ChevronUpDownIcon, CheckIcon, BranchIcon, CompressIcon } from "./icons";
 import { haptic } from "./haptics";
 import { usePush } from "./usePush";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,7 @@ export function ContextBar() {
   const {
     active, model, contextUsage, status,
     profiles, activeProfile, setActiveProfile,
-    notifications, dismissNotification, repoAvatars,
+    notifications, dismissNotification, compress, repoAvatars,
     turnStartedAt,
   } = useWorkspace();
 
@@ -225,11 +225,26 @@ export function ContextBar() {
               {effort}
             </button>
           )}
+
+          {/* Sessions — moved to the TOP row; arrows + live count, tap to open
+              the Sessions list. */}
+          <button
+            type="button"
+            onClick={goSessions}
+            aria-label={`${sessionCount} active sessions. Tap to view.`}
+            title={`${sessionCount} active sessions`}
+            className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 px-2 py-1 font-mono-ui text-[0.62rem] text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+          >
+            <ChevronUpDownIcon width={11} height={11} className="text-text-tertiary" />
+            <span className="tabular text-midground">{sessionCount}</span>
+            <span>{sessionCount === 1 ? "session" : "sessions"}</span>
+          </button>
         </div>
 
-        {/* ---- Second row: profile · context meter · sessions ---- */}
+        {/* ---- Second row: profile · context meter · pet — evenly spaced,
+            nothing clipped (justify-between, each cluster shrink-0). ---- */}
         <div className="border-t border-border/50">
-          <div className="flex items-center gap-2 px-3 py-1.5">
+          <div className="flex items-center justify-between gap-2 px-3 py-1.5">
             {/* Profile — tap to switch the brain that runs your turns */}
             <button
               type="button"
@@ -253,17 +268,27 @@ export function ContextBar() {
               <ChevronUpDownIcon width={10} height={10} className="text-text-tertiary" />
             </button>
 
-            <div className="min-w-0 flex-1" />
+            {/* Context meter + compress — center cluster. */}
+            <span className="flex min-w-0 shrink items-center gap-1.5">
+              <button
+                type="button"
+                onClick={compress}
+                title="Compress context (Ctrl+Shift+C)"
+                className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[0.65rem] text-text-tertiary transition-colors hover:text-midground active:scale-90"
+              >
+                <CompressIcon width={13} height={13} />
+              </button>
+              <ContextMeter pct={pct} used={ctxUsed} total={ctxTotal} />
+            </span>
 
-            {/* Pet marker — sits on the RIGHT, away from the profile chip (so no
-                timer renders next to `default`). ALWAYS shown (quiet when idle).
-                The running timer + green glow appear ONLY while an agent turn is
-                in flight (effectiveTurnStart != null — an in-app chat turn OR a
-                gateway turn from Telegram/CLI/cron): the label counts the live
-                agent runtime (`elapsedLabel`) and the sprite gets its success
-                drop-shadow. Idle = sprite only, no clock, no glow. Hold the
-                marker blank until the sprite resolves so we never flash a bare
-                dot before it loads in. */}
+            {/* Pet marker — right edge (no timer next to `default`). ALWAYS
+                shown (quiet when idle). The running timer + green glow appear
+                ONLY while an agent turn is in flight (effectiveTurnStart != null
+                — an in-app chat turn OR a gateway turn from Telegram/CLI/cron):
+                the label counts the live agent runtime (`elapsedLabel`) and the
+                sprite gets its success drop-shadow. Idle = sprite only, no
+                clock, no glow. Hold the marker blank until the sprite resolves
+                so we never flash a bare dot before it loads in. */}
             <span
               className="flex shrink-0 items-center gap-1.5 font-mono-ui tabular text-[0.62rem] text-text-tertiary"
               title={
@@ -291,23 +316,6 @@ export function ContextBar() {
                 <span className="text-[color:var(--color-success)]">{elapsedLabel}</span>
               )}
             </span>
-
-            {/* Context meter — always shown (every model has a window; live
-                usage fills `used` once a turn reports). */}
-            <ContextMeter pct={pct} used={ctxUsed} total={ctxTotal} />
-
-            {/* Sessions — arrows + live count; tap to open the Sessions list. */}
-            <button
-              type="button"
-              onClick={goSessions}
-              aria-label={`${sessionCount} active sessions. Tap to view.`}
-              title={`${sessionCount} active sessions`}
-              className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 px-2 py-0.5 font-mono-ui text-[0.62rem] text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
-            >
-              <ChevronUpDownIcon width={11} height={11} className="text-text-tertiary" />
-              <span className="tabular text-midground">{sessionCount}</span>
-              <span>{sessionCount === 1 ? "session" : "sessions"}</span>
-            </button>
           </div>
         </div>
       </div>
