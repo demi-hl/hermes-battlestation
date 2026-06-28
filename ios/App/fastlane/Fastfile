@@ -49,9 +49,19 @@ platform :ios do
       export_method: "app-store",
       output_directory: File.expand_path("~/fastlane-build"),
       output_name: "HermesBattlestation.ipa",
-      xcargs: "CURRENT_PROJECT_VERSION=#{build} -allowProvisioningUpdates",
+      # Pin MANUAL App Store Distribution signing. Without this, Xcode's
+      # automatic signing wins at the embedded-framework re-sign step and picks
+      # the "Apple Development" cert instead of the Distribution cert that
+      # cert/sigh just downloaded — which TestFlight rejects. Forcing the
+      # identity + style + team here makes xcodebuild use the AppStore identity
+      # for the app AND its embedded frameworks (Capacitor/Cordova).
+      xcargs: "CURRENT_PROJECT_VERSION=#{build} " \
+              "CODE_SIGN_STYLE=Manual " \
+              "CODE_SIGN_IDENTITY=\"Apple Distribution\" " \
+              "DEVELOPMENT_TEAM=#{TEAM_ID} " \
+              "-allowProvisioningUpdates",
       export_options: {
-        signingStyle: "automatic",
+        signingStyle: "manual",
         teamID: TEAM_ID,
         manageAppVersionAndBuildNumber: false,
         uploadSymbols: true,
