@@ -186,12 +186,16 @@ class ServerSetupViewController: UIViewController {
         }
         UserDefaults.standard.set(url, forKey: HermesBridgeViewController.serverURLKey)
 
+        // Persist the token in the Keychain so it self-heals across launches /
+        // cookie loss (TokenStore). Empty token clears any stored credential.
         let token = (tokenField.text ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
         if !token.isEmpty {
-            UserDefaults.standard.set(token, forKey: HermesBridgeViewController.pendingTokenKey)
+            TokenStore.save(token)
         } else {
-            UserDefaults.standard.removeObject(forKey: HermesBridgeViewController.pendingTokenKey)
+            TokenStore.delete()
         }
+        // Clear the legacy one-shot key so it can't shadow the Keychain token.
+        UserDefaults.standard.removeObject(forKey: HermesBridgeViewController.pendingTokenKey)
         onSaved?()
     }
 }

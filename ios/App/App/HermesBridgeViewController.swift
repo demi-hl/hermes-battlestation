@@ -8,10 +8,14 @@ import Capacitor
 // (keyboard resize, haptics, push, JS bridge). We do NOT touch the delegate —
 // a failed load surfaces via Capacitor's native errorPath (ios-web/error.html).
 //
-// Read order: UserDefaults("hermes_server_url") -> capacitor.config server.url.
-// If the setup screen captured a token, it is appended once as ?token=... and
-// immediately removed from native storage; the server swaps it for an httpOnly
-// cookie via middleware.
+// AUTH PERSISTENCE (self-healing): the access token lives in the Keychain
+// (TokenStore) and is re-appended to the server URL on EVERY cold launch as
+// ?token=…. The server's middleware strips it from the URL and swaps it for a
+// fresh httpOnly bs_token cookie. So a dropped cookie (box restart/deploy,
+// Tailscale blip, WebView storage eviction) self-heals on the next launch
+// instead of bouncing the user to the setup screen. UserDefaults(pendingToken)
+// is honored once as a migration path from the old single-use flow, then
+// promoted into the Keychain.
 class HermesBridgeViewController: CAPBridgeViewController {
 
     static let serverURLKey = "hermes_server_url"
@@ -22,13 +26,26 @@ class HermesBridgeViewController: CAPBridgeViewController {
         if let stored = UserDefaults.standard.string(forKey: Self.serverURLKey),
            !stored.isEmpty,
            URL(string: stored) != nil {
-            descriptor.serverURL = Self.urlWithPendingToken(stored)
+            descriptor.serverURL = Self.urlWithToken(stored)
         }
         return descriptor
     }
 
-    private static func urlWithPendingToken(_ raw: String) -> String {
-        guard let token = UserDefaults.standard.string(forKey: pendingTokenKey),
+    // Resolve the token to ride this launch. Prefer a fresh pending token from
+    // the setup screen (and promote it into the Keychain); otherwise fall back
+    // to the persisted Keychain token. Returns nil when neither exists.
+    private static func resolveToken() -> String? {
+        if let pending = UserDefaults.standard.string(forKey: pendingTokenKey),
+           !pending.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+            TokenStore.save(pending)
+            UserDefaults.standard.removeObject(forKey: pendingTokenKey)
+            return pending
+        }
+        return TokenStore.load()
+    }
+
+    private static func urlWithToken(_ raw: String) -> String {
+        guard let token = resolveToken(),
               !token.isEmpty,
               var components = URLComponents(string: raw) else {
             return raw
@@ -37,7 +54,6 @@ class HermesBridgeViewController: CAPBridgeViewController {
         items.removeAll { $0.name == "token" }
         items.append(URLQueryItem(name: "token", value: token))
         components.queryItems = items
-        UserDefaults.standard.removeObject(forKey: pendingTokenKey)
         return components.url?.absoluteString ?? raw
     }
 }

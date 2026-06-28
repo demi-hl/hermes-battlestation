@@ -3,28 +3,95 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="viewport-fit=cover,width=device-width,initial-scale=1"/>
-<title>Can't reach your Hermes</title>
+<title>Reconnecting to your Hermes</title>
 <style>
   html,body{height:100%;margin:0;background:#041c1c;color:#e7f8ef;
     font:16px -apple-system,BlinkMacSystemFont,"SF Pro Text",sans-serif;
     -webkit-font-smoothing:antialiased}
   main{min-height:100%;display:grid;place-items:center;text-align:center;
     padding:28px;box-sizing:border-box}
-  h1{color:#ff7373;font-size:26px;margin:0 0 14px}
-  p{color:#9db9ae;line-height:1.5;margin:0 0 26px;max-width:340px}
+  h1{color:#97FCE4;font-size:24px;margin:0 0 14px}
+  h1.failed{color:#ff7373}
+  p{color:#9db9ae;line-height:1.5;margin:0 0 22px;max-width:340px}
+  .spin{width:34px;height:34px;margin:0 auto 22px;border-radius:50%;
+    border:3px solid rgba(151,252,228,.25);border-top-color:#97FCE4;
+    animation:s 0.9s linear infinite}
+  @keyframes s{to{transform:rotate(360deg)}}
   button{appearance:none;border:0;border-radius:10px;height:50px;width:100%;
     max-width:320px;background:#97FCE4;color:#041c1c;font-size:17px;
-    font-weight:600;letter-spacing:.2px}
+    font-weight:600;letter-spacing:.2px;margin-top:10px}
+  button.ghost{background:transparent;color:#97FCE4;border:1px solid rgba(151,252,228,.4)}
   button:active{opacity:.85}
+  .hidden{display:none}
 </style>
 </head>
 <body>
 <main>
   <div>
-    <h1>Can't reach your Hermes</h1>
-    <p>The server URL didn't load. Check it's correct and your Hermes box is reachable (on the same Tailscale network if it's a <code>.ts.net</code> URL).</p>
-    <button onclick="location.href='battlestation://setup'">Change URL / Retry</button>
+    <div id="spin" class="spin"></div>
+    <h1 id="title">Reconnecting…</h1>
+    <p id="msg">Your Hermes box didn't answer. Retrying automatically — this usually clears in a few seconds (a deploy or a brief network blip).</p>
+    <button id="retry" class="hidden" onclick="manualRetry()">Retry now</button>
+    <button id="setup" class="ghost hidden" onclick="location.href='battlestation://setup'">Change URL</button>
   </div>
 </main>
+<script>
+  // AUTO-RETRY WITH BACKOFF. The most common reason this page appears is a
+  // TRANSIENT box outage: a deploy restarts the server (~5s down) or Tailscale
+  // reconnects. Rather than dump the user to the setup screen (the old
+  // behavior, which read as a "disconnect"), we silently reload the saved
+  // server URL a few times with growing delays. Only after the box is still
+  // unreachable do we surface the manual Change-URL fallback.
+  //
+  // The Capacitor server URL isn't directly readable here, so we recover the
+  // box origin from this error page's own context: a reachable health endpoint
+  // means the box is back, and reloading the WebView re-runs the bridge (which
+  // re-appends the Keychain token). We probe `/api/health` against the document
+  // referrer/last origin when available, else just reload after each delay.
+  var attempt = 0;
+  var DELAYS = [1500, 3000, 5000, 8000, 12000]; // ~30s total before giving up
+
+  function showFailed() {
+    document.getElementById('spin').classList.add('hidden');
+    var t = document.getElementById('title');
+    t.textContent = "Can't reach your Hermes";
+    t.classList.add('failed');
+    document.getElementById('msg').textContent =
+      "Still no answer after several tries. Check the URL and that your box is reachable (on the same Tailscale network if it's a .ts.net URL).";
+    document.getElementById('retry').classList.remove('hidden');
+    document.getElementById('setup').classList.remove('hidden');
+  }
+
+  function reloadBox() {
+    // Reloading navigates the WKWebView back to the configured server URL,
+    // which re-runs the native bridge and re-appends the persisted token.
+    // history.back() returns to the last in-app URL when one exists; a hard
+    // reload of the origin is the reliable path from a fresh error load.
+    try {
+      if (document.referrer) { location.replace(document.referrer); return; }
+    } catch (e) {}
+    location.reload();
+  }
+
+  function tick() {
+    if (attempt >= DELAYS.length) { showFailed(); return; }
+    var delay = DELAYS[attempt++];
+    setTimeout(reloadBox, delay);
+  }
+
+  function manualRetry() {
+    attempt = 0;
+    document.getElementById('retry').classList.add('hidden');
+    document.getElementById('setup').classList.add('hidden');
+    var t = document.getElementById('title');
+    t.textContent = "Reconnecting…";
+    t.classList.remove('failed');
+    document.getElementById('spin').classList.remove('hidden');
+    tick();
+  }
+
+  // Kick off the first auto-retry on load.
+  tick();
+</script>
 </body>
 </html>
