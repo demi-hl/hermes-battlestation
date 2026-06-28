@@ -118,7 +118,7 @@ class ServerSetupViewController: UIViewController {
         welcomeTitle.numberOfLines = 0
 
         let welcomeBlurb = UILabel()
-        welcomeBlurb.text = "A cockpit for your own Hermes agent. The app is a thin client — it loads from a Battlestation server on a box you control. Pick where you are and we'll take it from there."
+        welcomeBlurb.text = "A cockpit for your own Hermes agent. The app is a thin client. It loads from a Battlestation server on a box you control. Pick where you are and we'll take it from there."
         welcomeBlurb.font = body(12)
         welcomeBlurb.textColor = textTertiary
         welcomeBlurb.numberOfLines = 0
@@ -148,7 +148,7 @@ class ServerSetupViewController: UIViewController {
 
         // Footer reassurance
         let footer = UILabel()
-        footer.text = "The access token always lives on the server — the box mints it, this app only consumes it. Nothing personal is baked into the public build."
+        footer.text = "The access token always lives on the server. The box mints it, this app only consumes it. Nothing personal is baked into the public build."
         footer.font = body(11)
         footer.textColor = textTertiary
         footer.textAlignment = .center
@@ -276,7 +276,7 @@ class ServerSetupViewController: UIViewController {
         scanBtn.addTarget(self, action: #selector(openScanner), for: .touchUpInside)
         cardBody.addArrangedSubview(scanBtn)
         let scanHelp = UILabel()
-        scanHelp.text = "Opens the camera in-app. Point at the QR from `npm run pair` — connects instantly, nothing to type."
+        scanHelp.text = "Opens the camera in-app. Point at the QR from `npm run pair`. Connects instantly, nothing to type."
         scanHelp.font = body(11); scanHelp.textColor = textTertiary; scanHelp.numberOfLines = 0
         cardBody.addArrangedSubview(scanHelp)
 
@@ -290,7 +290,7 @@ class ServerSetupViewController: UIViewController {
         pasteBtn.addTarget(self, action: #selector(pasteAndConnect), for: .touchUpInside)
         cardBody.addArrangedSubview(pasteBtn)
         let pairHelp = UILabel()
-        pairHelp.text = "On your box run `npm run pair` and paste the link it prints — carries the URL and token together, no typing."
+        pairHelp.text = "On your box run `npm run pair` and paste the link it prints. Carries the URL and token together, no typing."
         pairHelp.font = body(11); pairHelp.textColor = textTertiary; pairHelp.numberOfLines = 0
         cardBody.addArrangedSubview(pairHelp)
 
@@ -320,7 +320,7 @@ class ServerSetupViewController: UIViewController {
     }
 
     private func buildHaveBox() {
-        cardBody.addArrangedSubview(para("Run these on the box you want Battlestation to live on (a VPS, home server, Raspberry Pi — anything with Node 18+ and Tailscale)."))
+        cardBody.addArrangedSubview(para("Run these on the box you want Battlestation to live on (a VPS, home server, Raspberry Pi, anything with Node 18+ and Tailscale)."))
         cardBody.addArrangedSubview(stepLabel(1, "Clone the repo"))
         cardBody.addArrangedSubview(copyRow("git clone https://github.com/demi-hl/hermes-battlestation && cd hermes-battlestation"))
         cardBody.addArrangedSubview(stepLabel(2, "Install & bring it up"))
@@ -334,7 +334,7 @@ class ServerSetupViewController: UIViewController {
     }
 
     private func buildNewToHermes() {
-        cardBody.addArrangedSubview(para("Battlestation drives the Hermes Agent. Install the CLI and create a Nous account first — then come back and stand up a server (the middle option)."))
+        cardBody.addArrangedSubview(para("Battlestation drives the Hermes Agent. Install the CLI and create a Nous account first, then come back and stand up a server (the middle option)."))
         cardBody.addArrangedSubview(stepLabel(1, "Install the Hermes Agent CLI"))
         cardBody.addArrangedSubview(copyRow("curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash"))
         cardBody.addArrangedSubview(stepLabel(2, "Create your Nous account"))
@@ -344,9 +344,30 @@ class ServerSetupViewController: UIViewController {
     }
 
     // MARK: - Reusable native components
+    // 40pt bordered tile holding the choice's vector glyph (server/box/spark),
+    // matching the web /start choice cards.
+    private func iconBadge(for c: Choice) -> UIView {
+        let kind: WizardIconView.Kind = c == .haveServer ? .server : (c == .haveBox ? .box : .spark)
+        let icon = WizardIconView(kind: kind, stroke: peach)
+        let box = UIView()
+        box.translatesAutoresizingMaskIntoConstraints = false
+        box.layer.cornerRadius = 12
+        box.layer.borderWidth = 1
+        box.layer.borderColor = border.cgColor
+        box.addSubview(icon)
+        NSLayoutConstraint.activate([
+            box.widthAnchor.constraint(equalToConstant: 40),
+            box.heightAnchor.constraint(equalToConstant: 40),
+            icon.centerXAnchor.constraint(equalTo: box.centerXAnchor),
+            icon.centerYAnchor.constraint(equalTo: box.centerYAnchor),
+            icon.widthAnchor.constraint(equalToConstant: 22),
+            icon.heightAnchor.constraint(equalToConstant: 22),
+        ])
+        return box
+    }
+
     private func choiceCard(id: Choice, title: String, blurb: String) -> UIView {
         let b = UIButton(type: .custom)
-        b.contentHorizontalAlignment = .leading
         let selected = (choice == id)
         b.backgroundColor = selected ? peachA(0.12) : cardFill
         b.layer.cornerRadius = 16
@@ -354,18 +375,20 @@ class ServerSetupViewController: UIViewController {
         b.layer.borderColor = (selected ? peach : border).cgColor
         let t = UILabel(); t.text = title; t.font = bodyBold(14); t.textColor = textPrimary; t.numberOfLines = 0
         let s = UILabel(); s.text = blurb; s.font = body(11); s.textColor = textTertiary; s.numberOfLines = 0
-        let stack = UIStackView(arrangedSubviews: [t, s])
-        stack.axis = .vertical; stack.spacing = 4
-        stack.isLayoutMarginsRelativeArrangement = true
-        stack.directionalLayoutMargins = .init(top: 14, leading: 16, bottom: 14, trailing: 16)
-        stack.isUserInteractionEnabled = false
-        stack.translatesAutoresizingMaskIntoConstraints = false
-        b.addSubview(stack)
+        let textStack = UIStackView(arrangedSubviews: [t, s])
+        textStack.axis = .vertical; textStack.spacing = 4
+        let row = UIStackView(arrangedSubviews: [iconBadge(for: id), textStack])
+        row.axis = .horizontal; row.spacing = 12; row.alignment = .center
+        row.isLayoutMarginsRelativeArrangement = true
+        row.directionalLayoutMargins = .init(top: 14, leading: 14, bottom: 14, trailing: 16)
+        row.isUserInteractionEnabled = false
+        row.translatesAutoresizingMaskIntoConstraints = false
+        b.addSubview(row)
         NSLayoutConstraint.activate([
-            stack.topAnchor.constraint(equalTo: b.topAnchor),
-            stack.bottomAnchor.constraint(equalTo: b.bottomAnchor),
-            stack.leadingAnchor.constraint(equalTo: b.leadingAnchor),
-            stack.trailingAnchor.constraint(equalTo: b.trailingAnchor),
+            row.topAnchor.constraint(equalTo: b.topAnchor),
+            row.bottomAnchor.constraint(equalTo: b.bottomAnchor),
+            row.leadingAnchor.constraint(equalTo: b.leadingAnchor),
+            row.trailingAnchor.constraint(equalTo: b.trailingAnchor),
         ])
         b.tag = id == .haveServer ? 0 : (id == .haveBox ? 1 : 2)
         b.addTarget(self, action: #selector(selectChoice(_:)), for: .touchUpInside)
@@ -383,9 +406,11 @@ class ServerSetupViewController: UIViewController {
         let s = UILabel(); s.text = blurb; s.font = body(11); s.textColor = textTertiary; s.numberOfLines = 0
         let v = UIStackView(arrangedSubviews: [t, s])
         v.axis = .vertical; v.spacing = 3
+        let head = UIStackView(arrangedSubviews: [iconBadge(for: c), v])
+        head.axis = .horizontal; head.spacing = 12; head.alignment = .center
         let sep = UIView(); sep.backgroundColor = border
         sep.heightAnchor.constraint(equalToConstant: 1).isActive = true
-        let wrap = UIStackView(arrangedSubviews: [v, sep])
+        let wrap = UIStackView(arrangedSubviews: [head, sep])
         wrap.axis = .vertical; wrap.spacing = 14
         return wrap
     }
@@ -567,7 +592,7 @@ class ServerSetupViewController: UIViewController {
 
     @objc private func pasteAndConnect() {
         guard let parsed = parsePairingLink(pairField.text ?? "") else {
-            errorLabel.text = "That doesn't look like a pairing link — paste the link from `npm run pair`."
+            errorLabel.text = "That doesn't look like a pairing link. Paste the link from `npm run pair`."
             return
         }
         let base = !parsed.url.isEmpty ? parsed.url : normalizedURL(urlField.text ?? "")
@@ -615,5 +640,55 @@ private extension UITextField {
     func setLeftPaddingPoints(_ amount: CGFloat) {
         let padding = UIView(frame: CGRect(x: 0, y: 0, width: amount, height: frame.size.height))
         leftView = padding; leftViewMode = .always
+    }
+}
+
+
+// Native vector port of the web /start choice glyphs (ServerIcon/BoxIcon/
+// SparkIcon). Strokes a 24x24-viewbox path in peach, scaled to the view bounds.
+final class WizardIconView: UIView {
+    enum Kind { case server, box, spark }
+    private let kind: Kind
+    private let stroke: UIColor
+
+    init(kind: Kind, stroke: UIColor) {
+        self.kind = kind; self.stroke = stroke
+        super.init(frame: .zero)
+        backgroundColor = .clear
+        translatesAutoresizingMaskIntoConstraints = false
+        isUserInteractionEnabled = false
+    }
+    required init?(coder: NSCoder) { fatalError("init(coder:) not used") }
+
+    override func draw(_ rect: CGRect) {
+        let unit = min(rect.width, rect.height) / 24.0
+        let ox = (rect.width - 24 * unit) / 2, oy = (rect.height - 24 * unit) / 2
+        func P(_ x: CGFloat, _ y: CGFloat) -> CGPoint { CGPoint(x: ox + x * unit, y: oy + y * unit) }
+        let path = UIBezierPath()
+        switch kind {
+        case .server:
+            path.append(UIBezierPath(roundedRect: CGRect(x: ox + 3 * unit, y: oy + 4 * unit, width: 18 * unit, height: 7 * unit), cornerRadius: 1.5 * unit))
+            path.append(UIBezierPath(roundedRect: CGRect(x: ox + 3 * unit, y: oy + 13 * unit, width: 18 * unit, height: 7 * unit), cornerRadius: 1.5 * unit))
+            path.move(to: P(7, 7.5)); path.addLine(to: P(7.4, 7.5))
+            path.move(to: P(7, 16.5)); path.addLine(to: P(7.4, 16.5))
+        case .box:
+            path.move(to: P(21, 8)); path.addLine(to: P(12, 3)); path.addLine(to: P(3, 8))
+            path.addLine(to: P(12, 13)); path.addLine(to: P(21, 8)); path.close()
+            path.move(to: P(3, 8)); path.addLine(to: P(3, 16)); path.addLine(to: P(12, 21))
+            path.addLine(to: P(21, 16)); path.addLine(to: P(21, 8))
+            path.move(to: P(12, 13)); path.addLine(to: P(12, 21))
+        case .spark:
+            let segs: [(CGFloat, CGFloat, CGFloat, CGFloat)] = [
+                (12, 3, 12, 7), (12, 17, 12, 21), (3, 12, 7, 12), (17, 12, 21, 12),
+                (5.6, 5.6, 8.4, 8.4), (15.6, 15.6, 18.4, 18.4),
+                (18.4, 5.6, 15.6, 8.4), (8.4, 15.6, 5.6, 18.4),
+            ]
+            for (x1, y1, x2, y2) in segs { path.move(to: P(x1, y1)); path.addLine(to: P(x2, y2)) }
+        }
+        stroke.setStroke()
+        path.lineWidth = 1.6 * unit
+        path.lineCapStyle = .round
+        path.lineJoinStyle = .round
+        path.stroke()
     }
 }
