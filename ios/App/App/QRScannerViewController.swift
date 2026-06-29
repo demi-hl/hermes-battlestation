@@ -67,7 +67,7 @@ final class QRScannerViewController: UIViewController {
         view.addSubview(reticle)
 
         let hint = UILabel()
-        hint.text = "Point at the QR from `npm run pair`"
+        hint.text = "Point at the QR from `cd hermes-battlestation && npm run pair`"
         hint.font = UIFont(name: "Collapse-Regular", size: 14) ?? .systemFont(ofSize: 14)
         hint.textColor = peach
         hint.textAlignment = .center

@@ -270,10 +270,10 @@ class ServerSetupViewController: UIViewController {
             p.text = "If the form accepted your token, Battlestation loads the dashboard. Need to retry? Go back and paste the URL + token from the box."
         case .haveBox:
             h.text = "Here's your next step"
-            p.text = "Finish the box setup, run `npm run pair` or `npm run token`, then go back to “I already have a server” and connect with the URL + token the box prints."
+            p.text = "Finish the box setup, run `cd hermes-battlestation && npm run pair` or `cd hermes-battlestation && npm run token`, then go back to “I already have a server” and connect with the URL + token the box prints."
             cardBody.addArrangedSubview(h); cardBody.addArrangedSubview(p)
-            cardBody.addArrangedSubview(copyRow("npm run pair"))
-            cardBody.addArrangedSubview(copyRow("npm run token"))
+            cardBody.addArrangedSubview(copyRow("cd hermes-battlestation && npm run pair"))
+            cardBody.addArrangedSubview(copyRow("cd hermes-battlestation && npm run token"))
             return
         default:
             h.text = "Here's your next step"
@@ -300,7 +300,7 @@ class ServerSetupViewController: UIViewController {
         scanBtn.addTarget(self, action: #selector(openScanner), for: .touchUpInside)
         cardBody.addArrangedSubview(scanBtn)
         let scanHelp = UILabel()
-        scanHelp.text = "Opens the camera in-app. Point at the QR from `npm run pair`. Connects instantly, nothing to type."
+        scanHelp.text = "Opens the camera in-app. Point at the QR from `cd hermes-battlestation && npm run pair`. Connects instantly, nothing to type."
         scanHelp.font = body(11); scanHelp.textColor = textTertiary; scanHelp.numberOfLines = 0
         cardBody.addArrangedSubview(scanHelp)
 
@@ -325,7 +325,7 @@ class ServerSetupViewController: UIViewController {
         pasteBtn.addTarget(self, action: #selector(pasteAndConnect), for: .touchUpInside)
         cardBody.addArrangedSubview(pasteBtn)
         let pairHelp = UILabel()
-        pairHelp.text = "On your box run `npm run pair` and paste the link it prints. Carries the URL and token together, no typing."
+        pairHelp.text = "On your box run `cd hermes-battlestation && npm run pair` and paste the link it prints. Carries the URL and token together, no typing."
         pairHelp.font = body(11); pairHelp.textColor = textTertiary; pairHelp.numberOfLines = 0
         cardBody.addArrangedSubview(pairHelp)
 
@@ -364,8 +364,8 @@ class ServerSetupViewController: UIViewController {
         cardBody.addArrangedSubview(para("serve:vps builds the server, mints a BATTLESTATION_TOKEN, installs a reboot-proof systemd --user service, and fronts it with Tailscale Serve.", tertiary: true))
         cardBody.addArrangedSubview(stepLabel(3, "Pair this app"))
         cardBody.addArrangedSubview(para("serve:vps prints a QR + link at the end. To reprint it, or grab the raw token to paste into Connect:", tertiary: true))
-        cardBody.addArrangedSubview(copyRow("npm run pair"))
-        cardBody.addArrangedSubview(copyRow("npm run token"))
+        cardBody.addArrangedSubview(copyRow("cd hermes-battlestation && npm run pair"))
+        cardBody.addArrangedSubview(copyRow("cd hermes-battlestation && npm run token"))
     }
 
     private func buildNewToHermes() {
@@ -627,7 +627,7 @@ class ServerSetupViewController: UIViewController {
 
     @objc private func pasteAndConnect() {
         guard let parsed = parsePairingLink(pairField.text ?? "") else {
-            errorLabel.text = "That doesn't look like a pairing link. Paste the link from `npm run pair`."
+            errorLabel.text = "That doesn't look like a pairing link. Paste the link from `cd hermes-battlestation && npm run pair`."
             return
         }
         let base = !parsed.url.isEmpty ? parsed.url : normalizedURL(urlField.text ?? "")
