@@ -2,7 +2,7 @@
 // it in a window. This is what turns the cockpit into a downloadable desktop app:
 // the user runs the installer, we start their LOCAL node server (talking to their
 // own `hermes`, repos, ssh) and render it. Nothing phones home.
-const { app, BrowserWindow, shell, dialog } = require("electron");
+const { app, BrowserWindow, shell, dialog, ipcMain } = require("electron");
 const { spawn } = require("node:child_process");
 const path = require("node:path");
 const http = require("node:http");
@@ -113,6 +113,48 @@ function ensureToken() {
 
 // In a packaged app the standalone server is unpacked next to resources.
 // In dev we point at the repo's built standalone output.
+
+// Persist a chosen remote target (URL + optional token) to the user env file so
+// the choice sticks across launches — the desktop equivalent of the iOS app's
+// Keychain pairing. Writes BATTLESTATION_REMOTE_URL (+ BATTLESTATION_TOKEN when
+// the pairing link carried one) with 0600 perms. Never logged.
+function persistRemote(url, token) {
+  const dir = userConfigDir();
+  const file = path.join(dir, "battlestation.env");
+  fs.mkdirSync(dir, { recursive: true });
+  let lines = [];
+  try {
+    lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+  } catch {
+    // no file yet
+  }
+  const setKey = (key, value) => {
+    const idx = lines.findIndex((l) => l.trim().startsWith(key + "="));
+    const entry = `${key}=${value}`;
+    if (idx >= 0) lines[idx] = entry;
+    else lines.push(entry);
+  };
+  setKey("BATTLESTATION_REMOTE_URL", url);
+  if (token) setKey("BATTLESTATION_TOKEN", token);
+  fs.writeFileSync(file, lines.join("\n").replace(/\n+$/, "") + "\n", { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
+}
+
+// Clear the persisted remote target so the next launch boots a local server
+// (the "use a local server instead" path).
+function clearRemote() {
+  const file = path.join(userConfigDir(), "battlestation.env");
+  let lines = [];
+  try {
+    lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+  } catch {
+    return;
+  }
+  lines = lines.filter((l) => !l.trim().startsWith("BATTLESTATION_REMOTE_URL="));
+  fs.writeFileSync(file, lines.join("\n").replace(/\n+$/, "") + "\n", { mode: 0o600 });
+}
+
+
 function serverEntry() {
   if (isDev) {
     return path.join(__dirname, "..", ".next", "standalone", "server.js");
@@ -200,9 +242,9 @@ async function startServer() {
 
 // Resolve a remote thin-client target, if configured. When set, the desktop
 // app does NOT spawn a local server — it loads the remote Hermes box directly,
-// exactly like the iOS app / PWA (same profiles + sessions, mirrored). This is
-// the open-source "connect to your own setup from any machine" path. Without
-// it, the app spawns a local server as before (single-machine desktop).
+// exactly like the iOS app / PWA (same profiles + sessions, mirrored). Reads
+// the live env first (a real var still forces it), then the persisted choice
+// written by the Connect screen.
 function remoteTarget() {
   const env = loadUserEnv();
   const raw = (process.env.BATTLESTATION_REMOTE_URL || env.BATTLESTATION_REMOTE_URL || "").trim();
@@ -212,13 +254,45 @@ function remoteTarget() {
   return u;
 }
 
-async function createWindow() {
+// Has the user already made a choice (paired a remote, or explicitly picked a
+// local server)? If neither, first launch shows the native Connect screen.
+function hasChosenMode() {
+  if (remoteTarget()) return true;
+  const env = loadUserEnv();
+  return (process.env.BATTLESTATION_MODE || env.BATTLESTATION_MODE || "").trim() === "local";
+}
+
+function persistLocalChoice() {
+  const dir = userConfigDir();
+  const file = path.join(dir, "battlestation.env");
+  fs.mkdirSync(dir, { recursive: true });
+  let lines = [];
+  try {
+    lines = fs.readFileSync(file, "utf8").split(/\r?\n/);
+  } catch {
+    // no file yet
+  }
+  const idx = lines.findIndex((l) => l.trim().startsWith("BATTLESTATION_MODE="));
+  if (idx >= 0) lines[idx] = "BATTLESTATION_MODE=local";
+  else lines.push("BATTLESTATION_MODE=local");
+  fs.writeFileSync(file, lines.join("\n").replace(/\n+$/, "") + "\n", { mode: 0o600 });
+  fs.chmodSync(file, 0o600);
+}
+
+// Load the native Connect screen into the window. The user pastes a pairing
+// link (URL + token) and we persist + reload into the chosen target — the
+// desktop equivalent of the iOS app's native onboarding. No env editing.
+function showConnect() {
+  win.loadFile(path.join(__dirname, "connect.html"));
+}
+
+// Boot the dashboard for whatever mode is configured (remote box or local
+// server). Called on launch when a choice exists, and after the Connect screen
+// saves a new one.
+async function showDashboard() {
   const remote = remoteTarget();
   let loadTarget;
-
   if (remote) {
-    // Thin-client mode: no local server. The remote box's middleware shows the
-    // Connect screen for the token if it requires one.
     loadTarget = `${remote}/`;
   } else {
     let port;
@@ -231,7 +305,79 @@ async function createWindow() {
     }
     loadTarget = `http://127.0.0.1:${port}/`;
   }
+  win.loadURL(loadTarget);
+}
 
+// IPC from the Connect screen.
+ipcMain.handle("connect:get", () => {
+  return { url: remoteTarget() || "" };
+});
+
+ipcMain.handle("connect:save", async (_evt, payload) => {
+  const url = ((payload && payload.url) || "").trim();
+  const token = ((payload && payload.token) || "").trim();
+  if (!url) return { ok: false, error: "No server URL in the pairing link." };
+  let normalized = url.replace(/\/+$/, "");
+  if (!/^https?:\/\//i.test(normalized)) normalized = "https://" + normalized;
+  // Reachability probe so a bad link fails on the Connect screen, not a blank
+  // dashboard. Token goes in the header the middleware accepts.
+  try {
+    await probeReachable(normalized, token);
+  } catch (e) {
+    return { ok: false, error: String(e && e.message ? e.message : e) };
+  }
+  try {
+    persistRemote(normalized, token);
+    if (token) process.env.BATTLESTATION_TOKEN = token;
+    process.env.BATTLESTATION_REMOTE_URL = normalized;
+  } catch (e) {
+    return { ok: false, error: "Could not save: " + String(e && e.message ? e.message : e) };
+  }
+  await showDashboard();
+  return { ok: true };
+});
+
+ipcMain.handle("connect:local", async () => {
+  try {
+    persistLocalChoice();
+  } catch {
+    // non-fatal: we still boot local this session
+  }
+  await showDashboard();
+  return { ok: true };
+});
+
+// Lightweight HTTPS/HTTP reachability check for a pairing target. Resolves on
+// any HTTP response (even 401/307 — the box is up); rejects on network failure.
+function probeReachable(url, token) {
+  return new Promise((resolve, reject) => {
+    let lib, opts;
+    try {
+      const u = new URL(url + "/");
+      lib = u.protocol === "http:" ? http : require("node:https");
+      opts = {
+        method: "GET",
+        host: u.hostname,
+        port: u.port || (u.protocol === "http:" ? 80 : 443),
+        path: "/",
+        timeout: 8000,
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+      };
+    } catch {
+      reject(new Error("That URL is not valid."));
+      return;
+    }
+    const req = lib.request(opts, (res) => {
+      res.destroy();
+      resolve();
+    });
+    req.on("error", () => reject(new Error("Could not reach that box. Check the URL and that it is online (Tailscale up?).")));
+    req.on("timeout", () => { req.destroy(); reject(new Error("Connection timed out reaching the box.")); });
+    req.end();
+  });
+}
+
+async function createWindow() {
   win = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -244,6 +390,7 @@ async function createWindow() {
     webPreferences: {
       contextIsolation: true,
       nodeIntegration: false,
+      preload: path.join(__dirname, "connect-preload.cjs"),
     },
   });
 
@@ -259,7 +406,14 @@ async function createWindow() {
     return { action: "deny" };
   });
 
-  win.loadURL(loadTarget);
+  // First launch with no choice yet → native Connect screen. Once paired (or
+  // local chosen), every later launch goes straight to the dashboard.
+  if (hasChosenMode()) {
+    await showDashboard();
+  } else {
+    showConnect();
+  }
+
   win.on("closed", () => {
     win = null;
   });
