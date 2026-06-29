@@ -41,8 +41,10 @@ export const SERVER_SETUP = {
   //    reboot-proof systemd --user service, and fronts it with tailscale serve.
   install: "npm install",
   serve: "npm run serve:vps",
-  // 3a. Pair a device with a scannable QR (preferred on mobile).
-  pair: "npm run pair",
+  // 3a. Pair a device with a scannable QR (preferred on mobile). Self-contained
+  //     so it works pasted into a fresh shell / an agent, not only right after
+  //     the clone step (npm run pair alone fails with ENOENT outside the repo).
+  pair: "cd hermes-battlestation && npm run pair",
   // 3b. Or just print the access token to paste into Connect.
-  token: "npm run token",
+  token: "cd hermes-battlestation && npm run token",
 };

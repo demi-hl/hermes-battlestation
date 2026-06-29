@@ -225,7 +225,7 @@ The same server is wrapped by Capacitor for iOS. Point the native shell at your 
 The public build ships with no baked server URL, so first launch opens a self-contained native
 setup wizard (no Safari, no Chrome handoff). It is a fixed single screen, not a scroller:
 
-1. **Paste a pairing link** from `npm run pair` on your box, or **scan its QR in-app** (built-in
+1. **Paste a pairing link** from `cd hermes-battlestation && npm run pair` on your box, or **scan its QR in-app** (built-in
    camera scanner, never the system Camera app). Both carry your box URL plus a token.
 2. The app stores the URL in `UserDefaults` and the token in the Keychain, then boots straight to
    your dashboard over the tailnet.

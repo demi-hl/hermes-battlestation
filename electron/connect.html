@@ -118,7 +118,7 @@
       <div class="word">BATTLESTATION</div>
     </div>
     <h1>Connect to your Hermes</h1>
-    <p class="lead">Paste a pairing link from your box (run <code>npm run pair</code> on it). Same profiles and sessions, mirrored across every device. Nothing is baked into this app.</p>
+    <p class="lead">Paste a pairing link from your box (run <code>cd hermes-battlestation && npm run pair</code> on it). Same profiles and sessions, mirrored across every device. Nothing is baked into this app.</p>
 
     <div class="field">
       <label for="pair">Pairing link</label>
@@ -164,7 +164,7 @@
       err.textContent = "";
       const parsed = parsePairing(pair.value);
       if (!parsed || !parsed.url) {
-        err.textContent = "That doesn't look like a pairing link. Run npm run pair on your box and paste the link.";
+        err.textContent = "That doesn't look like a pairing link. Run 'cd hermes-battlestation && npm run pair' on your box and paste the link.";
         return;
       }
       $("go").disabled = true;

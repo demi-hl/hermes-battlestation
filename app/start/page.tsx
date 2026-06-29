@@ -397,8 +397,8 @@ function FinalStep({ choice }: { choice: Choice }) {
           Here&apos;s your next step
         </h2>
         <p className="font-mono-ui text-[0.7rem] leading-relaxed text-text-secondary">
-          Finish the box setup, run <code className="text-text-primary">npm run pair</code>{" "}
-          or <code className="text-text-primary">npm run token</code>, then connect this
+          Finish the box setup, run <code className="text-text-primary">cd hermes-battlestation && npm run pair</code>{" "}
+          or <code className="text-text-primary">cd hermes-battlestation && npm run token</code>, then connect this
           app with the URL + token the box prints.
         </p>
         <a
@@ -448,8 +448,8 @@ function HaveServer() {
       />
       <p className="font-mono-ui text-[0.62rem] leading-relaxed text-text-tertiary">
         Don&apos;t have the token handy? On the box, run{" "}
-        <code className="text-text-secondary">npm run token</code> to print it,
-        or <code className="text-text-secondary">npm run pair</code> for a QR.
+        <code className="text-text-secondary">cd hermes-battlestation && npm run token</code> to print it,
+        or <code className="text-text-secondary">cd hermes-battlestation && npm run pair</code> for a QR.
       </p>
     </div>
   );
