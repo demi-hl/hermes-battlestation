@@ -687,7 +687,7 @@ function DetectChip({
         />
         <span className="text-[0.74rem] text-midground">{label}</span>
       </span>
-      <span className="mt-0.5 truncate font-mono-ui text-[0.6rem] text-text-tertiary">
+      <span className="mt-0.5 truncate font-mono-ui text-[0.6rem] text-text-secondary">
         {detail}
       </span>
     </div>
@@ -714,33 +714,41 @@ function Field({
   return (
     <label className="block">
       <span className="mb-1.5 flex items-center gap-1.5">
-        <Icon width={13} height={13} className="text-text-tertiary" />
-        <span className="font-mono-ui text-[0.6rem] uppercase tracking-[0.14em] text-text-tertiary">
+        <Icon width={13} height={13} className="text-text-secondary" />
+        <span className="font-mono-ui text-[0.6rem] uppercase tracking-[0.14em] text-text-secondary">
           {label}
         </span>
-        <span className="text-[0.6rem] text-text-disabled">· {hint}</span>
+        <span className="text-[0.6rem] text-text-tertiary">· {hint}</span>
       </span>
       {multiline ? (
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={(e) => {
+            const el = e.currentTarget;
+            setTimeout(() => el.scrollIntoView({ block: "center" }), 250);
+          }}
           placeholder={placeholder}
           rows={2}
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
-          className="w-full resize-none rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_4%,transparent)] px-3 py-2 font-mono-ui text-[0.78rem] text-midground outline-none placeholder:text-text-disabled focus:border-[color-mix(in_srgb,var(--midground)_30%,transparent)]"
+          className="w-full resize-none rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_4%,transparent)] px-3 py-2 font-mono-ui text-[0.78rem] text-midground outline-none placeholder:text-text-tertiary focus:border-[color-mix(in_srgb,var(--midground)_30%,transparent)]"
         />
       ) : (
         <input
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          onFocus={(e) => {
+            const el = e.currentTarget;
+            setTimeout(() => el.scrollIntoView({ block: "center" }), 250);
+          }}
           placeholder={placeholder}
           autoCapitalize="off"
           autoCorrect="off"
           spellCheck={false}
-          className="w-full rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_4%,transparent)] px-3 py-2 font-mono-ui text-[0.8rem] text-midground outline-none placeholder:text-text-disabled focus:border-[color-mix(in_srgb,var(--midground)_30%,transparent)]"
+          className="w-full rounded-[var(--radius-md)] border border-border bg-[color-mix(in_srgb,var(--midground)_4%,transparent)] px-3 py-2 font-mono-ui text-[0.8rem] text-midground outline-none placeholder:text-text-tertiary focus:border-[color-mix(in_srgb,var(--midground)_30%,transparent)]"
         />
       )}
     </label>
@@ -784,7 +792,7 @@ function Row({
       <span className="flex min-w-0 flex-1 flex-col text-left">
         <span className="text-[0.9rem] text-midground">{label}</span>
         {hint && (
-          <span className="text-[0.68rem] text-text-tertiary">{hint}</span>
+          <span className="text-[0.68rem] text-text-secondary">{hint}</span>
         )}
       </span>
       <span

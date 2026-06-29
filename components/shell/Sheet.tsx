@@ -49,13 +49,33 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
     if (info.offset.y > 120 || info.velocity.y > 650) onClose();
   };
 
+  // iOS WKWebView runs with Keyboard resize:None, so the layout viewport never
+  // shrinks when the keyboard opens — a bottom-anchored sheet stays pinned
+  // BEHIND the keyboard. Track visualViewport.height and clamp the sheet
+  // container to it so the panel floats just above the keyboard.
+  const [vh, setVh] = useState<number | null>(null);
+  useEffect(() => {
+    if (!open) return;
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const sync = () => setVh(vv.height);
+    sync();
+    vv.addEventListener("resize", sync);
+    vv.addEventListener("scroll", sync);
+    return () => {
+      vv.removeEventListener("resize", sync);
+      vv.removeEventListener("scroll", sync);
+    };
+  }, [open]);
+
   if (!mounted) return null;
 
   return createPortal(
     <AnimatePresence>
       {open && (
         <motion.div
-          className="fixed inset-0 z-[120] flex flex-col justify-end"
+          className="fixed inset-x-0 top-0 z-[120] flex flex-col justify-end"
+          style={{ height: vh ? `${vh}px` : "100dvh" }}
           variants={ROOT_V}
           initial="hidden"
           animate="visible"
@@ -75,7 +95,7 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
             aria-label={title}
             className={cn(
               "relative mx-auto w-full max-w-[560px]",
-              "max-h-[82dvh] overflow-hidden",
+              "flex flex-col max-h-full overflow-hidden",
               "rounded-t-[calc(var(--theme-radius)+10px)] border-t border-border",
               "shadow-[0_-18px_48px_-12px_rgba(0,0,0,0.7)]",
               className,
@@ -114,7 +134,7 @@ export function Sheet({ open, onClose, title, children, className }: SheetProps)
               </div>
             )}
 
-            <div className="max-h-[68dvh] overflow-y-auto overscroll-contain px-2.5 pb-2">
+            <div className="flex-1 min-h-0 overflow-y-auto overscroll-contain px-2.5 pb-2">
               {children}
             </div>
           </motion.div>
