@@ -551,6 +551,11 @@ class ServerSetupViewController: UIViewController {
     private func styleInput(_ field: UITextField) {
         field.textColor = .white
         field.font = body(16)
+        if let ph = field.placeholder {
+            field.attributedPlaceholder = NSAttributedString(
+                string: ph,
+                attributes: [.foregroundColor: peachA(0.55), .font: body(16)])
+        }
         field.backgroundColor = UIColor(white: 1, alpha: 0.08)
         field.layer.cornerRadius = 10
         field.setLeftPaddingPoints(12)
