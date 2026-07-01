@@ -4,6 +4,12 @@ import { oauthAvailable } from "@/lib/oauth/nous";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const CORS_HEADERS = {
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Methods": "GET, OPTIONS",
+  "Access-Control-Allow-Headers": "content-type",
+};
+
 // Unauthenticated liveness + auth-mode probe. The Connect screen hits this to
 // learn whether a token is required (and whether Nous sign-in is available)
 // before rendering its login affordances. Never leaks the token or client
@@ -17,11 +23,18 @@ export async function GET() {
   const tailnetTrust =
     process.env.BATTLESTATION_TRUST_TAILNET === "1" &&
     process.env.BATTLESTATION_FUNNEL !== "1";
-  return NextResponse.json({
-    ok: true,
-    app: "hermes-battlestation",
-    authRequired,
-    oauthAvailable: oauthAvailable(),
-    tailnetTrust,
-  });
+  return NextResponse.json(
+    {
+      ok: true,
+      app: "hermes-battlestation",
+      authRequired,
+      oauthAvailable: oauthAvailable(),
+      tailnetTrust,
+    },
+    { headers: CORS_HEADERS },
+  );
+}
+
+export function OPTIONS() {
+  return new NextResponse(null, { status: 204, headers: CORS_HEADERS });
 }

@@ -201,6 +201,20 @@ export function ContextBar() {
             )}
           </div>
 
+          {/* Sessions — left of the model chip; arrows + live count, tap to
+              open the Sessions list. */}
+          <button
+            type="button"
+            onClick={goSessions}
+            aria-label={`${sessionCount} active sessions. Tap to view.`}
+            title={`${sessionCount} active sessions`}
+            className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 px-2 py-1 font-mono-ui text-[0.62rem] text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
+          >
+            <ChevronUpDownIcon width={11} height={11} className="text-text-tertiary" />
+            <span className="tabular text-midground">{sessionCount}</span>
+            <span>{sessionCount === 1 ? "session" : "sessions"}</span>
+          </button>
+
           {/* Model name — tap to switch the per-turn model */}
           <button
             type="button"
@@ -208,7 +222,7 @@ export function ContextBar() {
             aria-label={`Model: ${model.label}. Tap to switch model.`}
             className="flex shrink-0 items-center gap-1 rounded-full border border-border px-2 py-1 text-[0.7rem] text-midground transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
           >
-            <span className="font-mondwest text-display tracking-wide">{model.label}</span>
+            <span className="font-mono-ui text-[0.7rem] tracking-wide">{model.label}</span>
             <ChevronUpDownIcon width={12} height={12} className="text-text-tertiary" />
           </button>
 
@@ -225,26 +239,14 @@ export function ContextBar() {
               {effort}
             </button>
           )}
-
-          {/* Sessions — moved to the TOP row; arrows + live count, tap to open
-              the Sessions list. */}
-          <button
-            type="button"
-            onClick={goSessions}
-            aria-label={`${sessionCount} active sessions. Tap to view.`}
-            title={`${sessionCount} active sessions`}
-            className="flex shrink-0 items-center gap-1 rounded-full border border-border/60 px-2 py-1 font-mono-ui text-[0.62rem] text-text-tertiary transition-colors active:bg-[color-mix(in_srgb,var(--midground)_8%,transparent)]"
-          >
-            <ChevronUpDownIcon width={11} height={11} className="text-text-tertiary" />
-            <span className="tabular text-midground">{sessionCount}</span>
-            <span>{sessionCount === 1 ? "session" : "sessions"}</span>
-          </button>
         </div>
 
         {/* ---- Second row: profile · context meter · pet — evenly spaced,
             nothing clipped (justify-between, each cluster shrink-0). ---- */}
         <div className="border-t border-border/50">
           <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+            {/* Left cluster: profile (default) + pet sitting right beside it. */}
+            <span className="flex min-w-0 shrink-0 items-center gap-2">
             {/* Profile — tap to switch the brain that runs your turns */}
             <button
               type="button"
@@ -268,20 +270,7 @@ export function ContextBar() {
               <ChevronUpDownIcon width={10} height={10} className="text-text-tertiary" />
             </button>
 
-            {/* Context meter + compress — center cluster. */}
-            <span className="flex min-w-0 shrink items-center gap-1.5">
-              <button
-                type="button"
-                onClick={compress}
-                title="Compress context (Ctrl+Shift+C)"
-                className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[0.65rem] text-text-tertiary transition-colors hover:text-midground active:scale-90"
-              >
-                <CompressIcon width={13} height={13} />
-              </button>
-              <ContextMeter pct={pct} used={ctxUsed} total={ctxTotal} />
-            </span>
-
-            {/* Pet marker — right edge (no timer next to `default`). ALWAYS
+            {/* Pet marker — right beside `default`. ALWAYS
                 shown (quiet when idle). The running timer + green glow appear
                 ONLY while an agent turn is in flight (effectiveTurnStart != null
                 — an in-app chat turn OR a gateway turn from Telegram/CLI/cron):
@@ -315,6 +304,20 @@ export function ContextBar() {
               {elapsedLabel && (
                 <span className="text-[color:var(--color-success)]">{elapsedLabel}</span>
               )}
+            </span>
+            </span>
+
+            {/* Context meter + compress — pushed to the right edge. */}
+            <span className="flex min-w-0 shrink items-center justify-end gap-1.5">
+              <button
+                type="button"
+                onClick={compress}
+                title="Compress context (Ctrl+Shift+C)"
+                className="flex shrink-0 items-center gap-1 rounded px-1 py-0.5 text-[0.65rem] text-text-tertiary transition-colors hover:text-midground active:scale-90"
+              >
+                <CompressIcon width={13} height={13} />
+              </button>
+              <ContextMeter pct={pct} used={ctxUsed} total={ctxTotal} />
             </span>
           </div>
         </div>

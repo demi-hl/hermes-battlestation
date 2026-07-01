@@ -28,7 +28,20 @@ export async function POST(req: Request) {
   }
 
   const message = (body.message ?? "").trim();
-  if (!message) return new Response("empty message", { status: 400 });
+
+  // Image attachments (pasted/added in the composer) ride the turn as ACP
+  // image content blocks. Cap count + payload so a fat clipboard paste can't
+  // wedge the bridge; oversize/extra images are dropped silently.
+  const MAX_IMAGES = 6;
+  const MAX_IMG_CHARS = 12_000_000; // ~9MB decoded per image
+  const images = (Array.isArray(body.images) ? body.images : [])
+    .filter((im) => im && typeof im.data === "string" && im.data.length <= MAX_IMG_CHARS)
+    .slice(0, MAX_IMAGES)
+    .map((im) => ({ data: im.data, mime: typeof im.mime === "string" ? im.mime : "image/png" }));
+
+  // A turn is valid with text OR at least one image (an image-only send is a
+  // real prompt for a vision model). Only reject when BOTH are missing.
+  if (!message && images.length === 0) return new Response("empty message", { status: 400 });
 
   const repo = body.repo || "general";
   const branch = body.branch?.trim() || null;
@@ -56,16 +69,6 @@ export async function POST(req: Request) {
   const prompt = skills.length
     ? `Load and follow these skills before responding: ${skills.join(", ")}.\n\n${message}`
     : message;
-
-  // Image attachments (pasted/added in the composer) ride the turn as ACP
-  // image content blocks. Cap count + payload so a fat clipboard paste can't
-  // wedge the bridge; oversize/extra images are dropped silently.
-  const MAX_IMAGES = 6;
-  const MAX_IMG_CHARS = 12_000_000; // ~9MB decoded per image
-  const images = (Array.isArray(body.images) ? body.images : [])
-    .filter((im) => im && typeof im.data === "string" && im.data.length <= MAX_IMG_CHARS)
-    .slice(0, MAX_IMAGES)
-    .map((im) => ({ data: im.data, mime: typeof im.mime === "string" ? im.mime : "image/png" }));
 
   // Which brain runs this turn. Profile is the real lever (spawns
   // `hermes -p <profile> acp`); model/provider are optional per-turn overrides.

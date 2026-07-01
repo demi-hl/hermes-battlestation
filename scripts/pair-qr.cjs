@@ -81,12 +81,28 @@ function lanIp() {
 }
 
 function tailscaleUrl() {
-  // Pull the first https URL tailscale is already serving, if any.
+  // Pull the https URL that proxies to THIS app's port. A box can expose
+  // multiple Tailscale Serve routes; the first one may be the stock dashboard,
+  // and the same app port can be served on several ports. Prefer the CLEANEST
+  // URL (no explicit :port) because a host:port URL makes iOS treat a tapped
+  // link as a search query instead of navigating.
   try {
     const out = execSync("tailscale serve status 2>/dev/null", {
       encoding: "utf8",
       timeout: 4000,
     });
+    const target = `127.0.0.1:${port()}`;
+    const candidates = [];
+    for (const block of out.split(/\n\s*\n/)) {
+      if (!block.includes(target)) continue;
+      const m = block.match(/https:\/\/[^\s]+/);
+      if (m) candidates.push(m[0].replace(/\/+$/, ""));
+    }
+    if (candidates.length) {
+      // A bare https host (https://host) with no :port wins over https://host:9443.
+      const portless = candidates.find((u) => !/^https:\/\/[^/]+:\d+/.test(u));
+      return portless || candidates[0];
+    }
     const m = out.match(/https:\/\/[^\s]+/);
     if (m) return m[0].replace(/\/+$/, "");
   } catch {
@@ -115,22 +131,31 @@ async function main() {
   }
   const base = baseUrl();
   const link = `${base}/?token=${encodeURIComponent(token)}`;
+  // Custom-scheme deep link: tapping/scanning this OPENS the installed iOS app
+  // (battlestation://connect) and boots straight into the dashboard. The https
+  // `link` above is the browser/PWA fallback for anyone without the native app.
+  const appLink = `battlestation://connect?url=${encodeURIComponent(base)}&token=${encodeURIComponent(token)}`;
 
   let QRCode;
   try {
     QRCode = require("qrcode");
   } catch {
     console.error("qrcode dep missing — run `npm install` first.");
-    console.error("\nPairing link:\n  " + link);
+    console.error("\nPairing link (browser):\n  " + link);
+    console.error("\nPairing link (opens the app):\n  " + appLink);
     process.exit(1);
   }
 
-  const qr = await QRCode.toString(link, { type: "terminal", small: true });
+  const qr = await QRCode.toString(appLink, { type: "terminal", small: true });
   console.log("");
   console.log("  Scan to pair a device with this Battlestation:");
+  console.log("  (opens the installed Battlestation app directly)");
   console.log("");
   console.log(qr);
-  console.log("  Or open this link on the device:");
+  console.log("  Open the APP from a device that has it installed:");
+  console.log("  " + appLink);
+  console.log("");
+  console.log("  Or open in a browser / PWA (no app needed):");
   console.log("  " + link);
   console.log("");
   if (base.startsWith("http://")) {

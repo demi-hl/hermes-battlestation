@@ -34,11 +34,28 @@ const DEFAULT_PET: Pet = {
 
 const PET_CHANGED = "pet-changed";
 
-async function fetchPet(): Promise<Pet> {
-  const res = await fetch("/api/pets?mode=info", { cache: "no-store" });
-  if (!res.ok) return DEFAULT_PET;
-  const data = (await res.json()) as { ok?: boolean; pet?: Partial<Pet> };
-  if (!data.ok || !data.pet?.enabled || !Array.isArray(data.pet.frames)) return DEFAULT_PET;
+// Returns the resolved Pet, or null when the fetch was transiently unavailable
+// (network blip / non-2xx / server error). Null means "couldn't determine —
+// keep the current sprite" so a single flaky 30s poll never wipes the sprite to
+// the status dot. DEFAULT_PET is returned ONLY when the server authoritatively
+// reports the pet is off/disabled.
+async function fetchPet(): Promise<Pet | null> {
+  let res: Response;
+  try {
+    res = await fetch("/api/pets?mode=info", { cache: "no-store" });
+  } catch {
+    return null; // network/tailnet blip — keep current sprite
+  }
+  if (!res.ok) return null; // transient 401/5xx — keep current sprite
+  let data: { ok?: boolean; pet?: Partial<Pet> };
+  try {
+    data = (await res.json()) as { ok?: boolean; pet?: Partial<Pet> };
+  } catch {
+    return null;
+  }
+  if (!data.ok) return null; // server-side error envelope — keep current sprite
+  // Authoritative: server responded ok, pet is explicitly off or has no frames.
+  if (!data.pet?.enabled || !Array.isArray(data.pet.frames)) return DEFAULT_PET;
   return {
     id: data.pet.id || "pet",
     label: data.pet.label || data.pet.id || "Pet",
@@ -64,7 +81,9 @@ export function usePet(): {
   const [resolved, setResolved] = useState(false);
 
   const reloadPet = useCallback(async () => {
-    setPet(await fetchPet());
+    const next = await fetchPet();
+    // null = transient failure; keep the current sprite instead of blanking it.
+    if (next) setPet(next);
     setResolved(true);
   }, []);
 

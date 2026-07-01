@@ -70,8 +70,9 @@ export function ConnectForm({
     return u;
   }
 
-  // Parse a pairing deep-link (what `npm run pair` prints / its QR encodes:
-  // `https://box/?token=…`) into its URL + token. Returns null if there's no
+  // Parse a pairing link into its URL + token. Supports both the browser/PWA
+  // fallback (`https://box/?token=…`) and the native app deep link
+  // (`battlestation://connect?url=…&token=…`). Returns null if there's no
   // token to extract. Falls back to treating a bare non-URL string as a raw
   // token so pasting just the token still works.
   function parsePairingLink(raw: string): { url: string; token: string } | null {
@@ -81,6 +82,9 @@ export function ConnectForm({
       const u = new URL(s);
       const tok = u.searchParams.get("token");
       if (!tok) return null;
+      if (u.protocol === "battlestation:") {
+        return { url: u.searchParams.get("url") ?? "", token: tok };
+      }
       return { url: `${u.protocol}//${u.host}`, token: tok };
     } catch {
       // Not a URL — if it has no scheme/space, treat it as a bare token.
@@ -116,13 +120,34 @@ export function ConnectForm({
     window.location.href = "/api/auth/oauth/start";
   }
 
+  function currentPairing(): { url: string; token: string } | null {
+    const parsed = parsePairingLink(pairLink) ?? parsePairingLink(token);
+    const tok = (parsed?.token ?? token).trim();
+    if (!tok) return null;
+    return { url: normalizeUrl(parsed?.url || url || window.location.origin), token: tok };
+  }
+
+  function openNativeApp() {
+    const pairing = currentPairing();
+    if (!pairing) {
+      setStatus("error");
+      setMsg("paste the full pairing link first, or enter the access token");
+      return;
+    }
+    setStatus("idle");
+    setMsg("opening the installed app… if nothing happens, install/update the app or paste the link inside it");
+    window.location.href = `battlestation://connect?url=${encodeURIComponent(pairing.url)}&token=${encodeURIComponent(pairing.token)}`;
+  }
+
   async function connect(e: FormEvent) {
     e.preventDefault();
     await doConnect(url, token);
   }
 
   async function doConnect(rawUrl: string, rawToken: string) {
-    const tok = rawToken.trim();
+    const pastedPairing = parsePairingLink(rawToken);
+    const effectiveUrl = pastedPairing?.url || rawUrl;
+    const tok = (pastedPairing?.token ?? rawToken).trim();
     if (!tok) {
       setStatus("error");
       setMsg("token is required");
@@ -131,7 +156,7 @@ export function ConnectForm({
     setStatus("checking");
     setMsg(null);
 
-    const target = normalizeUrl(rawUrl);
+    const target = normalizeUrl(effectiveUrl);
     const here = window.location.origin;
 
     // Different box → hand off the whole app to that URL with the token.
@@ -140,15 +165,6 @@ export function ConnectForm({
         localStorage.setItem(LS_URL, target);
       } catch {
         /* ignore */
-      }
-      // Probe it first so we fail loudly here instead of a blank redirect.
-      try {
-        const probe = await fetch(`${target}/api/health`, { cache: "no-store" });
-        if (!probe.ok) throw new Error(String(probe.status));
-      } catch {
-        setStatus("error");
-        setMsg(`couldn't reach ${target} — check the URL and that the box is reachable`);
-        return;
       }
       window.location.href = `${target}/?token=${encodeURIComponent(tok)}`;
       return;
@@ -274,9 +290,19 @@ export function ConnectForm({
         >
           {status === "checking" ? "Connecting…" : "Paste & connect"}
         </button>
+        <button
+          type="button"
+          onClick={openNativeApp}
+          disabled={status === "checking" || (!pairLink.trim() && !token.trim())}
+          className="rounded-full border border-midground/45 px-4 py-2 text-[0.76rem] font-medium text-midground transition-opacity hover:opacity-90 disabled:opacity-40"
+        >
+          Open installed iOS app
+        </button>
         <span className="font-mono-ui text-[0.58rem] leading-snug text-text-tertiary">
           On your box run <code className="text-text-secondary">npm run pair</code> and paste
-          the link it prints — carries the URL and token together, no typing.
+          the link it prints — carries the URL and token together, no typing. The
+          app button uses the <code className="text-text-secondary">battlestation://</code>
+          deep link, which only opens if the native app is installed.
         </span>
       </div>
 

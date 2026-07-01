@@ -2,6 +2,12 @@
 # Next standalone server omits static/ + public/ — copy them in so /_next/static
 # and public assets serve (else CSS/JS 404 -> unstyled app). Idempotent.
 cd "$(dirname "$0")/.." || exit 0
-[ -d .next/static ] && cp -r .next/static .next/standalone/.next/static 2>/dev/null
-[ -d public ] && cp -r public/. .next/standalone/public/ 2>/dev/null
+mkdir -p .next/standalone/.next .next/standalone/public
+if [ -d .next/static ]; then
+  rm -rf .next/standalone/.next/static
+  cp -R .next/static .next/standalone/.next/static
+fi
+if [ -d public ]; then
+  cp -R public/. .next/standalone/public/
+fi
 exit 0
